@@ -31,6 +31,52 @@ export const runtime = "nodejs";
 
 const MAX_CSV_BYTES = 200 * 1024 * 1024; // 单文件 200 MB
 const UNCATEGORIZED_DIR = "_uncategorized"; // csvType=null 时落盘的子目录
+const MAX_STORE_NAME_LEN = 180;
+
+/**
+ * 清理 agent 上报的文件名,变成可安全落盘的名字。
+ * - 剥掉路径分量(只留 basename),防 `..` / 绝对路径穿越
+ * - 去掉控制字符和 Windows 保留字符 < > : " | ? *
+ * - 限长 180
+ * - 全空 / 全 . 视为无效返回 null
+ */
+function sanitizeFileName(name: string | null): string | null {
+  if (!name) return null;
+  // 同时按正反斜杠取 basename
+  const base = name.split(/[\\/]/).pop() ?? "";
+  const cleaned = base
+    .replace(/[\x00-\x1f<>:"|?*]/g, "")
+    .replace(/^\.+/, "")
+    .trim()
+    .slice(0, MAX_STORE_NAME_LEN);
+  if (!cleaned || cleaned === "." || cleaned === "..") return null;
+  return cleaned;
+}
+
+/**
+ * 决定写到磁盘上的最终文件名:
+ *   1. fileName 无效 → 用 `${datasetId}.csv`
+ *   2. fileName 有效但目录里已有同名 → 在 stem 后追加 `__<8charId>`
+ *   3. fileName 有效且不撞名 → 直接用
+ */
+async function pickStoreName(
+  dir: string,
+  fileName: string | null,
+  datasetId: string,
+): Promise<string> {
+  const safe = sanitizeFileName(fileName);
+  if (!safe) return `${datasetId}.csv`;
+  const target = path.join(dir, safe);
+  try {
+    await fs.access(target);
+    // 撞名:加 datasetId 短码保唯一
+    const ext = path.extname(safe);
+    const stem = ext ? safe.slice(0, -ext.length) : safe;
+    return `${stem}__${datasetId.slice(0, 8)}${ext || ".csv"}`;
+  } catch {
+    return safe;
+  }
+}
 
 type DatasetSummary = {
   csvType: string | null;
@@ -168,11 +214,14 @@ export const POST = route(async (req, { params }) => {
     const csvTypeDir = csvType ?? UNCATEGORIZED_DIR;
     const dir = path.join(process.cwd(), "data", "raw", csvTypeDir);
     await fs.mkdir(dir, { recursive: true });
-    const storagePath = path.posix.join("data", "raw", csvTypeDir, `${datasetId}.csv`);
-    await fs.writeFile(path.join(dir, `${datasetId}.csv`), buf);
+
+    // 文件名优先用 agent 上报的原始名;非法 / 缺失 / 撞名时用 datasetId 兜底
+    const fileName = typeof file.name === "string" ? file.name : null;
+    const storeName = await pickStoreName(dir, fileName, datasetId);
+    const storagePath = path.posix.join("data", "raw", csvTypeDir, storeName);
+    await fs.writeFile(path.join(dir, storeName), buf);
 
     const contentHash = crypto.createHash("sha256").update(buf).digest("hex");
-    const fileName = typeof file.name === "string" ? file.name : null;
 
     await prisma.rawDataset.create({
       data: {

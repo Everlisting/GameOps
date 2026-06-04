@@ -149,7 +149,7 @@ export default async function JobDetailPage({
       <div className="mb-6 grid items-stretch gap-4 lg:grid-cols-3">
         {/*
           运行配置卡:用 flex-col 让自身和右侧"立即触发"卡同高(items-stretch),
-          内部各 KV 行用 flex-1 + justify-around 均匀分布;min-h-[420px] 保底,
+          内部各 KV 行用 flex-1 + justify-around 均匀分布;min-h-[300px] 保底,
           字段少时也不会被压扁。
         */}
         <Card className="flex min-h-[300px] flex-col p-4 lg:col-span-2">

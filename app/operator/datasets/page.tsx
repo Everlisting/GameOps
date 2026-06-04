@@ -89,14 +89,14 @@ export default async function OperatorDatasetsPage({
               {items.map((d) => (
                 <tr key={d.id} className="transition-colors hover:bg-muted/40">
                   <td className="px-3 py-2.5 align-top">
-                    <div className="font-mono text-xs">{d.id}</div>
+                    <div className="truncate text-xs font-medium">
+                      {d.fileName ?? <span className="text-muted-foreground">(无文件名)</span>}
+                    </div>
                     <div className="text-[11px] text-muted-foreground">
                       {d.csvType
                         ? (CSV_TYPE_LABEL[d.csvType] ?? d.csvType)
                         : <span className="italic">未分类</span>}
-                      {d.fileName && (
-                        <span className="ml-1 opacity-60">· {d.fileName}</span>
-                      )}
+                      <span className="ml-1 font-mono opacity-60">· {d.id}</span>
                     </div>
                   </td>
                   <td className="px-3 py-2.5 align-top text-xs">

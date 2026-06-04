@@ -9,6 +9,7 @@ import {
   CalendarRange,
   ClipboardCheck,
   Database,
+  FileSpreadsheet,
   LayoutGrid,
   Lightbulb,
   ListChecks,
@@ -121,6 +122,11 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
       { title: "全部机器", url: "/operator/admin/agents" },
       { title: "已停用", url: "/operator/admin/agents?status=DISABLED" },
     ],
+  },
+  {
+    title: "csvType 管理",
+    url: "/operator/admin/csv-types",
+    icon: FileSpreadsheet,
   },
 ];
 
