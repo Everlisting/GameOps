@@ -19,6 +19,7 @@ import ActivityStats, {
   type EnrollmentItem,
   type SubmissionItem,
 } from "./_components/ActivityStats";
+import IncentiveSection from "./_components/IncentiveSection";
 
 /** 弹窗内最多展示多少条;超出走「去稿件审核」走完整页 */
 const DIALOG_LIST_LIMIT = 200;
@@ -168,6 +169,10 @@ export default async function ActivityDetailPage({
           rewardRules: rules,
         }}
       />
+
+      <div className="mt-6">
+        <IncentiveSection activityId={a.id} hasRules={rules.length > 0} />
+      </div>
     </div>
   );
 }

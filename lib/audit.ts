@@ -26,9 +26,19 @@ export type AuditAction =
   | "agent.create"
   | "agent.update"
   | "agent.delete"
-  | "agent.rotateToken";
+  | "agent.rotateToken"
+  // 阶段5 · 激励引擎
+  | "incentive.compute"   // 全活动重算预估
+  | "incentive.adjust";   // 单条人工调整
 
-export type AuditTargetType = "task" | "job" | "agent" | "dataset" | "user";
+export type AuditTargetType =
+  | "task"
+  | "job"
+  | "agent"
+  | "dataset"
+  | "user"
+  | "activity"   // 阶段5 · compute 落到 activity
+  | "incentive"; // 阶段5 · adjust 落到 incentive
 
 export interface AuditOpts {
   /** 操作人 user.id;null = 系统(cron 自动触发) */

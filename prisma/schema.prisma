@@ -106,6 +106,9 @@ model User {
   createdTasks    CrawlerTask[]  @relation("createdTasks")
   createdCsvTypes CsvType[]      @relation("createdCsvTypes")
 
+  // 阶段5 · 激励人工调整记录
+  adjustedIncentives Incentive[] @relation("adjustedIncentives")
+
   // 审计:作为操作人留下的痕迹
   auditLogs       AuditLog[]
 }
@@ -159,6 +162,7 @@ model Creator {
   enrollments     ActivityEnrollment[]
   videoStats      VideoStat[]      // 阶段4 · 抖音视频明细按 dyUid 匹配
   dailyVideoStats DailyVideoStat[] // 阶段4.3 · 当日快照
+  incentives      Incentive[]     // 阶段5 · 各活动激励快照
 }
 
 model Activity {
@@ -176,6 +180,7 @@ model Activity {
 
   submissions Submission[]
   enrollments ActivityEnrollment[]
+  incentives  Incentive[] // 阶段5 · 本活动的所有激励记录
 
   @@index([status, startAt])
   @@index([status, publishAt])
@@ -447,4 +452,32 @@ model DailyVideoStat {
   @@index([snapshotDate])
   @@index([creatorId, snapshotDate])
   @@index([videoStatId, snapshotDate])
+}
+
+// 阶段5 · 激励 / 结算快照。
+// 每个 (creatorId, activityId) 一行;运营点"计算预估"时 upsert(重跑覆盖 estimated/breakdown/computedAt)。
+// adjusted 是人工调整后的最终值;有值则结算以它为准,审计写在 AuditLog(action="incentive.adjust")。
+// breakdown 落引擎 IncentiveContribution[] JSON,前端展开看"每条规则贡献多少"。
+model Incentive {
+  id           String    @id @default(cuid())
+  creatorId    String
+  activityId   String
+  estimated    Decimal   @db.Decimal(12, 2) // 引擎最新一次计算结果
+  adjusted     Decimal?  @db.Decimal(12, 2) // 人工调整后的金额;null = 沿用 estimated
+  adjustedById String?                       // 调整操作人;null = 未调整
+  adjustedAt   DateTime?
+  adjustReason String?                       // 调整原因(便于审计 / 创作者沟通)
+  breakdown    Json      @default("[]")      // IncentiveContribution[] 快照
+  computedAt   DateTime  @default(now())     // 最近一次跑引擎时间
+  status       String    @default("estimated") // estimated / settled(阶段5 只做 estimated,settled 留位)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  creator    Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  adjustedBy User?    @relation("adjustedIncentives", fields: [adjustedById], references: [id], onDelete: SetNull)
+
+  @@unique([creatorId, activityId])
+  @@index([activityId])
+  @@index([creatorId, status])
 }
