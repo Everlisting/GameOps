@@ -501,7 +501,7 @@ function AdjustDialog({
               id="adj-amount"
               type="number"
               min={0}
-              step="0.01"
+              step="1"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="留空 = 不锁定,沿用预估"

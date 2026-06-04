@@ -191,7 +191,10 @@ function applyRule(
 }
 
 // ── TIER ───────────────────────────────────────────────────
-// 第一个 (min,max] 命中区间生效;tiers 顺序运营端自己排,不强制升序。
+// 区间语义 (min, max]:下限严格 >,上限闭合。
+// 例:tier(100, 999) 表示 metric 严格大于 100 且 <= 999 才命中。
+// 想包含 0 的"零档"用 (-1, X] 之类绕(目前 schema min 不允许负;0 档建议另起一条 ACTIVITY_THRESHOLD 之类)。
+// tiers 顺序运营端自己排,不强制升序;取第一个命中。
 function applyTier(
   rule: TierRule,
   ruleIndex: number,
@@ -201,7 +204,7 @@ function applyTier(
   for (const c of creators) {
     const v = getMetric(c, rule.metric);
     const hit = rule.tiers.find(
-      (t) => v >= t.min && (t.max == null || v <= t.max),
+      (t) => v > t.min && (t.max == null || v <= t.max),
     );
     if (!hit) continue;
     const lim = applyLimits(hit.amount, c.views, rule.cap, rule.cpmCap);
@@ -210,7 +213,7 @@ function applyTier(
       kind: "TIER",
       raw: hit.amount,
       ...lim,
-      note: `命中 [${hit.min}, ${hit.max ?? "∞"}]`,
+      note: `命中 (${hit.min}, ${hit.max ?? "∞"}]`,
     });
   }
   return out;

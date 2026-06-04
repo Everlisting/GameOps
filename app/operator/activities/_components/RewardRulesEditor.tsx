@@ -263,7 +263,7 @@ function CapField({
         <Input
           type="number"
           min={0}
-          step="0.01"
+          step="1"
           value={cap ?? ""}
           placeholder="不填 = 无上限"
           onChange={(e) =>
@@ -297,7 +297,7 @@ function CpmCapField({
         <Input
           type="number"
           min={0}
-          step="0.01"
+          step="1"
           value={cpmCap ?? ""}
           placeholder="不填 = 无上限"
           onChange={(e) =>
@@ -369,7 +369,7 @@ function TierEditor({
 
       <div>
         <div className="mb-1.5 grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-xs text-muted-foreground">
-          <span>区间下限(≥)</span>
+          <span>区间下限(&gt;,严格大于)</span>
           <span>区间上限(≤,留空 = 不封顶)</span>
           <span>金额(元)</span>
           <span />
@@ -402,7 +402,7 @@ function TierEditor({
               <Input
                 type="number"
                 min={0}
-                step="0.01"
+                step="1"
                 value={t.amount}
                 onChange={(e) =>
                   setTier(i, { amount: Number(e.target.value) || 0 })
@@ -555,7 +555,7 @@ function FormulaEditor({
         <Input
           type="number"
           value={numInput}
-          step="0.01"
+          step="1"
           placeholder="输入数字"
           className="h-8 w-32"
           onChange={(e) => setNumInput(e.target.value)}
@@ -667,7 +667,7 @@ function SharePoolEditor({
         <Input
           type="number"
           min={0}
-          step="0.01"
+          step="1"
           value={rule.pool}
           onChange={(e) =>
             onChange({ ...rule, pool: Number(e.target.value) || 0 })
@@ -764,7 +764,7 @@ function RankEditor({
               <Input
                 type="number"
                 min={0}
-                step="0.01"
+                step="1"
                 value={r.amount}
                 onChange={(e) =>
                   setRank(i, { amount: Number(e.target.value) || 0 })
@@ -818,7 +818,7 @@ function PerSubmissionEditor({
           <Input
             type="number"
             min={0}
-            step="0.01"
+            step="1"
             value={rule.amount}
             onChange={(e) =>
               onChange({ ...rule, amount: Number(e.target.value) || 0 })
@@ -899,7 +899,7 @@ function ActivityThresholdEditor({
           <Input
             type="number"
             min={0}
-            step="0.01"
+            step="1"
             value={rule.amount}
             onChange={(e) =>
               onChange({ ...rule, amount: Number(e.target.value) || 0 })
@@ -952,7 +952,7 @@ function BasePlusStepEditor({
           <Input
             type="number"
             min={0}
-            step="0.01"
+            step="1"
             value={rule.baseAmount}
             onChange={(e) =>
               onChange({ ...rule, baseAmount: Number(e.target.value) || 0 })
@@ -992,7 +992,7 @@ function BasePlusStepEditor({
           <Input
             type="number"
             min={0}
-            step="0.01"
+            step="1"
             value={rule.stepAmount}
             onChange={(e) =>
               onChange({ ...rule, stepAmount: Number(e.target.value) || 0 })

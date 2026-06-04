@@ -55,13 +55,26 @@ describe("TIER", () => {
   it("命中中间档", () => {
     const r = computeIncentives([rule], [mk("a", { views: 500 })]);
     expect(r.get("a")?.estimated).toBe(10);
-    expect(r.get("a")?.breakdown[0]?.note).toBe("命中 [100, 999]");
+    expect(r.get("a")?.breakdown[0]?.note).toBe("命中 (100, 999]");
   });
 
   it("命中无上限档", () => {
     const r = computeIncentives([rule], [mk("a", { views: 50000 })]);
     expect(r.get("a")?.estimated).toBe(50);
-    expect(r.get("a")?.breakdown[0]?.note).toBe("命中 [1000, ∞]");
+    expect(r.get("a")?.breakdown[0]?.note).toBe("命中 (1000, ∞]");
+  });
+
+  it("下限严格 >:v 等于 min 不命中", () => {
+    // v=100 既不满足 (0, 99] 也不满足 (100, 999](100 > 100 为假)
+    const r = computeIncentives([rule], [mk("a", { views: 100 })]);
+    expect(r.get("a")?.estimated).toBe(0);
+    expect(r.get("a")?.breakdown).toEqual([]);
+  });
+
+  it("上限闭合:v 等于 max 命中", () => {
+    // v=999:999 > 100 ✓ 且 999 <= 999 ✓
+    const r = computeIncentives([rule], [mk("a", { views: 999 })]);
+    expect(r.get("a")?.estimated).toBe(10);
   });
 
   it("cap 截断", () => {
@@ -627,10 +640,14 @@ describe("组合叠加", () => {
       {
         kind: "TIER",
         metric: "views",
+        // TIER 下限严格 >,所以这里需要 views > 0 才命中
         tiers: [{ min: 0, amount: 1 }],
       },
     ];
-    const r = computeIncentives(rules, [mk("a", { submissions: 1 })]);
+    const r = computeIncentives(
+      rules,
+      [mk("a", { submissions: 1, views: 1 })],
+    );
     expect(r.get("a")?.breakdown.map((b) => b.kind)).toEqual([
       "PER_SUBMISSION",
       "TIER",
