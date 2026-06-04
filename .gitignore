@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.env
+.env.local
+*.log
+
+# 运行时上传产物(保留目录占位)
+public/uploads/**/*
+!public/uploads/**/.gitkeep
+
+# 爬虫原始 CSV 落盘目录(只保留路径,内容不入库)
+data/raw/**/*
+!data/raw/**/.gitkeep
