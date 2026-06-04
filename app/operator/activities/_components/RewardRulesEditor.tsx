@@ -218,6 +218,12 @@ export default function RewardRulesEditor({
               cap={rule.cap}
               onChange={(cap) => update(i, { ...rule, cap } as RewardRule)}
             />
+            <CpmCapField
+              cpmCap={rule.cpmCap}
+              onChange={(cpmCap) =>
+                update(i, { ...rule, cpmCap } as RewardRule)
+              }
+            />
           </Card>
         ))
       )}
@@ -269,6 +275,40 @@ function CapField({
         />
         <span className="text-[11px] text-muted-foreground">
           引擎结算时取 min(计算值, 上限)
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── 共用:CPM 上限(元/千播放) ─────────────────────────
+// 实际换算到的金额上限 = cpmCap × 创作者播放量 / 1000;views=0 时不生效。
+function CpmCapField({
+  cpmCap,
+  onChange,
+}: {
+  cpmCap: number | undefined;
+  onChange: (cpmCap: number | undefined) => void;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-[160px_1fr] sm:items-center">
+      <Label className="text-xs">CPM 上限(元/千播放)</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          min={0}
+          step="0.01"
+          value={cpmCap ?? ""}
+          placeholder="不填 = 无上限"
+          onChange={(e) =>
+            onChange(
+              e.target.value === "" ? undefined : Number(e.target.value),
+            )
+          }
+          className="max-w-[220px]"
+        />
+        <span className="text-[11px] text-muted-foreground">
+          换算成金额 = CPM × 该创作者播放量 / 1000;views=0 不生效
         </span>
       </div>
     </div>
@@ -771,32 +811,56 @@ function PerSubmissionEditor({
   onChange: (r: PerSubmissionRule) => void;
 }) {
   return (
-    <div className="grid gap-3 rounded-md bg-muted/30 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+    <div className="space-y-3 rounded-md bg-muted/30 p-3">
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div>
+          <Label className="mb-1.5 block text-xs">每条稿件金额(元)</Label>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={rule.amount}
+            onChange={(e) =>
+              onChange({ ...rule, amount: Number(e.target.value) || 0 })
+            }
+            className="max-w-[220px]"
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            单条稿件按此金额计;最终按下方「激励上限」截断。
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-xs">
+          <Checkbox
+            checked={rule.approvedOnly ?? false}
+            onCheckedChange={(v) =>
+              onChange({ ...rule, approvedOnly: v === true ? true : undefined })
+            }
+          />
+          仅审核通过的稿件
+        </label>
+      </div>
+
       <div>
-        <Label className="mb-1.5 block text-xs">每条稿件金额(元)</Label>
+        <Label className="mb-1.5 block text-xs">最小播放量(可选,≥)</Label>
         <Input
           type="number"
           min={0}
-          step="0.01"
-          value={rule.amount}
+          step={1}
+          value={rule.minViews ?? ""}
+          placeholder="不填 = 不限制"
           onChange={(e) =>
-            onChange({ ...rule, amount: Number(e.target.value) || 0 })
+            onChange({
+              ...rule,
+              minViews:
+                e.target.value === "" ? undefined : Number(e.target.value) || 0,
+            })
           }
           className="max-w-[220px]"
         />
         <p className="mt-1 text-[11px] text-muted-foreground">
-          单条稿件按此金额计;最终按下方「激励上限」截断。
+          只数播放量达到此门槛的稿件;无播放数据的稿件视为 0,不计入。
         </p>
       </div>
-      <label className="flex items-center gap-2 text-xs">
-        <Checkbox
-          checked={rule.approvedOnly ?? false}
-          onCheckedChange={(v) =>
-            onChange({ ...rule, approvedOnly: v === true ? true : undefined })
-          }
-        />
-        仅审核通过的稿件
-      </label>
     </div>
   );
 }

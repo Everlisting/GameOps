@@ -38,6 +38,20 @@ const capSchema = z
   .max(1_000_000_000, "上限过大")
   .optional();
 
+/**
+ * 每条规则的 CPM 上限(单位:元 / 千次播放)。空值 = 不限制。
+ * 实际换算到金额上限 = cpmCap × 创作者播放量 / 1000。
+ * 创作者 views=0(无播放数据)时不生效,沿用原值;不"惩罚"还没回流的创作者。
+ *
+ * 7 类规则都挂这个字段:配不配是运营自己的事;非播放量相关的规则(PER_SUBMISSION /
+ * ACTIVITY_THRESHOLD)若运营配了 cpmCap,引擎也会按相同口径截一刀。
+ */
+const cpmCapSchema = z
+  .number()
+  .positive("CPM 上限必须大于 0")
+  .max(1_000_000, "CPM 过大")
+  .optional();
+
 export const tierRuleSchema = z.object({
   kind: z.literal("TIER"),
   metric: rewardMetricSchema,
@@ -57,6 +71,7 @@ export const tierRuleSchema = z.object({
     .min(1, "至少配置 1 档")
     .max(20, "最多配置 20 档"),
   cap: capSchema,
+  cpmCap: cpmCapSchema,
 });
 
 /**
@@ -85,6 +100,7 @@ export const formulaRuleSchema = z.object({
     .min(1, "请至少添加 1 个积木")
     .max(60, "公式过长"),
   cap: capSchema,
+  cpmCap: cpmCapSchema,
 });
 
 export type FormulaToken = z.infer<typeof formulaTokenSchema>;
@@ -96,6 +112,7 @@ export const sharePoolRuleSchema = z.object({
   weightField: rewardMetricSchema,
   topN: z.number().int().positive().max(10000).optional(),
   cap: capSchema,
+  cpmCap: cpmCapSchema,
 });
 
 export const rankRuleSchema = z.object({
@@ -117,13 +134,20 @@ export const rankRuleSchema = z.object({
     .min(1, "至少配置 1 档排名")
     .max(20, "最多配置 20 档排名"),
   cap: capSchema,
+  cpmCap: cpmCapSchema,
 });
 
 export const perSubmissionRuleSchema = z.object({
   kind: z.literal("PER_SUBMISSION"),
   amount: z.number().positive("单条金额必须大于 0"),
   approvedOnly: z.boolean().optional(), // true = 仅审核通过的稿件计数
+  /**
+   * 最小播放量门槛(≥);0 / 空 = 不过滤。
+   * 设了之后,只有"该稿件 views >= minViews"的才计入。无 VideoStat 数据的稿件视为 views=0。
+   */
+  minViews: z.number().int().nonnegative().max(1_000_000_000).optional(),
   cap: capSchema,
+  cpmCap: cpmCapSchema,
 });
 
 export const activityThresholdRuleSchema = z.object({
@@ -132,6 +156,7 @@ export const activityThresholdRuleSchema = z.object({
   threshold: z.number().int().positive("门槛必须大于 0"),
   amount: z.number().positive("奖励金额必须大于 0"),
   cap: capSchema,
+  cpmCap: cpmCapSchema,
 });
 
 // 注:步进起点 < 触发门槛 在逻辑上没意义,但不做硬约束(discriminatedUnion 不接 .refine()),
@@ -145,6 +170,7 @@ export const basePlusStepRuleSchema = z.object({
   stepSize: z.number().int().positive("步长必须大于 0"),
   stepAmount: z.number().nonnegative("每步金额必须不小于 0"),
   cap: capSchema,
+  cpmCap: cpmCapSchema,
 });
 
 export const rewardRuleSchema = z.discriminatedUnion("kind", [

@@ -45,6 +45,9 @@ type Contribution = {
   raw: number;
   amount: number;
   cap: number | null;
+  cpmCap: number | null;
+  cpmLimit: number | null;
+  cappedBy?: "cap" | "cpm";
   note?: string;
 };
 
@@ -396,9 +399,13 @@ function BreakdownView({ breakdown }: { breakdown: Contribution[] }) {
             <span className="tabular-nums">
               +{fmtMoney(c.amount)}
             </span>
-            {c.cap != null && c.raw > c.cap && (
+            {c.cappedBy && (
               <span className="text-[11px] text-amber-600 dark:text-amber-300">
-                (原 {fmtMoney(c.raw)},cap {fmtMoney(c.cap)})
+                (原 {fmtMoney(c.raw)} ·{" "}
+                {c.cappedBy === "cpm"
+                  ? `CPM ${c.cpmCap}元/千播 截到 ${fmtMoney(c.amount)}`
+                  : `金额上限截到 ${fmtMoney(c.amount)}`}
+                )
               </span>
             )}
           </li>

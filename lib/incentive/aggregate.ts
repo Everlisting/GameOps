@@ -7,13 +7,12 @@
  * 指标聚合口径(v1):
  *   - submissions          本活动下该创作者的全部投稿条数(不分状态)
  *   - approvedSubmissions  status=APPROVED 的条数
- *   - views/likes/comments/shares
- *       只从 status=APPROVED 且 platform=douyin 且有 externalId 的投稿出发,
- *       去 VideoStat 按 (platform, externalId) 加总。
- *       未审核 / 已拒的稿件不参与互动数据计算(防刷),由 PER_SUBMISSION.approvedOnly 之外的规则口径统一。
+ *   - views/likes/comments/shares  ── 创作者维度的总量,从 APPROVED + douyin + 有 externalId 的稿件 join VideoStat 加总
+ *   - submissionViews      ── 单条稿件维度的明细;每条 = { approved, views },views 来自 VideoStat(没 VideoStat 视为 0)
+ *                             给 PER_SUBMISSION.minViews / approvedOnly 过滤用。
+ *                             非 douyin / 无 externalId 的稿件:views=0(没数据源,符合"达不到 minViews"语义)
  *
- * 非抖音平台暂时 views/likes 等都是 0(数据源还没接);PER_SUBMISSION 之类的"数稿件"
- * 规则照常生效。
+ * 非抖音平台暂时互动数据都是 0(数据源还没接);PER_SUBMISSION 之类"数稿件"规则照常生效。
  *
  * 一次拉满,不分页:活动报名通常 <= 几百人,Submission/VideoStat 链表也是同等量级。
  */
@@ -89,12 +88,14 @@ export async function aggregateActivityMetrics(
     subCount.set(s.creatorId, e);
   }
 
-  // ── 4. 抖音稿件互动数据:approved + douyin + externalId 才算 ─
-  const approvedDouyinSubs = allSubs.filter(
-    (s) => s.status === "APPROVED" && s.platform === "douyin" && s.externalId,
+  // ── 4. 抖音稿件 VideoStat:覆盖全部 douyin + 有 externalId 的稿件(不只是 APPROVED) ─
+  // 创作者维度互动数据仍按"approved 才算"口径累加;
+  // 单条明细 submissionViews 则保留全部状态,供 PER_SUBMISSION.minViews/approvedOnly 自由过滤。
+  const douyinSubs = allSubs.filter(
+    (s) => s.platform === "douyin" && s.externalId,
   );
   const externalIds = Array.from(
-    new Set(approvedDouyinSubs.map((s) => s.externalId!)),
+    new Set(douyinSubs.map((s) => s.externalId!)),
   );
 
   const stats =
@@ -119,7 +120,26 @@ export async function aggregateActivityMetrics(
     shares: number;
   };
   const metricsByCreator = new Map<string, MetricSum>();
-  for (const sub of approvedDouyinSubs) {
+  const submissionViewsByCreator = new Map<
+    string,
+    Array<{ approved: boolean; views: number }>
+  >();
+
+  // 先把所有稿件(含非抖音)按 creator 分组进 submissionViews,views 默认 0
+  for (const s of allSubs) {
+    const list = submissionViewsByCreator.get(s.creatorId) ?? [];
+    let views = 0;
+    if (s.platform === "douyin" && s.externalId) {
+      const stat = statByExternalId.get(s.externalId);
+      if (stat) views = stat.views;
+    }
+    list.push({ approved: s.status === "APPROVED", views });
+    submissionViewsByCreator.set(s.creatorId, list);
+  }
+
+  // 创作者总互动量:仅 APPROVED + douyin + 有 VideoStat 的累加
+  for (const sub of douyinSubs) {
+    if (sub.status !== "APPROVED") continue;
     const stat = statByExternalId.get(sub.externalId!);
     if (!stat) continue;
     const e =
@@ -155,6 +175,7 @@ export async function aggregateActivityMetrics(
       likes: m.likes,
       comments: m.comments,
       shares: m.shares,
+      submissionViews: submissionViewsByCreator.get(cid) ?? [],
     });
   }
   return result;

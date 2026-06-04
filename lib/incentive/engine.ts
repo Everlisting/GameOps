@@ -39,6 +39,12 @@ export type CreatorMetrics = {
   submissions: number;
   /** 已通过的投稿条数 */
   approvedSubmissions: number;
+  /**
+   * 单条投稿明细(只填能拿到的;无 VideoStat 数据的稿件 views=0)。
+   * PER_SUBMISSION 的 minViews / approvedOnly 在这里过滤。
+   * 引擎对此字段宽容:不提供时按计数模式工作(submissions / approvedSubmissions)。
+   */
+  submissionViews?: Array<{ approved: boolean; views: number }>;
 };
 
 /** 一条规则对一个创作者的贡献明细 */
@@ -47,10 +53,16 @@ export type IncentiveContribution = {
   kind: RewardRule["kind"];
   /** cap 截断前的原始计算值(可能为负;FORMULA 才会出负) */
   raw: number;
-  /** 实际计入 estimated 的金额(已 cap 截断、已截负) */
+  /** 实际计入 estimated 的金额(已 cap / cpmCap 截断、已截负) */
   amount: number;
-  /** 该规则的 cap;null = 无上限 */
+  /** 该规则的金额上限;null = 无上限 */
   cap: number | null;
+  /** 该规则的 CPM 上限(元/千播放);null = 无上限 */
+  cpmCap: number | null;
+  /** cpmCap 换算到金额后的实际上限 = cpmCap × views / 1000;null = 未设 cpmCap 或 views=0 不生效 */
+  cpmLimit: number | null;
+  /** 实际截断该贡献的上限来源(便于 UI 标"被 CPM 截"); */
+  cappedBy?: "cap" | "cpm";
   /** 触发说明(命中档位 / 排名 / 占比 等),供前端展示 */
   note?: string;
 };
@@ -111,13 +123,48 @@ function getMetric(c: CreatorMetrics, m: RewardMetric): number {
   }
 }
 
-function capAmount(
+/**
+ * 应用上限链:截负 → 取 min(raw, cap, cpmCap × views / 1000)。
+ * 返回 amount + 元信息(供 breakdown 展示哪个上限触发了)。
+ *
+ * cpmCap 在 views=0(创作者没播放数据)时不生效,放过原值。这是产品决策:
+ * 不想用"还没采集到播放数据"这个事去惩罚创作者。
+ */
+function applyLimits(
   raw: number,
+  views: number,
   cap: number | undefined,
-): { amount: number; cap: number | null } {
+  cpmCap: number | undefined,
+): {
+  amount: number;
+  cap: number | null;
+  cpmCap: number | null;
+  cpmLimit: number | null;
+  cappedBy?: "cap" | "cpm";
+} {
   const clamped = Math.max(0, raw);
-  if (cap == null) return { amount: clamped, cap: null };
-  return { amount: Math.min(clamped, cap), cap };
+  const cpmLimit =
+    cpmCap != null && views > 0 ? (cpmCap * views) / 1000 : null;
+
+  // 找最紧的那一个
+  let amount = clamped;
+  let cappedBy: "cap" | "cpm" | undefined;
+  if (cap != null && cap < amount) {
+    amount = cap;
+    cappedBy = "cap";
+  }
+  if (cpmLimit != null && cpmLimit < amount) {
+    amount = cpmLimit;
+    cappedBy = "cpm";
+  }
+
+  return {
+    amount,
+    cap: cap ?? null,
+    cpmCap: cpmCap ?? null,
+    cpmLimit,
+    cappedBy,
+  };
 }
 
 function applyRule(
@@ -157,13 +204,12 @@ function applyTier(
       (t) => v >= t.min && (t.max == null || v <= t.max),
     );
     if (!hit) continue;
-    const { amount, cap } = capAmount(hit.amount, rule.cap);
+    const lim = applyLimits(hit.amount, c.views, rule.cap, rule.cpmCap);
     out.set(c.creatorId, {
       ruleIndex,
       kind: "TIER",
       raw: hit.amount,
-      amount,
-      cap,
+      ...lim,
       note: `命中 [${hit.min}, ${hit.max ?? "∞"}]`,
     });
   }
@@ -187,13 +233,12 @@ function applyFormula(
     } catch {
       raw = 0;
     }
-    const { amount, cap } = capAmount(raw, rule.cap);
+    const lim = applyLimits(raw, c.views, rule.cap, rule.cpmCap);
     out.set(c.creatorId, {
       ruleIndex,
       kind: "FORMULA",
       raw,
-      amount,
-      cap,
+      ...lim,
     });
   }
   return out;
@@ -293,13 +338,12 @@ function applySharePool(
 
   for (const { c, w } of participants) {
     const raw = (w / total) * rule.pool;
-    const { amount, cap } = capAmount(raw, rule.cap);
+    const lim = applyLimits(raw, c.views, rule.cap, rule.cpmCap);
     out.set(c.creatorId, {
       ruleIndex,
       kind: "SHARE_POOL",
       raw,
-      amount,
-      cap,
+      ...lim,
       note: `权重 ${w}/${total}`,
     });
   }
@@ -331,13 +375,12 @@ function applyRank(
   for (const { c, rank } of ranks) {
     const hit = rule.ranks.find((r) => rank >= r.from && rank <= r.to);
     if (!hit) continue;
-    const { amount, cap } = capAmount(hit.amount, rule.cap);
+    const lim = applyLimits(hit.amount, c.views, rule.cap, rule.cpmCap);
     out.set(c.creatorId, {
       ruleIndex,
       kind: "RANK",
       raw: hit.amount,
-      amount,
-      cap,
+      ...lim,
       note: `第 ${rank} 名`,
     });
   }
@@ -345,24 +388,51 @@ function applyRank(
 }
 
 // ── PER_SUBMISSION ─────────────────────────────────────────
+// 数稿件 × 单条金额。两个可选过滤:
+//   - approvedOnly:只数 APPROVED 的稿件
+//   - minViews:只数 views ≥ minViews 的稿件(需要 submissionViews 明细;没明细则降级用 submissions 计数)
+// 同时设了两个 → AND(既要 APPROVED,又要 views 达标)。
 function applyPerSubmission(
   rule: PerSubmissionRule,
   ruleIndex: number,
   creators: CreatorMetrics[],
 ): Map<string, IncentiveContribution> {
   const out = new Map<string, IncentiveContribution>();
+  const usesMinViews = rule.minViews != null && rule.minViews > 0;
+
   for (const c of creators) {
-    const count = rule.approvedOnly ? c.approvedSubmissions : c.submissions;
+    let count: number;
+    let noteFilters: string[] = [];
+
+    if (usesMinViews && c.submissionViews) {
+      // 明细模式:逐条过滤
+      count = c.submissionViews.filter((s) => {
+        if (rule.approvedOnly && !s.approved) return false;
+        if (s.views < (rule.minViews ?? 0)) return false;
+        return true;
+      }).length;
+      noteFilters.push(`播放量 ≥ ${rule.minViews}`);
+      if (rule.approvedOnly) noteFilters.push("已通过");
+    } else {
+      // 计数模式:approvedOnly 切换 approvedSubmissions / submissions
+      count = rule.approvedOnly ? c.approvedSubmissions : c.submissions;
+      if (rule.approvedOnly) noteFilters.push("已通过");
+      // minViews 配了但没明细 → 标注一下,运营能从 UI 看出"明细缺,过滤未生效"
+      if (usesMinViews && !c.submissionViews) {
+        noteFilters.push(`(minViews 已配但缺播放明细)`);
+      }
+    }
+
     if (count <= 0) continue;
     const raw = count * rule.amount;
-    const { amount, cap } = capAmount(raw, rule.cap);
+    const lim = applyLimits(raw, c.views, rule.cap, rule.cpmCap);
+    const filterTag = noteFilters.length ? ` · ${noteFilters.join(" · ")}` : "";
     out.set(c.creatorId, {
       ruleIndex,
       kind: "PER_SUBMISSION",
       raw,
-      amount,
-      cap,
-      note: `${count} 条稿件`,
+      ...lim,
+      note: `${count} 条稿件${filterTag}`,
     });
   }
   return out;
@@ -382,13 +452,12 @@ function applyActivityThreshold(
   if (total < rule.threshold) return out;
   const perCreator = rule.amount / creators.length;
   for (const c of creators) {
-    const { amount, cap } = capAmount(perCreator, rule.cap);
+    const lim = applyLimits(perCreator, c.views, rule.cap, rule.cpmCap);
     out.set(c.creatorId, {
       ruleIndex,
       kind: "ACTIVITY_THRESHOLD",
       raw: perCreator,
-      amount,
-      cap,
+      ...lim,
       note: `活动总 ${total} ≥ ${rule.threshold},均分到 ${creators.length} 人`,
     });
   }
@@ -413,13 +482,12 @@ function applyBasePlusStep(
       const steps = Math.floor((v - rule.stepStart) / rule.stepSize);
       raw += steps * rule.stepAmount;
     }
-    const { amount, cap } = capAmount(raw, rule.cap);
+    const lim = applyLimits(raw, c.views, rule.cap, rule.cpmCap);
     out.set(c.creatorId, {
       ruleIndex,
       kind: "BASE_PLUS_STEP",
       raw,
-      amount,
-      cap,
+      ...lim,
       note: `metric=${v}`,
     });
   }

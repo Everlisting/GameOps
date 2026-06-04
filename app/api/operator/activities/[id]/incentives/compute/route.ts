@@ -52,6 +52,7 @@ export const POST = route(async (_req, { params }) => {
       shares: a.shares,
       submissions: a.submissions,
       approvedSubmissions: a.approvedSubmissions,
+      submissionViews: a.submissionViews,
     })),
   );
 

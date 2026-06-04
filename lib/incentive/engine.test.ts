@@ -401,6 +401,199 @@ describe("BASE_PLUS_STEP", () => {
   });
 });
 
+describe("cpmCap", () => {
+  it("cpmCap × views / 1000 截断,views=10000 + cpmCap=5 → 上限 50", () => {
+    // 阶梯给 100,cpmCap=5 元/千播,views=10000 → cpm 上限 = 5 * 10000 / 1000 = 50
+    const rule: RewardRule = {
+      kind: "TIER",
+      metric: "views",
+      tiers: [{ min: 0, amount: 100 }],
+      cpmCap: 5,
+    };
+    const r = computeIncentives([rule], [mk("a", { views: 10000 })]);
+    const b = r.get("a")?.breakdown[0];
+    expect(b?.raw).toBe(100);
+    expect(b?.amount).toBe(50);
+    expect(b?.cpmCap).toBe(5);
+    expect(b?.cpmLimit).toBe(50);
+    expect(b?.cappedBy).toBe("cpm");
+  });
+
+  it("views=0 时 cpmCap 不生效(不惩罚没播放数据的创作者)", () => {
+    const rule: RewardRule = {
+      kind: "PER_SUBMISSION",
+      amount: 100,
+      cpmCap: 1, // 严苛
+    };
+    const r = computeIncentives(
+      [rule],
+      [mk("a", { submissions: 1, approvedSubmissions: 1, views: 0 })],
+    );
+    expect(r.get("a")?.estimated).toBe(100);
+    expect(r.get("a")?.breakdown[0]?.cpmLimit).toBeNull();
+    expect(r.get("a")?.breakdown[0]?.cappedBy).toBeUndefined();
+  });
+
+  it("同时配 cap 和 cpmCap → 取更紧的", () => {
+    // cap=30,cpmCap=5 元/千 × 10000 views = 50。raw=100 → min(100, 30, 50) = 30,cap 触发
+    const rule: RewardRule = {
+      kind: "TIER",
+      metric: "views",
+      tiers: [{ min: 0, amount: 100 }],
+      cap: 30,
+      cpmCap: 5,
+    };
+    const r = computeIncentives([rule], [mk("a", { views: 10000 })]);
+    expect(r.get("a")?.estimated).toBe(30);
+    expect(r.get("a")?.breakdown[0]?.cappedBy).toBe("cap");
+  });
+
+  it("cpmCap 比 cap 紧 → cappedBy=cpm", () => {
+    // cap=200,cpmCap=5 × 10000 / 1000 = 50。raw=100 → min(100, 200, 50) = 50
+    const rule: RewardRule = {
+      kind: "TIER",
+      metric: "views",
+      tiers: [{ min: 0, amount: 100 }],
+      cap: 200,
+      cpmCap: 5,
+    };
+    const r = computeIncentives([rule], [mk("a", { views: 10000 })]);
+    expect(r.get("a")?.estimated).toBe(50);
+    expect(r.get("a")?.breakdown[0]?.cappedBy).toBe("cpm");
+  });
+
+  it("cpmCap 没截到 → cappedBy 为 undefined", () => {
+    // raw=10, cpmCap=5 × 10000 / 1000 = 50 → 10 不用截
+    const rule: RewardRule = {
+      kind: "TIER",
+      metric: "views",
+      tiers: [{ min: 0, amount: 10 }],
+      cpmCap: 5,
+    };
+    const r = computeIncentives([rule], [mk("a", { views: 10000 })]);
+    const b = r.get("a")?.breakdown[0];
+    expect(b?.amount).toBe(10);
+    expect(b?.cappedBy).toBeUndefined();
+    expect(b?.cpmCap).toBe(5);
+    expect(b?.cpmLimit).toBe(50);
+  });
+
+  it("FORMULA 负值经 cpmCap 仍归 0", () => {
+    const rule: RewardRule = {
+      kind: "FORMULA",
+      tokens: [
+        { type: "metric", value: "views" },
+        { type: "op", value: "-" },
+        { type: "number", value: 1_000_000 },
+      ],
+      cpmCap: 5,
+    };
+    const r = computeIncentives([rule], [mk("a", { views: 10000 })]);
+    expect(r.get("a")?.estimated).toBe(0);
+  });
+});
+
+describe("PER_SUBMISSION.minViews", () => {
+  it("有 submissionViews 明细时按 minViews 过滤", () => {
+    const rule: RewardRule = {
+      kind: "PER_SUBMISSION",
+      amount: 10,
+      minViews: 10000,
+    };
+    const r = computeIncentives(
+      [rule],
+      [
+        mk("a", {
+          submissions: 3,
+          approvedSubmissions: 3,
+          submissionViews: [
+            { approved: true, views: 50000 }, // 计
+            { approved: true, views: 10000 }, // 计(等于 ≥)
+            { approved: true, views: 5000 }, // 不计
+          ],
+        }),
+      ],
+    );
+    // 2 条达标 × 10 = 20
+    expect(r.get("a")?.estimated).toBe(20);
+    expect(r.get("a")?.breakdown[0]?.note).toContain("播放量 ≥ 10000");
+  });
+
+  it("minViews + approvedOnly 同时:AND 关系", () => {
+    const rule: RewardRule = {
+      kind: "PER_SUBMISSION",
+      amount: 10,
+      minViews: 10000,
+      approvedOnly: true,
+    };
+    const r = computeIncentives(
+      [rule],
+      [
+        mk("a", {
+          submissions: 3,
+          approvedSubmissions: 2,
+          submissionViews: [
+            { approved: true, views: 50000 }, // 计
+            { approved: true, views: 5000 }, // 播放量不够,不计
+            { approved: false, views: 100000 }, // 未通过,不计
+          ],
+        }),
+      ],
+    );
+    expect(r.get("a")?.estimated).toBe(10);
+  });
+
+  it("minViews=0 等价于不设(全部计入)", () => {
+    const rule: RewardRule = {
+      kind: "PER_SUBMISSION",
+      amount: 10,
+      minViews: 0,
+    };
+    const r = computeIncentives(
+      [rule],
+      [mk("a", { submissions: 3, approvedSubmissions: 3 })],
+    );
+    expect(r.get("a")?.estimated).toBe(30);
+  });
+
+  it("配了 minViews 但没 submissionViews 明细 → 降级用 submissions 计数 + note 标记", () => {
+    const rule: RewardRule = {
+      kind: "PER_SUBMISSION",
+      amount: 10,
+      minViews: 10000,
+    };
+    const r = computeIncentives(
+      [rule],
+      [mk("a", { submissions: 2, approvedSubmissions: 2 })],
+    );
+    expect(r.get("a")?.estimated).toBe(20);
+    expect(r.get("a")?.breakdown[0]?.note).toContain("minViews 已配但缺播放明细");
+  });
+
+  it("过滤后 0 条 → 整条规则跳过", () => {
+    const rule: RewardRule = {
+      kind: "PER_SUBMISSION",
+      amount: 10,
+      minViews: 10000,
+    };
+    const r = computeIncentives(
+      [rule],
+      [
+        mk("a", {
+          submissions: 2,
+          approvedSubmissions: 2,
+          submissionViews: [
+            { approved: true, views: 100 },
+            { approved: true, views: 500 },
+          ],
+        }),
+      ],
+    );
+    expect(r.get("a")?.estimated).toBe(0);
+    expect(r.get("a")?.breakdown).toEqual([]);
+  });
+});
+
 describe("组合叠加", () => {
   it("TIER + PER_SUBMISSION + RANK 三条同时生效", () => {
     const rules: RewardRule[] = [
