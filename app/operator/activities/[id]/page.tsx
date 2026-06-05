@@ -168,11 +168,10 @@ export default async function ActivityDetailPage({
           publishAt: a.publishAt ? fmtLocal(a.publishAt) : "",
           rewardRules: rules,
         }}
+        bottomSlot={
+          <IncentiveSection activityId={a.id} hasRules={rules.length > 0} />
+        }
       />
-
-      <div className="mt-6">
-        <IncentiveSection activityId={a.id} hasRules={rules.length > 0} />
-      </div>
     </div>
   );
 }

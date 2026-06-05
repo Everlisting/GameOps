@@ -24,6 +24,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,7 +42,9 @@ import {
 } from "@/components/ui/dialog";
 import { CreatorAvatar } from "@/components/creator-avatar";
 import { fmtDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { REWARD_KIND_LABEL } from "@/lib/incentive/labels";
+import { usePersistentToggle } from "@/hooks/use-persistent-toggle";
 
 type Contribution = {
   ruleIndex: number;
@@ -102,6 +109,12 @@ export default function IncentiveSection({
   const [computing, setComputing] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<IncentiveItem | null>(null);
+  // 默认收起 — 摘要(人数 + 实发)在 trigger 行已经展示,展开后才是明细表。
+  // 用户显式切换后落 localStorage,刷新保留。
+  const [open, setOpen] = usePersistentToggle(
+    `gameops:activity:${activityId}:incentive-open`,
+    false,
+  );
 
   const load = useCallback(async () => {
     setError(null);
@@ -152,174 +165,201 @@ export default function IncentiveSection({
 
   return (
     <Card className="p-5">
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">激励结算</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {hasRules
-              ? "按当前激励规则 + 已通过投稿数据预估每位创作者的金额。"
-              : "未配置激励规则,先在上面表单里加规则。"}
-            {summary?.latestComputedAt && (
-              <span className="ml-2">
-                · 最近计算 {fmtDateTime(new Date(summary.latestComputedAt))}
-              </span>
-            )}
-          </p>
-        </div>
-        <Button
-          size="sm"
-          onClick={compute}
-          disabled={!hasRules || computing}
-        >
-          {computing ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="size-3.5" />
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex flex-1 items-start gap-2 text-left"
+            >
+              <ChevronDown
+                className={cn(
+                  "mt-0.5 size-4 text-muted-foreground transition-transform shrink-0",
+                  open && "rotate-180",
+                )}
+              />
+              <div>
+                <h2 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  激励结算
+                  {summary && (
+                    <span className="font-normal text-xs text-muted-foreground">
+                      {summary.total} 人 · 实发 ¥{fmtMoney(summary.totalFinal)}
+                    </span>
+                  )}
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {hasRules
+                    ? "按当前激励规则 + 已通过投稿数据预估每位创作者的金额。"
+                    : "未配置激励规则,先在上面表单里加规则。"}
+                  {summary?.latestComputedAt && (
+                    <span className="ml-2">
+                      · 最近计算{" "}
+                      {fmtDateTime(new Date(summary.latestComputedAt))}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </button>
+          </CollapsibleTrigger>
+          {open && (
+            <Button
+              size="sm"
+              onClick={compute}
+              disabled={!hasRules || computing}
+            >
+              {computing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              重算预估
+            </Button>
           )}
-          重算预估
-        </Button>
-      </header>
-
-      {error && (
-        <p className="mb-3 text-xs text-destructive">{error}</p>
-      )}
-
-      <div className="mb-4 grid gap-3 sm:grid-cols-4">
-        <Stat
-          label="参与创作者"
-          value={summary ? fmtCount(summary.total) : "—"}
-        />
-        <Stat
-          label="预估总额(元)"
-          value={summary ? fmtMoney(summary.totalEstimated) : "—"}
-        />
-        <Stat
-          label={`已调整 ${summary?.adjustedCount ?? 0} 条(元)`}
-          value={summary ? fmtMoney(summary.totalAdjusted) : "—"}
-          tone="warn"
-        />
-        <Stat
-          label="实发总额(元)"
-          value={summary ? fmtMoney(summary.totalFinal) : "—"}
-          tone="ok"
-        />
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-          <Loader2 className="mr-2 size-4 animate-spin" />
-          正在加载激励数据
         </div>
-      ) : items.length === 0 ? (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {hasRules
-            ? "暂无激励记录。点击右上「重算预估」根据当前规则生成。"
-            : "请先在上方表单里至少添加一条激励规则,再来计算预估。"}
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-md border border-border">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2.5 font-medium">创作者</th>
-                <th className="px-3 py-2.5 font-medium text-right">预估(元)</th>
-                <th className="px-3 py-2.5 font-medium text-right">调整(元)</th>
-                <th className="px-3 py-2.5 font-medium text-right">实发(元)</th>
-                <th className="px-3 py-2.5 font-medium">调整记录</th>
-                <th className="px-3 py-2.5 font-medium text-right w-24">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {items.map((it) => {
-                const isOpen = expanded === it.id;
-                const final = it.adjusted ?? it.estimated;
-                return (
-                  <>
-                    <tr key={it.id} className="hover:bg-muted/30">
-                      <td className="px-3 py-2.5 align-top">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpanded(isOpen ? null : it.id)
-                          }
-                          className="flex items-center gap-2 text-left hover:text-primary"
-                        >
-                          {isOpen ? (
-                            <ChevronDown className="size-3.5 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="size-3.5 text-muted-foreground" />
-                          )}
-                          <CreatorAvatar
-                            avatar={it.avatarUrl}
-                            name={it.nickname}
-                            size="sm"
-                          />
-                          <div>
-                            <div className="text-sm">{it.nickname}</div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {it.username}
-                            </div>
-                          </div>
-                        </button>
-                      </td>
-                      <td className="px-3 py-2.5 align-top text-right tabular-nums">
-                        {fmtMoney(it.estimated)}
-                      </td>
-                      <td className="px-3 py-2.5 align-top text-right tabular-nums">
-                        {it.adjusted == null ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <span className="text-amber-600 dark:text-amber-300">
-                            {fmtMoney(it.adjusted)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 align-top text-right font-medium tabular-nums">
-                        {fmtMoney(final)}
-                      </td>
-                      <td className="px-3 py-2.5 align-top text-xs">
-                        {it.adjusted == null ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {it.adjustedBy ?? "—"}{" "}
-                              {it.adjustedAt &&
-                                `· ${fmtDateTime(new Date(it.adjustedAt))}`}
-                            </div>
-                            {it.adjustReason && (
-                              <div className="mt-0.5 line-clamp-2 text-[11px]">
-                                {it.adjustReason}
+
+        <CollapsibleContent className="mt-4">
+          {error && (
+            <p className="mb-3 text-xs text-destructive">{error}</p>
+          )}
+
+          <div className="mb-4 grid gap-3 sm:grid-cols-4">
+            <Stat
+              label="参与创作者"
+              value={summary ? fmtCount(summary.total) : "—"}
+            />
+            <Stat
+              label="预估总额(元)"
+              value={summary ? fmtMoney(summary.totalEstimated) : "—"}
+            />
+            <Stat
+              label={`已调整 ${summary?.adjustedCount ?? 0} 条(元)`}
+              value={summary ? fmtMoney(summary.totalAdjusted) : "—"}
+              tone="warn"
+            />
+            <Stat
+              label="实发总额(元)"
+              value={summary ? fmtMoney(summary.totalFinal) : "—"}
+              tone="ok"
+            />
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              正在加载激励数据
+            </div>
+          ) : items.length === 0 ? (
+            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+              {hasRules
+                ? "暂无激励记录。点击右上「重算预估」根据当前规则生成。"
+                : "请先在上方表单里至少添加一条激励规则,再来计算预估。"}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-md border border-border">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2.5 font-medium">创作者</th>
+                    <th className="px-3 py-2.5 font-medium text-right">预估(元)</th>
+                    <th className="px-3 py-2.5 font-medium text-right">调整(元)</th>
+                    <th className="px-3 py-2.5 font-medium text-right">实发(元)</th>
+                    <th className="px-3 py-2.5 font-medium">调整记录</th>
+                    <th className="px-3 py-2.5 font-medium text-right w-24">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {items.map((it) => {
+                    const isOpen = expanded === it.id;
+                    const final = it.adjusted ?? it.estimated;
+                    return (
+                      <>
+                        <tr key={it.id} className="hover:bg-muted/30">
+                          <td className="px-3 py-2.5 align-top">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpanded(isOpen ? null : it.id)
+                              }
+                              className="flex items-center gap-2 text-left hover:text-primary"
+                            >
+                              {isOpen ? (
+                                <ChevronDown className="size-3.5 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="size-3.5 text-muted-foreground" />
+                              )}
+                              <CreatorAvatar
+                                avatar={it.avatarUrl}
+                                name={it.nickname}
+                                size="sm"
+                              />
+                              <div>
+                                <div className="text-sm">{it.nickname}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  {it.username}
+                                </div>
+                              </div>
+                            </button>
+                          </td>
+                          <td className="px-3 py-2.5 align-top text-right tabular-nums">
+                            {fmtMoney(it.estimated)}
+                          </td>
+                          <td className="px-3 py-2.5 align-top text-right tabular-nums">
+                            {it.adjusted == null ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              <span className="text-amber-600 dark:text-amber-300">
+                                {fmtMoney(it.adjusted)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 align-top text-right font-medium tabular-nums">
+                            {fmtMoney(final)}
+                          </td>
+                          <td className="px-3 py-2.5 align-top text-xs">
+                            {it.adjusted == null ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              <div>
+                                <div className="text-[11px] text-muted-foreground">
+                                  {it.adjustedBy ?? "—"}{" "}
+                                  {it.adjustedAt &&
+                                    `· ${fmtDateTime(new Date(it.adjustedAt))}`}
+                                </div>
+                                {it.adjustReason && (
+                                  <div className="mt-0.5 line-clamp-2 text-[11px]">
+                                    {it.adjustReason}
+                                  </div>
+                                )}
                               </div>
                             )}
-                          </div>
+                          </td>
+                          <td className="px-3 py-2.5 align-top text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditing(it)}
+                            >
+                              <Pencil className="size-3.5" />
+                              调整
+                            </Button>
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr key={`${it.id}_breakdown`} className="bg-muted/20">
+                            <td colSpan={6} className="px-3 py-3">
+                              <BreakdownView breakdown={it.breakdown} />
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="px-3 py-2.5 align-top text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setEditing(it)}
-                        >
-                          <Pencil className="size-3.5" />
-                          调整
-                        </Button>
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr key={`${it.id}_breakdown`} className="bg-muted/20">
-                        <td colSpan={6} className="px-3 py-3">
-                          <BreakdownView breakdown={it.breakdown} />
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
 
       <AdjustDialog
         item={editing}

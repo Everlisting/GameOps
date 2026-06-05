@@ -9,11 +9,13 @@
  *     ENDED   :永久只读,无解锁按钮
  * - 提交后:create → /operator/activities/[id];edit → router.refresh()
  */
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { ActivityStatus } from "@prisma/client";
+import { usePersistentToggle } from "@/hooks/use-persistent-toggle";
 import {
   CalendarClock,
+  ChevronDown,
   ImagePlus,
   Lock,
   LockOpen,
@@ -23,6 +25,11 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,11 +65,14 @@ export default function ActivityForm({
   initial,
   mode,
   status,
+  bottomSlot,
 }: {
   initial: ActivityFormInitial;
   mode: "create" | "edit";
   /** 编辑模式下必须传入,新建模式 undefined */
   status?: ActivityStatus;
+  /** 渲染在「定时发布」和提交按钮之间的内容(详情页用来塞 IncentiveSection) */
+  bottomSlot?: ReactNode;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initial.name);
@@ -75,6 +85,12 @@ export default function ActivityForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 激励规则默认开关:已有规则 → 收起(摘要够用);无规则 → 展开提示填写。
+  // 用户显式切换后落 localStorage,下次按用户偏好优先。
+  const [rulesOpen, setRulesOpen] = usePersistentToggle(
+    initial.id ? `gameops:activity:${initial.id}:rules-open` : null,
+    initial.rewardRules.length === 0,
+  );
 
   const isDraftEdit = mode === "edit" && status === "DRAFT";
   const readonly = mode === "edit" && status === "ENDED";
@@ -210,18 +226,48 @@ export default function ActivityForm({
             </div>
           </div>
         </Card>
-
-        <Card className="space-y-4 p-5">
-          <div>
-            <h2 className="text-sm font-medium">激励规则</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              七类规则可叠加(最多 10 条)。阶段3 仅做配置存储,实际预估金额由阶段5
-              激励引擎读取计算。
-            </p>
-          </div>
-          <RewardRulesEditor value={rules} onChange={setRules} />
-        </Card>
       </fieldset>
+
+      {/* 激励规则卡:默认折叠;trigger 故意放在 fieldset 外,readonly/锁定状态下也能展开查看 */}
+      <Card className="p-5">
+        <Collapsible open={rulesOpen} onOpenChange={setRulesOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-start gap-2 text-left"
+            >
+              <ChevronDown
+                className={cn(
+                  "mt-0.5 size-4 text-muted-foreground transition-transform shrink-0",
+                  rulesOpen && "rotate-180",
+                )}
+              />
+              <div>
+                <h2 className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  激励规则
+                  <span className="font-normal text-xs text-muted-foreground">
+                    已配 {rules.length} 条
+                  </span>
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  七类规则可叠加(最多 10 条),激励引擎按此配置计算预估。
+                </p>
+              </div>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4">
+            <fieldset
+              disabled={!canEdit}
+              className={cn(
+                "m-0 border-0 p-0",
+                !canEdit && "opacity-70",
+              )}
+            >
+              <RewardRulesEditor value={rules} onChange={setRules} />
+            </fieldset>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
 
       {isDraftEdit && (
         <Card className="space-y-3 p-5">
@@ -255,6 +301,8 @@ export default function ActivityForm({
           </div>
         </Card>
       )}
+
+      {bottomSlot}
 
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
