@@ -10,9 +10,11 @@ import {
   ClipboardCheck,
   Database,
   FileSpreadsheet,
+  History,
   LayoutGrid,
   Lightbulb,
   ListChecks,
+  MonitorSmartphone,
   Server,
   Shield,
   ShieldCheck,
@@ -35,6 +37,7 @@ import { OperatorNavUser } from "./OperatorNavUser";
 
 const NAV_ITEMS: NavItem[] = [
   { title: "概览", url: "/operator/dashboard", icon: LayoutGrid, exact: true },
+  { title: "BI 大屏", url: "/operator/bi", icon: MonitorSmartphone, exact: true },
   {
     title: "活动管理",
     url: "/operator/activities",
@@ -127,6 +130,11 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
     title: "csvType 管理",
     url: "/operator/admin/csv-types",
     icon: FileSpreadsheet,
+  },
+  {
+    title: "审计日志",
+    url: "/operator/admin/audit-logs",
+    icon: History,
   },
 ];
 

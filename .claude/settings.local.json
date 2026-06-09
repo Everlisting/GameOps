@@ -10,7 +10,8 @@
       "PowerShell(npx prisma generate 2>&1 | Select-Object -Last 10)",
       "Bash(pnpm install *)",
       "Bash(pnpm typecheck *)",
-      "Bash(pnpm prisma *)"
+      "Bash(pnpm prisma *)",
+      "WebFetch(domain:api.anthropic.com)"
     ]
   }
 }

@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>GameOps — Sign in</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body, #root { height: 100%; }
+  body {
+    background: #09090b;
+    color: #fafafa;
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ============ Dotted surface canvas wrapper ============ */
+  .dotted-surface {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    opacity: 0;
+    animation: surfaceFade 1.8s ease-out 0.2s forwards;
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 55%, #000 35%, transparent 88%);
+            mask-image: radial-gradient(ellipse 80% 70% at 50% 55%, #000 35%, transparent 88%);
+  }
+  @keyframes surfaceFade { to { opacity: 1; } }
+
+  /* ============ Top-right radial glow accent (from hero-section) ============ */
+  .stage-glow {
+    position: absolute; inset: 0; pointer-events: none; isolation: isolate;
+    opacity: 0; z-index: 1;
+    animation: surfaceFade 2.4s ease-out 0.5s forwards;
+  }
+  .stage-glow .blob-a {
+    position: absolute; left: -10%; top: -16%;
+    width: 38rem; height: 80rem;
+    transform: translateY(-220px) rotate(-45deg);
+    border-radius: 9999px;
+    background: radial-gradient(68% 68% at 55% 31%, hsla(220,40%,80%,.10) 0, hsla(220,30%,55%,.03) 50%, transparent 80%);
+  }
+  .stage-glow .blob-b {
+    position: absolute; right: -6%; top: -20%;
+    width: 42rem; height: 80rem;
+    transform: translateY(-220px) rotate(40deg);
+    border-radius: 9999px;
+    background: radial-gradient(60% 60% at 50% 50%, hsla(160,70%,55%,.07) 0, hsla(160,60%,40%,.02) 60%, transparent 85%);
+  }
+  .stage-vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(125% 125% at 50% 100%, transparent 0%, #09090b 78%);
+  }
+
+  /* ============ Accent grid lines ============ */
+  .accent-lines { position: absolute; inset: 0; pointer-events: none; opacity: .55; z-index: 2; }
+  .hline, .vline { position: absolute; background: #1f1f23; will-change: transform, opacity; }
+  .hline { left: 0; right: 0; height: 1px; transform: scaleX(0); transform-origin: 50% 50%; animation: drawX 1.1s cubic-bezier(.22,.61,.36,1) forwards; }
+  .vline { top: 0; bottom: 0; width: 1px; transform: scaleY(0); transform-origin: 50% 0%; animation: drawY 1.2s cubic-bezier(.22,.61,.36,1) forwards; }
+  .hline:nth-child(1) { top: 14%; animation-delay: .35s; }
+  .hline:nth-child(2) { top: 50%; animation-delay: .50s; }
+  .hline:nth-child(3) { top: 86%; animation-delay: .65s; }
+  .vline:nth-child(4) { left: 18%; animation-delay: .55s; }
+  .vline:nth-child(5) { left: 50%; animation-delay: .70s; }
+  .vline:nth-child(6) { left: 82%; animation-delay: .85s; }
+  .hline::after, .vline::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(110,231,183,.28), transparent);
+    opacity: 0; animation: shimmer 1.1s ease-out forwards;
+  }
+  .hline:nth-child(1)::after { animation-delay: .35s; }
+  .hline:nth-child(2)::after { animation-delay: .50s; }
+  .hline:nth-child(3)::after { animation-delay: .65s; }
+  .vline:nth-child(4)::after { animation-delay: .55s; }
+  .vline:nth-child(5)::after { animation-delay: .70s; }
+  .vline:nth-child(6)::after { animation-delay: .85s; }
+  @keyframes drawX { 0%{transform:scaleX(0);opacity:0} 60%{opacity:.9} 100%{transform:scaleX(1);opacity:.55} }
+  @keyframes drawY { 0%{transform:scaleY(0);opacity:0} 60%{opacity:.9} 100%{transform:scaleY(1);opacity:.55} }
+  @keyframes shimmer { 0%{opacity:0} 40%{opacity:.45} 100%{opacity:0} }
+
+  /* ============ Particles ============ */
+  .particles { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: screen; opacity: .55; pointer-events: none; z-index: 3; }
+
+  /* ============ Nav ============ */
+  .nav-enter { opacity: 0; transform: translateY(-14px); animation: navIn .9s cubic-bezier(.22,.61,.36,1) .1s forwards; }
+  @keyframes navIn { to { opacity: 1; transform: translateY(0); } }
+
+  /* Wide -> Pill condense on scroll */
+  .nav-wrap { transition: max-width .55s cubic-bezier(.22,.61,.36,1); max-width: 72rem; margin-left:auto; margin-right:auto; }
+  .nav-wrap[data-scrolled="true"] { max-width: 56rem; }
+  .nav-shell {
+    transition:
+      padding .45s ease,
+      background-color .45s ease,
+      border-color .45s ease,
+      box-shadow .45s ease,
+      backdrop-filter .45s ease;
+    background: transparent;
+    border: 1px solid transparent;
+    box-shadow: none;
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+  }
+  .nav-shell[data-scrolled="true"] {
+    background: rgba(10,10,12,0.96);
+    border-color: rgba(82,82,91,0.7);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 14px 40px -12px rgba(0,0,0,0.75);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+  /* fade version-badge when condensed */
+  .nav-badge { transition: opacity .35s ease, transform .35s ease, max-width .45s ease, margin .35s ease, padding .35s ease; max-width: 80px; }
+  .nav-shell[data-scrolled="true"] .nav-badge { opacity: 0; transform: translateX(-6px); max-width: 0; margin-left: 0; padding-left: 0; padding-right: 0; border-color: transparent; overflow: hidden; }
+  .nav-signin { transition: opacity .3s ease, max-width .35s ease, padding .3s ease, margin .3s ease; max-width: 80px; overflow: hidden; }
+  .nav-shell[data-scrolled="true"] .nav-signin { opacity: 0; max-width: 0; padding-left: 0; padding-right: 0; margin: 0; pointer-events: none; }
+  .nav-item { position: relative; }
+  .nav-item::after {
+    content: ""; position: absolute; left: 8px; right: 8px; bottom: -6px; height: 1px;
+    background: linear-gradient(90deg, transparent, #6ee7b7, transparent);
+    opacity: 0; transform: scaleX(0.4); transition: opacity .3s, transform .3s;
+  }
+  .nav-item:hover { color: #fafafa; }
+  .nav-item:hover::after { opacity: 1; transform: scaleX(1); }
+  .pill-intro { opacity: 0; transform: translateY(-6px); animation: pillIn .8s ease .55s forwards; }
+  @keyframes pillIn { to { opacity: 1; transform: translateY(0); } }
+
+  /* ============ Card ============ */
+  .card-animate { opacity: 0; transform: translateY(22px) scale(.985); filter: blur(6px); animation: cardIn 1.0s cubic-bezier(.22,.61,.36,1) 0.65s forwards; }
+  @keyframes cardIn { to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
+  .card-shell {
+    background: linear-gradient(180deg, rgba(24,24,27,0.78) 0%, rgba(15,15,18,0.78) 100%);
+    border: 1px solid rgba(63,63,70,0.55);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 30px 80px -20px rgba(0,0,0,0.7),
+      0 0 0 1px rgba(110,231,183,0.04);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    position: relative;
+    overflow: hidden;
+  }
+  /* moving conic border highlight */
+  .card-shell::before {
+    content: ""; position: absolute; inset: -1px; border-radius: 18px; padding: 1px;
+    background: conic-gradient(from var(--ang, 0deg), transparent 0deg, rgba(110,231,183,0.55) 30deg, transparent 90deg, transparent 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    opacity: .55;
+    animation: spin 8s linear infinite;
+    pointer-events: none;
+  }
+  @property --ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+  @keyframes spin { to { --ang: 360deg; } }
+
+  /* ============ Tabs ============ */
+  .tabs-list {
+    background: #0c0c0e;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 4px;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    position: relative;
+  }
+  .tab-trigger {
+    position: relative; z-index: 1;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    color: #a1a1aa;
+    transition: color .25s ease;
+    user-select: none;
+  }
+  .tab-trigger[data-active="true"] { color: #fafafa; }
+  .tab-indicator {
+    position: absolute; top: 4px; bottom: 4px; width: calc(50% - 6px);
+    border-radius: 8px;
+    background: linear-gradient(180deg, #1a1a1d, #131316);
+    box-shadow: inset 0 0 0 1px #2a2a2f, 0 6px 14px -8px rgba(0,0,0,.7);
+    transition: transform .42s cubic-bezier(.22,.9,.32,1.2);
+    z-index: 0;
+  }
+  .tab-shell { position: relative; min-height: 360px; }
+  .tab-panel {
+    transition: opacity .35s ease, filter .35s ease, transform .35s ease;
+    position: absolute; inset: 0;
+  }
+  .tab-panel[data-state="inactive"] {
+    opacity: 0; filter: blur(10px); transform: translateY(6px) scale(.98);
+    pointer-events: none;
+  }
+  .tab-panel[data-state="active"] {
+    position: relative; opacity: 1; filter: blur(0); transform: translateY(0) scale(1);
+  }
+  /* stagger the fields when becoming active */
+  .tab-panel[data-state="active"] > * { opacity: 0; transform: translateY(8px); animation: fieldIn .5s cubic-bezier(.22,.61,.36,1) forwards; }
+  .tab-panel[data-state="active"] > *:nth-child(1) { animation-delay: .05s; }
+  .tab-panel[data-state="active"] > *:nth-child(2) { animation-delay: .10s; }
+  .tab-panel[data-state="active"] > *:nth-child(3) { animation-delay: .15s; }
+  .tab-panel[data-state="active"] > *:nth-child(4) { animation-delay: .20s; }
+  .tab-panel[data-state="active"] > *:nth-child(5) { animation-delay: .25s; }
+  .tab-panel[data-state="active"] > *:nth-child(6) { animation-delay: .30s; }
+  .tab-panel[data-state="active"] > *:nth-child(7) { animation-delay: .35s; }
+  @keyframes fieldIn { to { opacity: 1; transform: translateY(0); } }
+
+  /* ============ Inputs ============ */
+  .field {
+    position: relative;
+  }
+  .field input {
+    width: 100%;
+    height: 42px;
+    background: #0a0a0c;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 0 38px 0 40px;
+    color: #fafafa;
+    font-size: 14px;
+    transition: border-color .25s, box-shadow .25s, background .25s;
+    outline: none;
+  }
+  .field input::placeholder { color: #52525b; }
+  .field input:focus {
+    border-color: #34d399;
+    background: #0c0c0f;
+    box-shadow: 0 0 0 4px rgba(52,211,153,0.10), 0 0 24px -8px rgba(52,211,153,0.35);
+  }
+  .field .icon-left  { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #71717a; transition: color .25s; }
+  .field input:focus + .icon-left,
+  .field:has(input:focus) .icon-left { color: #34d399; }
+  .field .icon-right { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display:flex; align-items:center; justify-content:center; width: 32px; height: 32px; border-radius: 8px; color: #a1a1aa; }
+  .field .icon-right:hover { color: #fafafa; background: rgba(255,255,255,0.04); }
+
+  /* primary CTA */
+  .cta {
+    height: 44px; width: 100%; border-radius: 12px; font-weight: 600; font-size: 14px;
+    color: #052e1d;
+    background: linear-gradient(180deg, #6ee7b7 0%, #34d399 50%, #10b981 100%);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 -1px 0 rgba(0,0,0,0.15) inset, 0 10px 30px -10px rgba(16,185,129,0.6);
+    position: relative; overflow: hidden;
+    transition: transform .15s ease, filter .25s ease, box-shadow .25s ease;
+  }
+  .cta::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%);
+    transform: translateX(-120%); transition: transform .8s ease;
+  }
+  .cta:hover::after { transform: translateX(120%); }
+  .cta:hover { filter: brightness(1.04); }
+  .cta:active { transform: translateY(1px); }
+
+  /* secondary buttons */
+  .btn-secondary {
+    height: 40px; border-radius: 10px;
+    background: #0a0a0c; border: 1px solid #27272a; color: #fafafa;
+    font-size: 13px; font-weight: 500;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background .2s, border-color .2s, transform .15s;
+  }
+  .btn-secondary:hover { background: #131316; border-color: #3f3f46; }
+  .btn-secondary:active { transform: translateY(1px); }
+
+  /* check */
+  .check {
+    width: 16px; height: 16px; border-radius: 4px; border: 1px solid #3f3f46;
+    background: #0a0a0c; cursor: pointer; flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all .2s;
+  }
+  .check[data-checked="true"] { background: #34d399; border-color: #34d399; }
+  .check[data-checked="true"] svg { opacity: 1; transform: scale(1); }
+  .check svg { color: #052e1d; opacity: 0; transform: scale(.6); transition: all .2s; }
+
+  /* separator with label */
+  .sep { position: relative; display:flex; align-items:center; }
+  .sep::before { content: ""; flex: 1; height: 1px; background: #27272a; }
+  .sep::after  { content: ""; flex: 1; height: 1px; background: #27272a; }
+  .sep span { padding: 0 12px; font-size: 11px; letter-spacing: .18em; color: #52525b; text-transform: uppercase; }
+
+  /* status dot pulse */
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 9999px; background: #34d399;
+    box-shadow: 0 0 0 0 rgba(52,211,153,.6);
+    animation: pulse 2s ease-out infinite;
+  }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)} 70%{box-shadow:0 0 0 10px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
+
+  /* link underline */
+  .link-u { position: relative; }
+  .link-u::after { content:""; position:absolute; left:0; right:0; bottom:-2px; height:1px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform .3s ease; }
+  .link-u:hover::after { transform: scaleX(1); }
+
+  /* Mono caption corners */
+  .corner-mono { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #52525b; }
+
+  .corner { position: absolute; width: 10px; height: 10px; border: 1px solid #34d399; opacity: .55; }
+  .corner.tl { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+  .corner.tr { top: 10px; right: 10px; border-left: none; border-bottom: none; }
+  .corner.bl { bottom: 10px; left: 10px; border-right: none; border-top: none; }
+  .corner.br { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+
+  /* ============ Hero ============ */
+  .hero-pill { opacity: 0; transform: translateY(8px); animation: heroIn .9s cubic-bezier(.22,.61,.36,1) .55s forwards; }
+  .hero-title { opacity: 0; filter: blur(12px); transform: translateY(14px); animation: heroBlurIn 1.2s cubic-bezier(.22,.61,.36,1) .70s forwards; }
+  .hero-sub { opacity: 0; transform: translateY(14px); animation: heroIn 1.0s cubic-bezier(.22,.61,.36,1) .95s forwards; }
+  .hero-ctas { opacity: 0; transform: translateY(14px); animation: heroIn 1.0s cubic-bezier(.22,.61,.36,1) 1.15s forwards; }
+  .hero-logos { opacity: 0; animation: heroFade 1.0s ease 1.45s forwards; }
+  @keyframes heroIn { to { opacity: 1; transform: translateY(0); } }
+  @keyframes heroBlurIn { to { opacity: 1; transform: translateY(0); filter: blur(0); } }
+  @keyframes heroFade { to { opacity: 1; } }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 5px 6px 5px 16px; border-radius: 9999px;
+    background: rgba(24,24,27,0.70); border: 1px solid rgba(63,63,70,0.6);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px -10px rgba(0,0,0,0.6);
+    transition: background .3s, border-color .3s;
+  }
+  .pill:hover { background: rgba(39,39,42,0.75); border-color: rgba(82,82,91,0.7); }
+  .pill .pill-sep { width: 1px; height: 14px; background: rgba(82,82,91,0.7); }
+  .pill .pill-arrow {
+    width: 20px; height: 20px; border-radius: 9999px; background: #09090b;
+    overflow: hidden; position: relative;
+    display: inline-flex; align-items: center; justify-content: flex-start;
+    flex: 0 0 auto;
+  }
+  .pill .pill-arrow-track { display: inline-flex; transform: translateX(-50%); transition: transform .45s ease; width: 40px; }
+  .pill:hover .pill-arrow-track { transform: translateX(0); }
+  .pill .pill-arrow-track > span { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; }
+
+  .hero-h1 {
+    font-size: clamp(40px, 6.8vw, 84px);
+    line-height: 0.98;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  .hero-h1 .grad {
+    background: linear-gradient(180deg, #ecfdf5 0%, #6ee7b7 50%, #10b981 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* outline button (Request demo) */
+  .btn-ghost {
+    height: 44px; padding: 0 18px; border-radius: 12px;
+    color: #fafafa; font-weight: 500; font-size: 14px;
+    background: transparent; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: background .2s, border-color .2s;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.04); border-color: rgba(82,82,91,0.55); }
+
+  /* primary CTA framed (matches hero language) */
+  .cta-frame {
+    padding: 2px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(110,231,183,0.4) 0%, rgba(16,185,129,0.1) 100%);
+  }
+
+  /* customer logos */
+  .logos-grid {
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 28px 40px;
+    align-items: center;
+  }
+  .logo-mark {
+    color: #71717a; font-size: 13px; letter-spacing: .04em; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: color .2s ease, filter .2s ease;
+    justify-self: center;
+  }
+  .logo-mark:hover { color: #d4d4d8; }
+  .logo-mark .dot { width: 6px; height: 6px; border-radius: 2px; background: currentColor; }
+  .logos-wrap { position: relative; }
+  .logos-wrap::before, .logos-wrap::after {
+    content: "Trusted by live-ops teams at"; position: absolute; top: -24px; left: 50%; transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .18em;
+    color: #52525b; text-transform: uppercase; white-space: nowrap;
+  }
+  .logos-wrap::after { content: none; }
+
+  /* ============ Modal ============ */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(9,9,11,0.55);
+    backdrop-filter: blur(14px) saturate(120%);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    opacity: 0;
+    animation: backdropIn .35s ease forwards;
+    display: grid; place-items: center;
+    padding: 24px;
+    overflow-y: auto;
+  }
+  .modal-backdrop[data-closing="true"] { animation: backdropOut .25s ease forwards; }
+  @keyframes backdropIn { to { opacity: 1; } }
+  @keyframes backdropOut { from { opacity: 1; } to { opacity: 0; } }
+
+  .modal-card-wrap {
+    transform: translateY(28px) scale(.96);
+    opacity: 0; filter: blur(8px);
+    animation: modalIn .55s cubic-bezier(.22,.9,.32,1.15) .06s forwards;
+  }
+  .modal-backdrop[data-closing="true"] .modal-card-wrap { animation: modalOut .25s ease forwards; }
+  @keyframes modalIn { to { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); } }
+  @keyframes modalOut { to { transform: translateY(20px) scale(.97); opacity: 0; filter: blur(8px); } }
+
+  .modal-close {
+    position: absolute; top: 14px; right: 14px; z-index: 2;
+    width: 32px; height: 32px; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #a1a1aa; background: rgba(24,24,27,0.6); border: 1px solid rgba(63,63,70,0.6);
+    transition: color .2s, background .2s, transform .2s;
+  }
+  .modal-close:hover { color: #fafafa; background: rgba(39,39,42,0.85); transform: rotate(90deg); }
+
+  /* ============ Preview dashboard ============ */
+  .preview-wrap { opacity: 0; transform: translateY(28px); animation: heroIn 1.2s cubic-bezier(.22,.61,.36,1) 1.5s forwards; }
+  .preview-frame {
+    position: relative;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(24,24,27,0.85) 0%, rgba(12,12,14,0.85) 100%);
+    border: 1px solid rgba(63,63,70,0.55);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 50px 120px -30px rgba(0,0,0,0.8),
+      0 0 0 1px rgba(110,231,183,0.04);
+    padding: 14px;
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+  }
+  .preview-chrome { display: flex; align-items: center; gap: 6px; padding: 6px 8px 12px; }
+  .preview-chrome .dot-r { width: 10px; height: 10px; border-radius: 9999px; background: #3f3f46; }
+  .preview-chrome .url-pill {
+    margin-left: 12px; height: 22px; border-radius: 6px;
+    background: rgba(9,9,11,0.7); border: 1px solid #27272a;
+    display: inline-flex; align-items: center; gap: 6px; padding: 0 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #71717a;
+  }
+  .preview-grid {
+    display: grid; grid-template-columns: 200px 1fr; gap: 12px;
+    background: #0a0a0c; border-radius: 12px; padding: 12px; min-height: 320px;
+    border: 1px solid #1f1f23;
+  }
+  .pv-side { display: flex; flex-direction: column; gap: 2px; padding: 4px; }
+  .pv-side .nav-row { display:flex; align-items:center; gap:8px; padding: 7px 9px; border-radius: 8px; font-size: 12px; color: #a1a1aa; }
+  .pv-side .nav-row.active { background: rgba(110,231,183,0.08); color: #ecfdf5; border: 1px solid rgba(110,231,183,0.18); }
+  .pv-side .nav-row .ic { width: 14px; height: 14px; border-radius: 4px; background: #27272a; flex: 0 0 auto; }
+  .pv-side .nav-row.active .ic { background: #34d399; }
+  .pv-main { display: flex; flex-direction: column; gap: 10px; padding: 4px; }
+  .pv-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .pv-card {
+    background: rgba(15,15,18,0.85); border: 1px solid #1f1f23; border-radius: 10px;
+    padding: 12px; position: relative; overflow: hidden;
+  }
+  .pv-card .label { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: #52525b; }
+  .pv-card .value { font-size: 20px; font-weight: 600; letter-spacing: -.01em; color: #fafafa; margin-top: 4px; }
+  .pv-card .delta { font-size: 10.5px; color: #34d399; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+  .pv-card .delta.down { color: #f87171; }
+  .pv-card .sparkline { position: absolute; right: 10px; top: 14px; opacity: .9; }
+  .pv-row-wide { background: rgba(15,15,18,0.85); border: 1px solid #1f1f23; border-radius: 10px; padding: 12px 14px; flex: 1; min-height: 190px; position: relative; overflow: hidden; }
+  .pv-row-wide .head { display:flex; align-items:center; justify-content:space-between; }
+  .pv-row-wide .head .title { font-size: 12px; color: #d4d4d8; font-weight: 600; }
+  .pv-row-wide .head .chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #71717a; padding: 2px 6px; border: 1px solid #27272a; border-radius: 6px; }
+  .pv-bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; margin-top: 14px; }
+  .pv-bars span {
+    flex: 1; border-radius: 3px 3px 0 0;
+    background: linear-gradient(180deg, #6ee7b7 0%, #10b981 100%);
+    opacity: .85;
+    animation: barRise .8s cubic-bezier(.22,.61,.36,1) forwards;
+    transform-origin: bottom; transform: scaleY(0);
+  }
+  @keyframes barRise { to { transform: scaleY(1); } }
+  .pv-bars span:nth-child(odd) { background: linear-gradient(180deg, #34d399 0%, #059669 100%); }
+  .preview-fade {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 45%;
+    background: linear-gradient(180deg, transparent 0%, #09090b 90%);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+
+
+
+
+
+const { useState, useRef, useEffect } = React;
+
+/* ───────── Inline icons (lucide-style) ───────── */
+const Icon = ({ d, size = 16, stroke = 2, className = "", children }) =>
+<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round"
+className={className}>{children || d && <path d={d} />}</svg>;
+
+const Mail = (p) => <Icon {...p}><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></Icon>;
+const Lock = (p) => <Icon {...p}><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></Icon>;
+const Eye = (p) => <Icon {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></Icon>;
+const EyeOff = (p) => <Icon {...p}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" /></Icon>;
+const Github = (p) => <Icon {...p}><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" /><path d="M9 18c-4.51 2-5-2-7-2" /></Icon>;
+const Chrome = (p) => <Icon {...p}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><line x1="21.17" x2="12" y1="8" y2="8" /><line x1="3.95" x2="8.54" y1="6.06" y2="14" /><line x1="10.88" x2="15.46" y1="21.94" y2="14" /></Icon>;
+const User = (p) => <Icon {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Icon>;
+const ArrowRight = (p) => <Icon {...p}><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></Icon>;
+const Check = (p) => <Icon {...p}><path d="M20 6 9 17l-5-5" /></Icon>;
+const Shield = (p) => <Icon {...p}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></Icon>;
+const X = (p) => <Icon {...p}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Icon>;
+const Sparkles = (p) => <Icon {...p}><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></Icon>;
+const Activity = (p) => <Icon {...p}><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.5.5 0 0 1-.96 0L9.24 2.18a.5.5 0 0 0-.96 0l-2.35 8.36A2 2 0 0 1 4 12H2" /></Icon>;
+
+/* ───────── Dotted three.js surface ───────── */
+function DottedSurface() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const container = ref.current;
+    if (!container || !window.THREE) return;
+    const THREE = window.THREE;
+
+    const SEPARATION = 160;
+    const AMOUNTX = 46;
+    const AMOUNTY = 70;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 1, 12000);
+    camera.position.set(0, 340, 1280);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    container.appendChild(renderer.domElement);
+
+    const geometry = new THREE.BufferGeometry();
+    const positions = [];
+    const colors = [];
+
+    for (let ix = 0; ix < AMOUNTX; ix++) {
+      for (let iy = 0; iy < AMOUNTY; iy++) {
+        const x = ix * SEPARATION - AMOUNTX * SEPARATION / 2;
+        const z = iy * SEPARATION - AMOUNTY * SEPARATION / 2;
+        positions.push(x, 0, z);
+        // gradient by depth — emerald->slate
+        const t = iy / AMOUNTY;
+        const r = 0.25 + (1 - t) * 0.10;
+        const g = 0.65 + (1 - t) * 0.20;
+        const b = 0.50 + (1 - t) * 0.10;
+        colors.push(r, g, b);
+      }
+    }
+
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+      size: 7,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      sizeAttenuation: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    let count = 0;
+    let raf = 0;
+    let mouseX = 0;
+
+    const onMove = (e) => {mouseX = (e.clientX / innerWidth - 0.5) * 80;};
+    window.addEventListener('pointermove', onMove);
+
+    const animate = () => {
+      raf = requestAnimationFrame(animate);
+      const arr = geometry.attributes.position.array;
+      let i = 0;
+      for (let ix = 0; ix < AMOUNTX; ix++) {
+        for (let iy = 0; iy < AMOUNTY; iy++) {
+          const idx = i * 3;
+          arr[idx + 1] =
+          Math.sin((ix + count) * 0.3) * 55 +
+          Math.sin((iy + count) * 0.5) * 55;
+          i++;
+        }
+      }
+      geometry.attributes.position.needsUpdate = true;
+      camera.position.x += (mouseX - camera.position.x) * 0.02;
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+      count += 0.06;
+    };
+    animate();
+
+    const onResize = () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    };
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('pointermove', onMove);
+      cancelAnimationFrame(raf);
+      geometry.dispose();
+      material.dispose();
+      renderer.dispose();
+      if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+    };
+  }, []);
+  return <div ref={ref} className="dotted-surface" />;
+}
+
+/* ───────── Particles (rising) ───────── */
+function Particles() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const setSize = () => {canvas.width = innerWidth;canvas.height = innerHeight;};
+    setSize();
+    let ps = [];let raf = 0;
+    const make = () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      v: Math.random() * 0.25 + 0.06,
+      o: Math.random() * 0.35 + 0.15
+    });
+    const init = () => {ps = [];const n = Math.floor(canvas.width * canvas.height / 12000);for (let i = 0; i < n; i++) ps.push(make());};
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ps.forEach((p) => {
+        p.y -= p.v;
+        if (p.y < 0) {p.x = Math.random() * canvas.width;p.y = canvas.height + Math.random() * 40;p.v = Math.random() * 0.25 + 0.06;p.o = Math.random() * 0.35 + 0.15;}
+        ctx.fillStyle = `rgba(167, 243, 208, ${p.o})`;
+        ctx.fillRect(p.x, p.y, 0.7, 2.2);
+      });
+      raf = requestAnimationFrame(draw);
+    };
+    const onResize = () => {setSize();init();};
+    window.addEventListener('resize', onResize);
+    init();raf = requestAnimationFrame(draw);
+    return () => {window.removeEventListener('resize', onResize);cancelAnimationFrame(raf);};
+  }, []);
+  return <canvas ref={ref} className="particles" />;
+}
+
+/* ───────── Brand logo ───────── */
+const Logo = ({ size = 22 }) =>
+<svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+    <defs>
+      <linearGradient id="lg" x1="0" y1="0" x2="32" y2="32">
+        <stop offset="0" stopColor="#6ee7b7" />
+        <stop offset="1" stopColor="#10b981" />
+      </linearGradient>
+    </defs>
+    <path d="M16 2 L29 9 V23 L16 30 L3 23 V9 Z" stroke="url(#lg)" strokeWidth="1.6" fill="rgba(16,185,129,0.06)" />
+    <path d="M11 13 L16 10 L21 13 V19 L16 22 L11 19 Z" fill="url(#lg)" opacity=".95" />
+    <circle cx="16" cy="16" r="1.6" fill="#09090b" />
+  </svg>;
+
+
+/* ───────── Header nav ───────── */
+const menuItems = [
+{ name: 'Platform', href: '#' },
+{ name: 'Live Ops', href: '#' },
+{ name: 'Telemetry', href: '#' },
+{ name: 'Docs', href: '#' }];
+
+function Header({ onOpenAuth, scrolled }) {
+  return (
+    <header className="fixed top-0 left-0 right-0 z-30 px-4 pt-4 nav-enter">
+      <nav className="nav-wrap" data-scrolled={scrolled}>
+        <div className="nav-shell rounded-2xl px-4 sm:px-5 py-2.5 flex items-center justify-between gap-4 whitespace-nowrap" data-scrolled={scrolled}>
+          <a href="#" className="flex items-center gap-2.5 group">
+            <Logo size={22} />
+            <span className="text-[15px] font-semibold tracking-tight">GameOps</span>
+            <span className="nav-badge hidden sm:inline-flex items-center gap-1.5 ml-2 px-1.5 py-0.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-[10px] font-mono uppercase tracking-widest text-zinc-400">
+              <span className="live-dot"></span> v3.2
+            </span>
+          </a>
+
+          <ul className="hidden md:flex items-center gap-6 text-[13px] text-zinc-400">
+            {menuItems.map((it) =>
+            <li key={it.name}><a className="nav-item transition-colors" href={it.href}>{it.name}</a></li>
+            )}
+          </ul>
+
+          <div className="flex items-center gap-2 pill-intro">
+            <button type="button" onClick={() => onOpenAuth('login')}
+            className="nav-signin hidden sm:inline-flex text-[13px] text-zinc-400 hover:text-zinc-100 px-3 py-1.5 rounded-lg transition-colors">
+              Sign in
+            </button>
+            <button type="button" onClick={() => onOpenAuth('signup')}
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium pl-3 pr-2 py-1.5 rounded-lg bg-zinc-50 text-zinc-950 hover:bg-white transition-colors">
+              Get started
+              <span className="inline-flex w-5 h-5 rounded-md bg-zinc-950 text-zinc-50 items-center justify-center">
+                <ArrowRight size={11} stroke={2.5} />
+              </span>
+            </button>
+          </div>
+        </div>
+      </nav>
+    </header>);
+
+}
+
+/* ───────── Form fields ───────── */
+function Field({ id, label, type = "text", placeholder, icon: I, value, onChange, rightSlot, autoComplete }) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-[12px] font-medium text-zinc-300 mb-1.5">{label}</label>
+      <div className="field">
+        <input id={id} type={type} placeholder={placeholder} value={value} onChange={onChange} autoComplete={autoComplete} />
+        <span className="icon-left"><I size={16} /></span>
+        {rightSlot}
+      </div>
+    </div>);
+
+}
+
+function PasswordField({ id, label, value, onChange, autoComplete }) {
+  const [show, setShow] = useState(false);
+  return (
+    <Field
+      id={id}
+      label={label}
+      type={show ? "text" : "password"}
+      placeholder="••••••••"
+      icon={Lock}
+      value={value}
+      onChange={onChange}
+      autoComplete={autoComplete}
+      rightSlot={
+      <button type="button" className="icon-right" aria-label={show ? "Hide password" : "Show password"} onClick={() => setShow((v) => !v)}>
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      } />);
+
+
+}
+
+function CheckRow({ id, checked, onChange, children }) {
+  return (
+    <label htmlFor={id} className="flex items-center gap-2.5 cursor-pointer select-none">
+      <span className="check" data-checked={checked} onClick={(e) => {e.preventDefault();onChange(!checked);}}>
+        <Check size={11} stroke={3} />
+      </span>
+      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only" />
+      <span className="text-[13px] text-zinc-400">{children}</span>
+    </label>);
+
+}
+
+/* ───────── Auth card ───────── */
+function AuthCard({ initialTab = 'login' }) {
+  const [tab, setTab] = useState(initialTab); // 'login' | 'signup'
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPw, setLoginPw] = useState('');
+  const [remember, setRemember] = useState(true);
+
+  const [name, setName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPw, setSignupPw] = useState('');
+  const [terms, setTerms] = useState(false);
+
+  const [pwStrength, setPwStrength] = useState(0);
+  useEffect(() => {
+    const v = signupPw;
+    let s = 0;
+    if (v.length >= 6) s++;
+    if (v.length >= 10) s++;
+    if (/[A-Z]/.test(v) && /[a-z]/.test(v)) s++;
+    if (/\d/.test(v) && /[^A-Za-z0-9]/.test(v)) s++;
+    setPwStrength(s);
+  }, [signupPw]);
+
+  return (
+    <div className="w-[500px] max-w-[calc(100vw-32px)]">
+      <div className="card-shell">
+        <span className="corner tl" /><span className="corner tr" /><span className="corner bl" /><span className="corner br" />
+
+        <div className="p-7 pb-5" style={{ width: "498px" }}>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2 corner-mono">
+              <Shield size={12} className="text-emerald-400" />
+              SECURE • TLS 1.3
+            </div>
+            <div className="corner-mono">/ AUTH</div>
+          </div>
+
+          <h1 className="text-[26px] font-semibold tracking-tight leading-tight">
+            {tab === 'login' ? 'Welcome back, operator' : 'Join the control plane'}
+          </h1>
+          <p className="text-[13.5px] text-zinc-400 mt-1.5">
+            {tab === 'login' ? 'Sign in to your GameOps workspace.' : 'Create a workspace to monitor your live game.'}
+          </p>
+
+          {/* Tabs */}
+          <div className="mt-6">
+            <div className="tabs-list" role="tablist">
+              <span className="tab-indicator" style={{ transform: `translateX(${tab === 'login' ? '0%' : 'calc(100% + 4px)'})` }} />
+              <button role="tab" aria-selected={tab === 'login'} data-active={tab === 'login'} className="tab-trigger" onClick={() => setTab('login')}>Log in</button>
+              <button role="tab" aria-selected={tab === 'signup'} data-active={tab === 'signup'} className="tab-trigger" onClick={() => setTab('signup')}>Sign up</button>
+            </div>
+          </div>
+
+          {/* Panels */}
+          <div className="tab-shell mt-6">
+            {/* LOGIN */}
+            <div className="tab-panel" data-state={tab === 'login' ? 'active' : 'inactive'}>
+              <Field id="login-email" label="Email" type="email" placeholder="operator@studio.gg" icon={Mail}
+              value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} autoComplete="email" />
+              <div className="mt-4"><PasswordField id="login-pw" label="Password" value={loginPw} onChange={(e) => setLoginPw(e.target.value)} autoComplete="current-password" /></div>
+
+              <div className="mt-4 flex items-center justify-between">
+                <CheckRow id="remember" checked={remember} onChange={setRemember}>Remember device</CheckRow>
+                <a href="#" className="text-[12.5px] text-zinc-300 link-u">Forgot password?</a>
+              </div>
+
+              <button className="cta mt-5">
+                <span className="inline-flex items-center gap-2">
+                  Continue <ArrowRight size={14} stroke={2.5} />
+                </span>
+              </button>
+
+              <div className="sep mt-5"><span>or continue with</span></div>
+
+              <div className="grid grid-cols-2 gap-2.5 mt-4">
+                <button className="btn-secondary"><Github size={15} /> GitHub</button>
+                <button className="btn-secondary"><Chrome size={15} /> Google</button>
+              </div>
+            </div>
+
+            {/* SIGNUP */}
+            <div className="tab-panel" data-state={tab === 'signup' ? 'active' : 'inactive'}>
+              <Field id="name" label="Full name" placeholder="Ada Lovelace" icon={User}
+              value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+              <div className="mt-4"><Field id="signup-email" label="Work email" type="email" placeholder="ada@studio.gg" icon={Mail}
+                value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} autoComplete="email" /></div>
+              <div className="mt-4">
+                <PasswordField id="signup-pw" label="Password" value={signupPw} onChange={(e) => setSignupPw(e.target.value)} autoComplete="new-password" />
+                {/* strength */}
+                <div className="mt-2 flex items-center gap-1.5">
+                  {[0, 1, 2, 3].map((i) =>
+                  <span key={i} className="h-1 flex-1 rounded-full" style={{
+                    background: i < pwStrength ?
+                    ['#ef4444', '#f59e0b', '#34d399', '#10b981'][Math.min(pwStrength - 1, 3)] :
+                    '#27272a',
+                    transition: 'background .3s ease'
+                  }} />
+                  )}
+                  <span className="text-[10.5px] font-mono uppercase tracking-widest text-zinc-500 ml-1 w-12 text-right">
+                    {['', 'weak', 'fair', 'good', 'strong'][pwStrength]}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <CheckRow id="terms" checked={terms} onChange={setTerms}>
+                  I agree to the <a className="text-zinc-200 link-u" href="#">Terms</a> & <a className="text-zinc-200 link-u" href="#">Privacy</a>
+                </CheckRow>
+              </div>
+
+              <button className="cta mt-5" disabled={!terms} style={{ opacity: terms ? 1 : 0.55, cursor: terms ? 'pointer' : 'not-allowed' }}>
+                <span className="inline-flex items-center gap-2">
+                  Create workspace <ArrowRight size={14} stroke={2.5} />
+                </span>
+              </button>
+
+              <div className="sep mt-5"><span>or sign up with</span></div>
+
+              <div className="grid grid-cols-2 gap-2.5 mt-4">
+                <button className="btn-secondary"><Github size={15} /> GitHub</button>
+                <button className="btn-secondary"><Chrome size={15} /> Google</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-zinc-800/70 px-7 py-4 flex items-center justify-between text-[12.5px] text-zinc-500">
+          <span className="font-mono uppercase tracking-widest text-[10.5px]">SOC 2 · GDPR · ISO 27001</span>
+          <a href="#" className="text-zinc-300 link-u">Need help?</a>
+        </div>
+      </div>
+
+      {/* below-card status row */}
+      <div className="mt-4 flex items-center justify-between px-1 text-[11px] font-mono uppercase tracking-widest text-zinc-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="live-dot"></span> All systems operational
+        </span>
+        <span>Region · IAD-1</span>
+      </div>
+    </div>);
+
+}
+
+/* ───────── Hero copy ───────── */
+function Hero({ onOpenAuth }) {
+  return (
+    <div className="mx-auto max-w-5xl px-6 text-center">
+      <h1 className="hero-title hero-h1 mt-8 mx-auto max-w-4xl">
+        The control plane for <br className="hidden sm:block" />
+        <span className="grad">live game operations.</span>
+      </h1>
+
+      <p className="hero-sub mx-auto mt-7 max-w-2xl text-balance text-[16px] leading-relaxed text-zinc-400">
+        Monitor matchmaking, economies, and player health from one workspace. Ship hotfixes without redeploys,
+        run experiments in production, and keep your players in flow.
+      </p>
+
+      <div className="hero-ctas mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-3">
+        <div className="cta-frame">
+          <button type="button" onClick={() => onOpenAuth('signup')} className="cta" style={{ width: 'auto', paddingLeft: 22, paddingRight: 18, whiteSpace: 'nowrap' }}>
+            <span className="inline-flex items-center gap-2">
+              Get started
+              <ArrowRight size={14} stroke={2.5} />
+            </span>
+          </button>
+        </div>
+        <button type="button" className="btn-ghost">
+          <Activity size={14} />
+          Request a demo
+        </button>
+      </div>
+
+      {/* customer logos */}
+      <div className="hero-logos mt-20">
+        <div className="logos-wrap pt-1">
+          <div className="logos-grid mx-auto max-w-3xl">
+            <span className="logo-mark"><span className="dot" />OBSIDIAN</span>
+            <span className="logo-mark" style={{ fontFamily: "'JetBrains Mono', monospace", letterSpacing: '.18em', fontSize: 12 }}>HELIX//</span>
+            <span className="logo-mark" style={{ fontStyle: 'italic', fontWeight: 600 }}>Northstar</span>
+            <span className="logo-mark"><span className="dot" style={{ borderRadius: 9999 }} />paradox</span>
+            <span className="logo-mark" style={{ letterSpacing: '.22em', fontWeight: 600 }}>R · I · O · T</span>
+            <span className="logo-mark" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{'<vector/>'}</span>
+            <span className="logo-mark" style={{ fontWeight: 700, letterSpacing: '-0.02em' }}>Lumen.</span>
+            <span className="logo-mark"><span className="dot" />KRAKEN</span>
+            <span className="logo-mark" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>FORGE_07</span>
+            <span className="logo-mark" style={{ fontStyle: 'italic', letterSpacing: '.04em' }}>Sundial</span>
+          </div>
+        </div>
+      </div>
+
+      {/* dashboard preview */}
+      <div className="preview-wrap mt-24 mx-auto max-w-5xl text-left">
+        <div className="preview-frame">
+          <div className="preview-chrome">
+            <span className="dot-r" /><span className="dot-r" /><span className="dot-r" />
+            <span className="url-pill">
+              <span style={{ width: 6, height: 6, borderRadius: 9999, background: '#34d399', display: 'inline-block' }}></span>
+              app.gameops.gg / live-ops
+            </span>
+            <span className="ml-auto corner-mono">⌘K · SEARCH</span>
+          </div>
+          <div className="preview-grid">
+            <aside className="pv-side">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 px-2 pt-1 pb-2">Workspace</div>
+              <div className="nav-row active"><span className="ic" />Overview</div>
+              <div className="nav-row"><span className="ic" />Matchmaking</div>
+              <div className="nav-row"><span className="ic" />Economy</div>
+              <div className="nav-row"><span className="ic" />Player health</div>
+              <div className="nav-row"><span className="ic" />Experiments</div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 px-2 pt-4 pb-2">Live</div>
+              <div className="nav-row"><span className="ic" />Incidents <span className="ml-auto text-[10px] font-mono text-emerald-400">0</span></div>
+              <div className="nav-row"><span className="ic" />Releases</div>
+            </aside>
+            <div className="pv-main">
+              <div className="pv-kpis">
+                <div className="pv-card">
+                  <div className="label">CCU</div>
+                  <div className="value">184,302</div>
+                  <div className="delta">↑ 12.4% vs 24h</div>
+                  <svg className="sparkline" width="56" height="22" viewBox="0 0 56 22" fill="none"><path d="M2 18 L10 14 L18 16 L26 10 L34 12 L42 6 L54 4" stroke="#34d399" strokeWidth="1.5" fill="none" /></svg>
+                </div>
+                <div className="pv-card">
+                  <div className="label">Match P99</div>
+                  <div className="value">42ms</div>
+                  <div className="delta">↓ 8.1% vs 24h</div>
+                  <svg className="sparkline" width="56" height="22" viewBox="0 0 56 22" fill="none"><path d="M2 6 L10 10 L18 8 L26 14 L34 11 L42 16 L54 18" stroke="#34d399" strokeWidth="1.5" fill="none" /></svg>
+                </div>
+                <div className="pv-card">
+                  <div className="label">Crash rate</div>
+                  <div className="value">0.04%</div>
+                  <div className="delta down">↑ 0.01%</div>
+                  <svg className="sparkline" width="56" height="22" viewBox="0 0 56 22" fill="none"><path d="M2 14 L10 12 L18 15 L26 10 L34 13 L42 8 L54 10" stroke="#f87171" strokeWidth="1.5" fill="none" /></svg>
+                </div>
+                <div className="pv-card">
+                  <div className="label">ARPDAU</div>
+                  <div className="value">$0.87</div>
+                  <div className="delta">↑ 4.2%</div>
+                  <svg className="sparkline" width="56" height="22" viewBox="0 0 56 22" fill="none"><path d="M2 16 L10 12 L18 14 L26 8 L34 10 L42 6 L54 4" stroke="#34d399" strokeWidth="1.5" fill="none" /></svg>
+                </div>
+              </div>
+              <div className="pv-row-wide">
+                <div className="head">
+                  <span className="title">Concurrent players · last 24h</span>
+                  <span className="chip">Region · GLOBAL</span>
+                </div>
+                <div className="pv-bars">
+                  {[28, 42, 38, 52, 48, 61, 55, 72, 68, 76, 82, 74, 88, 92, 84, 78, 90, 98, 86, 72, 64, 58, 50, 44].map((h, i) =>
+                  <span key={i} style={{ height: `${h}%`, animationDelay: `${1.7 + i * 0.022}s` }} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="preview-fade" />
+        </div>
+      </div>
+    </div>);
+
+}
+
+/* ───────── Modal ───────── */
+function AuthModal({ open, initialTab, onClose }) {
+  const [mounted, setMounted] = useState(open);
+  const [closing, setClosing] = useState(false);
+
+  useEffect(() => {
+    if (open) {setMounted(true);setClosing(false);} else
+    if (mounted) {
+      setClosing(true);
+      const t = setTimeout(() => {setMounted(false);setClosing(false);}, 260);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const onKey = (e) => {if (e.key === 'Escape') onClose();};
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mounted, onClose]);
+
+  if (!mounted) return null;
+
+  return (
+    <div
+      className="modal-backdrop"
+      data-closing={closing}
+      onClick={(e) => {if (e.target === e.currentTarget) onClose();}}
+      role="dialog"
+      aria-modal="true">
+      
+      <div className="modal-card-wrap relative">
+        <button type="button" className="modal-close" aria-label="Close" onClick={onClose}>
+          <X size={15} stroke={2.2} />
+        </button>
+        <AuthCard initialTab={initialTab} />
+      </div>
+    </div>);
+
+}
+
+/* ───────── App ───────── */
+function App() {
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authTab, setAuthTab] = useState('login');
+  const [scrolled, setScrolled] = useState(false);
+  const mainRef = useRef(null);
+  const openAuth = (tab) => {setAuthTab(tab);setAuthOpen(true);};
+
+  useEffect(() => {
+    const m = mainRef.current;
+    if (!m) return;
+    const onScroll = () => setScrolled(m.scrollTop > 40);
+    onScroll();
+    m.addEventListener('scroll', onScroll, { passive: true });
+    return () => m.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      {/* layers */}
+      <DottedSurface />
+      <div className="stage-glow">
+        <div className="blob-a" />
+        <div className="blob-b" />
+      </div>
+      <div className="accent-lines">
+        <div className="hline" />
+        <div className="hline" />
+        <div className="hline" />
+        <div className="vline" />
+        <div className="vline" />
+        <div className="vline" />
+      </div>
+      <Particles />
+      <div className="stage-vignette" />
+
+      <Header onOpenAuth={openAuth} scrolled={scrolled} />
+
+      <main ref={mainRef} className="relative z-20 w-full h-full px-4 pt-32 pb-24 overflow-y-auto">
+        <Hero onOpenAuth={openAuth} />
+      </main>
+
+      {/* bottom mono caption */}
+      <div className="absolute bottom-5 left-0 right-0 z-20 flex items-center justify-between px-6 text-[10.5px] font-mono uppercase tracking-widest text-zinc-600 pointer-events-none">
+        <span>© 2026 GameOps Inc.</span>
+        <span>build · 26.05.22</span>
+      </div>
+
+      <AuthModal open={authOpen} initialTab={authTab} onClose={() => setAuthOpen(false)} />
+    </div>);
+
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

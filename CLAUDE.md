@@ -22,7 +22,7 @@
 - **时区**:PG 数据库强制 `timezone='UTC'`,前端用 `lib/format.ts` 锁 Asia/Shanghai 渲染;raw SQL 用 `(NOW() AT TIME ZONE 'UTC')` 显式 UTC。
 - CSV→表映射写在代码内(每种 csvType 一个解析器,见 lib/parsers/index.ts)。
 - 数据三层:原始层(留底)→ 明细层(upsert 只留最新)→ 每日汇总层(历史趋势)。
-- 激励:组合规则引擎(阶梯+公式可叠加),运营建活动时配置,半自动(可人工调整)。
+- **激励引擎**:7 类规则块可叠加(TIER / FORMULA / SHARE_POOL / RANK / PER_SUBMISSION / ACTIVITY_THRESHOLD / BASE_PLUS_STEP),每条规则可挂 `cap`(元)与 `cpmCap`(元/千播放,创作者 views=0 不生效)。引擎纯函数 `lib/incentive/engine.ts`,聚合层 `lib/incentive/aggregate.ts`(候选 = 报名 ∪ 投稿)。结果落 `Incentive` 表(`(creatorId, activityId)` 唯一);重算覆盖 `estimated/breakdown/computedAt`,人工 `adjusted` 字段保留。审计:`incentive.compute`(全活动重算) / `incentive.adjust`(单条调整)。
 
 ## 目录约定
 - app/(auth)/login        登录页(真实 URL /login)
@@ -59,10 +59,13 @@
 - Agent 取消监听:跑命令期间每 5s 空 POST `/log`,返回 4xx 即视为被取消 → kill 子进程。
 - Task 日志页默认折叠,展开后只渲染尾 100 行;`?lines=N` / `?tail=N` / `?offset=N` / `?download=1` 四种模式。
 
-## 开发阶段(当前:阶段 4 完成,含 Jenkins-style 重构 + 周边)
+## 开发阶段(当前:阶段 7 完成,BI 大屏落地)
 1.✅地基+认证+RBAC+登录分流  2.✅创作者端MVP(活动/报名/投稿)  3.✅运营端核心(含创作灵感)
 4.✅爬虫链路+Agent
    4.1 ✅协议骨架 / 4.2 ✅parser+明细 / 4.3 ✅每日汇总 / 4.4 ✅运营 UI
    4.5 ✅Jenkins-style 重构(Job 模板 + 命令模板 + 并发=1 + cron + 实时日志)
    4.6 ✅审计日志 + cron 仅控自动 + 分页 + EXCEL/可选/glob 产物 + UTC 时区
-5.激励引擎  6.每日汇总+飞书(cron 补每日快照漏洞)  7.BI大屏  8.管理员面板(审计查看)
+5.✅激励引擎(7 类规则 × cap/cpmCap + 聚合层 + `Incentive` 表 + 创作者端预估卡 + 运营端结算明细 + 人工调整审计)
+6.每日汇总+飞书(cron 补每日快照漏洞)
+7.✅BI 大屏(shadcn Card + 交互式 LineChart + Donut + Fullscreen API)
+8.管理员面板(审计查看)
