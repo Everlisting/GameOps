@@ -386,7 +386,7 @@ model DailySummary {
 5. ✅ **激励引擎**:七类规则块 + `cap`/`cpmCap` 双上限 + 聚合层 + `Incentive` 表 + 创作者预估 / 运营结算明细 UI + 人工调整审计(`incentive.compute` / `incentive.adjust`)。
 6. **每日汇总 + 飞书**:汇总定时任务 + webhook 推送。
 7. ✅ **BI 大屏**:`/operator/bi` 路由 + `aggregateDashboard` 单次 server 聚合 + shadcn `Card` 容器 + `ChartLineInteractive` 风格 30 天投稿/通过趋势 + 4 张 `ChartPieDonutText` 维度切片 + KPI sparkline + 浏览器 Fullscreen API 全屏壳。
-8. **管理员面板**:爬虫任务/机器监控/用户管理 + **审计日志查看**(剩余项)。
+8. ✅ **管理员面板**:`/operator/admin/*` 下 — 运营账户(operators)/ 爬虫 Job / 爬虫机 agents / csvType 管理 + **审计日志查看**(`audit-logs`):近 60 天硬底窗口、操作人/动作/目标类型/起止时间多维筛选(URL 同步、变更回到 page=1)、详情 Dialog 渲染 details JSON、可选每页 25/50/100/200 条。
 9. **完善**:其余 csvType 解析器、调度自动化、测试与监控。
 
 ---
