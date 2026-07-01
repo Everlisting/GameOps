@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireCreator } from "@/lib/creator";
+import { autoTransitionActivities } from "@/lib/activity-publish";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -31,6 +32,8 @@ export default async function ActivityDetailPage({
   params: { id: string };
 }) {
   const { creator } = await requireCreator();
+  // 读时懒转移:DRAFT→ONGOING(publishAt 到点)+ ONGOING→ENDED(endAt 到点)
+  await autoTransitionActivities();
 
   const activity = await prisma.activity.findUnique({
     where: { id: params.id },

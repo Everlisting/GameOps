@@ -1,6 +1,7 @@
 /**
  * PATCH /api/operator/activities/[id]/status — 切换活动状态
- * 允许转移:DRAFT → ONGOING / ENDED;ONGOING → ENDED;ENDED 终态,不可再变。
+ * 允许转移:DRAFT → ONGOING;ONGOING → ENDED;ENDED 终态,不可再变。
+ * DRAFT → ENDED 已下线 —— 想丢弃草稿走 DELETE /api/operator/activities/[id]。
  */
 import type { ActivityStatus } from "@prisma/client";
 import { route, parseJson } from "@/lib/api";
@@ -10,7 +11,7 @@ import { badRequest, notFound } from "@/lib/errors";
 import { activityStatusSchema } from "@/lib/validation/activity";
 
 const ALLOWED: Record<ActivityStatus, ActivityStatus[]> = {
-  DRAFT: ["ONGOING", "ENDED"],
+  DRAFT: ["ONGOING"],
   ONGOING: ["ENDED"],
   ENDED: [],
 };

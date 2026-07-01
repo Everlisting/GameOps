@@ -6,10 +6,14 @@ import { route } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { requireCreator } from "@/lib/creator";
 import { badRequest, notFound } from "@/lib/errors";
+import { autoTransitionActivities } from "@/lib/activity-publish";
 
 export const POST = route(async (_req, { params }) => {
   const id = params?.id ?? "";
   const { creator } = await requireCreator();
+
+  // 状态守卫前先跑一次自动转移,避免创作者绕过列表页直接 POST 到 endAt 已到点的 ONGOING 活动
+  await autoTransitionActivities();
 
   const activity = await prisma.activity.findUnique({
     where: { id },

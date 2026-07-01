@@ -11,6 +11,7 @@ import {
   submissionListQuerySchema,
 } from "@/lib/validation/submission";
 import { resolveAndParseExternalId } from "@/lib/submission-review";
+import { autoTransitionActivities } from "@/lib/activity-publish";
 
 export const GET = route(async (req) => {
   const { creator } = await requireCreator();
@@ -46,6 +47,9 @@ export const POST = route(async (req) => {
   const input = await parseJson(req, submissionCreateSchema);
 
   if (input.activityId) {
+    // 状态守卫前先跑一次自动转移,避免 endAt 已到点的 ONGOING 被残留状态误开放投稿
+    await autoTransitionActivities();
+
     const activity = await prisma.activity.findUnique({
       where: { id: input.activityId },
       select: { status: true },

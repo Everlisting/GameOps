@@ -2,7 +2,8 @@
 
 /**
  * 活动详情页操作区:状态切换 + 删除(仅 DRAFT)。
- * 转移规则:DRAFT → ONGOING / ENDED;ONGOING → ENDED;ENDED 终态。
+ * 转移规则:DRAFT → ONGOING;ONGOING → ENDED;ENDED 终态。
+ * DRAFT 不再支持直接归档到 ENDED —— 需要先上线再结束,或直接删除。
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,10 +17,7 @@ const NEXT_STATUS: Record<
   ActivityStatus,
   { status: ActivityStatus; label: string; icon: React.ComponentType<{ className?: string }> }[]
 > = {
-  DRAFT: [
-    { status: "ONGOING", label: "上线", icon: Play },
-    { status: "ENDED", label: "归档", icon: Square },
-  ],
+  DRAFT: [{ status: "ONGOING", label: "上线", icon: Play }],
   ONGOING: [{ status: "ENDED", label: "结束", icon: Square }],
   ENDED: [],
 };

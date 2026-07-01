@@ -99,7 +99,7 @@ export const DELETE = route(async (_req, { params }) => {
   });
   if (!a) throw notFound("活动不存在");
   if (a.status !== "DRAFT")
-    throw badRequest("仅草稿状态的活动可以删除,请先改为草稿或归档为已结束");
+    throw badRequest("仅草稿状态的活动可以删除;进行中 / 已结束的活动不允许删除");
 
   await prisma.activity.delete({ where: { id } });
   return Response.json({ ok: true });

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ActivityBadge } from "@/app/(creator)/_components/StatusBadge";
 import ActivityCover from "@/app/(creator)/_components/ActivityCover";
-import { autoPublishDue } from "@/lib/activity-publish";
+import { autoTransitionActivities } from "@/lib/activity-publish";
 import ActivitiesListFilters from "./_components/ActivitiesListFilters";
 
 const STATUS_VALUES: ActivityStatus[] = ["DRAFT", "ONGOING", "ENDED"];
@@ -73,8 +73,8 @@ export default async function OperatorActivitiesPage({
 }) {
   await requireRole("OPERATOR");
 
-  // 读时懒触发定时发布(阶段 4 接入 cron 后可拆掉)
-  await autoPublishDue();
+  // 读时懒触发状态转移:DRAFT→ONGOING(publishAt 到点)+ ONGOING→ENDED(endAt 到点)
+  await autoTransitionActivities();
 
   const status = STATUS_VALUES.includes(searchParams?.status as ActivityStatus)
     ? (searchParams!.status as ActivityStatus)

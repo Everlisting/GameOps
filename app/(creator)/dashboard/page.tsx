@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Wallet } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireCreator } from "@/lib/creator";
+import { autoTransitionActivities } from "@/lib/activity-publish";
 import { fmtDateTime } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,8 @@ import { incentiveDb } from "@/lib/incentive/db";
 
 export default async function CreatorOverview() {
   const { creator } = await requireCreator();
+  // 读时懒转移:DRAFT→ONGOING(publishAt 到点)+ ONGOING→ENDED(endAt 到点)
+  await autoTransitionActivities();
 
   const [
     enrollmentCount,

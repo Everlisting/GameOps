@@ -12,7 +12,7 @@ import {
   rewardRulesSchema,
   type RewardRule,
 } from "@/lib/validation/activity";
-import { autoPublishDue } from "@/lib/activity-publish";
+import { autoTransitionActivities } from "@/lib/activity-publish";
 import ActivityForm from "../_components/ActivityForm";
 import ActivityActions from "../_components/ActivityActions";
 import ActivityStats, {
@@ -36,8 +36,8 @@ export default async function ActivityDetailPage({
 }) {
   await requireRole("OPERATOR");
 
-  // 读时懒触发定时发布:把到点的草稿推到 ONGOING(阶段 4 接入 cron 后可拆掉)
-  await autoPublishDue();
+  // 读时懒触发状态转移:DRAFT→ONGOING(publishAt 到点)+ ONGOING→ENDED(endAt 到点)
+  await autoTransitionActivities();
 
   const a = await prisma.activity.findUnique({
     where: { id: params.id },
