@@ -11,3 +11,7 @@ public/uploads/**/*
 # 爬虫原始 CSV 落盘目录(只保留路径,内容不入库)
 data/raw/**/*
 !data/raw/**/.gitkeep
+
+# 阶段9 · 舆情监控 报告产物(HTML + JSON),中台从分析服务拉回后落这里
+storage/opinion-reports/**/*
+!storage/opinion-reports/.gitkeep

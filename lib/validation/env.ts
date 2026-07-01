@@ -10,6 +10,10 @@ const schema = z.object({
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET 至少 32 个字符"),
   NEXT_PUBLIC_APP_URL: z.string().url(),
   FEISHU_WEBHOOK_URL: z.string().optional().default(""),
+  // 阶段9 · 舆情监控
+  ANALYSIS_BASE_URL: z.string().url().optional().default("http://127.0.0.1:8000"),
+  ANALYSIS_SHARED_SECRET: z.string().min(1, "ANALYSIS_SHARED_SECRET 不能为空").optional().default(""),
+  OPINION_AES_KEY: z.string().min(1, "OPINION_AES_KEY 不能为空").optional().default(""),
 });
 
 const parsed = schema.safeParse(process.env);

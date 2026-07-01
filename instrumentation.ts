@@ -32,4 +32,12 @@ export async function register() {
   } catch (err) {
     console.error("[instrumentation] log-cleanup 启动失败", err);
   }
+
+  // 阶段9 · 舆情监控:每 10s 拉分析服务的 DONE 报告落中台 storage
+  try {
+    const { startDownloader } = await import("@/lib/opinion/downloader");
+    startDownloader();
+  } catch (err) {
+    console.error("[instrumentation] opinion.downloader 启动失败", err);
+  }
 }

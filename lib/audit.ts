@@ -29,7 +29,12 @@ export type AuditAction =
   | "agent.rotateToken"
   // 阶段5 · 激励引擎
   | "incentive.compute"   // 全活动重算预估
-  | "incentive.adjust";   // 单条人工调整
+  | "incentive.adjust"    // 单条人工调整
+  // 阶段9 · 舆情监控
+  | "opinion.trigger"       // ADMIN 触发生成一份报告
+  | "opinion.rerun"         // ADMIN 用相同输入重跑
+  | "opinion.delete"        // ADMIN 删除报告 + 产物
+  | "opinion.settings.update"; // ADMIN 改 LLM 配置
 
 export type AuditTargetType =
   | "task"
@@ -38,7 +43,9 @@ export type AuditTargetType =
   | "dataset"
   | "user"
   | "activity"   // 阶段5 · compute 落到 activity
-  | "incentive"; // 阶段5 · adjust 落到 incentive
+  | "incentive"  // 阶段5 · adjust 落到 incentive
+  | "opinion_task"       // 阶段9 · 舆情监控:一份报告 task
+  | "opinion_settings";  // 阶段9 · LLM 配置
 
 export interface AuditOpts {
   /** 操作人 user.id;null = 系统(cron 自动触发) */
