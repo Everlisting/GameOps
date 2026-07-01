@@ -116,6 +116,14 @@ function buildOpinionItem(isAdmin: boolean): NavItem {
   };
 }
 
+/** 把舆情监控插到"稿件管理"前面(即"活动管理"后面)。按 title 定位,避免依赖硬编码索引。 */
+function buildNavItems(isAdmin: boolean): NavItem[] {
+  const idx = NAV_ITEMS.findIndex((i) => i.title === "稿件管理");
+  const opinion = buildOpinionItem(isAdmin);
+  if (idx < 0) return [...NAV_ITEMS, opinion];
+  return [...NAV_ITEMS.slice(0, idx), opinion, ...NAV_ITEMS.slice(idx)];
+}
+
 /** 仅 ADMIN 可见的菜单组 */
 const ADMIN_NAV_ITEMS: NavItem[] = [
   {
@@ -184,7 +192,7 @@ export function OperatorSidebar({
         <BrandHeader />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={[...NAV_ITEMS, buildOpinionItem(user.isAdmin)]} label="运营工作区" />
+        <NavMain items={buildNavItems(user.isAdmin)} label="运营工作区" />
         {user.isAdmin && (
           <NavMain items={ADMIN_NAV_ITEMS} label="管理面板" />
         )}
