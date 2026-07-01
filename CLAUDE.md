@@ -23,6 +23,7 @@
 - CSV→表映射写在代码内(每种 csvType 一个解析器,见 lib/parsers/index.ts)。
 - 数据三层:原始层(留底)→ 明细层(upsert 只留最新)→ 每日汇总层(历史趋势)。
 - **激励引擎**:7 类规则块可叠加(TIER / FORMULA / SHARE_POOL / RANK / PER_SUBMISSION / ACTIVITY_THRESHOLD / BASE_PLUS_STEP),每条规则可挂 `cap`(元)与 `cpmCap`(元/千播放,创作者 views=0 不生效)。引擎纯函数 `lib/incentive/engine.ts`,聚合层 `lib/incentive/aggregate.ts`(候选 = 报名 ∪ 投稿)。结果落 `Incentive` 表(`(creatorId, activityId)` 唯一);重算覆盖 `estimated/breakdown/computedAt`,人工 `adjusted` 字段保留。审计:`incentive.compute`(全活动重算) / `incentive.adjust`(单条调整)。
+- **舆情监控**(详见 `docs/opinion-monitor.md`):三份报告(私域 / 公域 / 对比)由独立 Docker 容器 `slg_analyzer/service`(FastAPI wrapper of run.py / run_public.py / run_combined.py)生成,中台代理调用。**中台不落 OpinionReport 表**,任务状态与元数据由分析服务 SQLite 持有,中台只存单例 `OpinionSettings`(LLM 配置,`apiKey` AES-256-GCM 加密)。产物 HTML+JSON 由后台 downloader 每 10s 从分析服务拉回 `storage/opinion-reports/<taskId>/`,通过鉴权 route `/operator/opinion/reports/<id>/view` 新页面打开(不用 iframe)。权限:OPERATOR 只读列表/查看报告,ADMIN 触发/删除/重跑/改设置。审计:`opinion.trigger / rerun / delete / settings.update`(明文 apiKey 永不入日志)。
 
 ## 目录约定
 - app/(auth)/login        登录页(真实 URL /login)
@@ -58,8 +59,10 @@
 - Job.command 用 `{{paramName}}` 模板,渲染规则见 `lib/jobs.ts` `renderCommand`;支持中文 var 名。
 - Agent 取消监听:跑命令期间每 5s 空 POST `/log`,返回 4xx 即视为被取消 → kill 子进程。
 - Task 日志页默认折叠,展开后只渲染尾 100 行;`?lines=N` / `?tail=N` / `?offset=N` / `?download=1` 四种模式。
+- **舆情监控 env**:`ANALYSIS_BASE_URL`(分析服务地址,dev 默认 `http://127.0.0.1:8000`)/ `ANALYSIS_SHARED_SECRET`(Bearer token,与分析服务同源)/ `OPINION_AES_KEY`(32 字节 base64,加密 apiKey 用)。缺失只 warn 不阻塞其他功能,首次触发接口时懒失败。
+- **分析服务本地起法**:`cd F:\Kaifa\slg_analyzer && docker compose up -d`(先在 shell 或 `slg_analyzer/.env` 设 `ANALYSIS_SHARED_SECRET`)。中台 dev 侧同一台机器起 `pnpm dev` 即可。
 
-## 开发阶段(当前:阶段 8 完成,管理员面板齐活)
+## 开发阶段(当前:阶段 9 完成,舆情监控上线)
 1.✅地基+认证+RBAC+登录分流  2.✅创作者端MVP(活动/报名/投稿)  3.✅运营端核心(含创作灵感)
 4.✅爬虫链路+Agent
    4.1 ✅协议骨架 / 4.2 ✅parser+明细 / 4.3 ✅每日汇总 / 4.4 ✅运营 UI
@@ -69,3 +72,4 @@
 6.每日汇总+飞书(cron 补每日快照漏洞)
 7.✅BI 大屏(shadcn Card + 交互式 LineChart + Donut + Fullscreen API)
 8.✅管理员面板(运营账户 / Job / 爬虫机 / csvType / **审计日志查看**:近 60 天硬底 + 多维筛选 + 详情 Dialog + 可选每页条数)
+9.✅舆情监控(私域 / 公域 / 对比 三份报告:独立 FastAPI 分析容器 + 中台代理 + 后台 downloader + 鉴权跳转打开 HTML + AES 加密 apiKey 单例配置面板)

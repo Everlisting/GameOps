@@ -14,6 +14,7 @@ import {
   LayoutGrid,
   Lightbulb,
   ListChecks,
+  MessageSquareText,
   MonitorSmartphone,
   Server,
   Shield,
@@ -100,6 +101,21 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/** 阶段9 舆情监控:三个二级页 OPERATOR 可看,模型设置仅 ADMIN。 */
+function buildOpinionItem(isAdmin: boolean): NavItem {
+  return {
+    title: "舆情监控",
+    url: "/operator/opinion/private",
+    icon: MessageSquareText,
+    items: [
+      { title: "私域", url: "/operator/opinion/private" },
+      { title: "公域", url: "/operator/opinion/public" },
+      { title: "对比", url: "/operator/opinion/combined" },
+      ...(isAdmin ? [{ title: "模型设置", url: "/operator/opinion/settings" }] : []),
+    ],
+  };
+}
+
 /** 仅 ADMIN 可见的菜单组 */
 const ADMIN_NAV_ITEMS: NavItem[] = [
   {
@@ -168,7 +184,7 @@ export function OperatorSidebar({
         <BrandHeader />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={NAV_ITEMS} label="运营工作区" />
+        <NavMain items={[...NAV_ITEMS, buildOpinionItem(user.isAdmin)]} label="运营工作区" />
         {user.isAdmin && (
           <NavMain items={ADMIN_NAV_ITEMS} label="管理面板" />
         )}

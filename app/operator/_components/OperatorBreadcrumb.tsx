@@ -29,6 +29,12 @@ const SEGMENT_LABEL: Record<string, string> = {
   operators: "运营账户",
   new: "新建",
   edit: "编辑",
+  // 阶段9 · 舆情监控
+  opinion: "舆情监控",
+  private: "私域",
+  public: "公域",
+  combined: "对比",
+  settings: "模型设置",
 };
 
 export default function OperatorBreadcrumb() {

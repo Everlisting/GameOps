@@ -13,12 +13,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { AppError } from "@/lib/errors";
+
 const ROOT = path.resolve(process.cwd(), "storage", "opinion-reports");
 const SAFE_ID = /^[A-Za-z0-9_.-]{1,80}$/;
 
 export function assertSafeTaskId(taskId: string): void {
   if (!SAFE_ID.test(taskId)) {
-    throw new Error(`非法的 taskId 格式: ${taskId}`);
+    throw new AppError("BAD_REQUEST", `非法的 taskId 格式: ${taskId}`);
   }
 }
 
