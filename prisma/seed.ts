@@ -89,9 +89,30 @@ async function seedActivities() {
   else console.log(`已有 ${count} 个活动且封面齐全,跳过。`);
 }
 
+async function seedOpinionSettings() {
+  const existing = await prisma.opinionSettings.findUnique({ where: { id: 1 } });
+  if (existing) {
+    console.log("OpinionSettings 单例已存在,跳过。");
+    return;
+  }
+  await prisma.opinionSettings.create({
+    data: {
+      id: 1,
+      provider: "echo",
+      model: "echo",
+      apiKeyEnc: "",
+      apiKeyMask: "",
+      baseUrl: null,
+      updatedBy: "<system>",
+    },
+  });
+  console.log("已写入 OpinionSettings 初始行(provider=echo,未配置 apiKey)。");
+}
+
 async function main() {
   await seedAdmin();
   await seedActivities();
+  await seedOpinionSettings();
 }
 
 main()

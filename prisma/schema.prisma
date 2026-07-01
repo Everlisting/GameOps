@@ -481,3 +481,21 @@ model Incentive {
   @@index([activityId])
   @@index([creatorId, status])
 }
+
+/// 阶段9 · 舆情监控 LLM 全局配置(单例:id 恒等 1)。
+/// apiKeyEnc 为 AES-256-GCM 密文(格式见 lib/crypto.ts),明文只在触发生成时临时解出往分析服务传;
+/// apiKeyMask 是打码后的显示串(如 "sk-****abcd"),用于 UI 回显,不含真实密钥。
+/// provider = "echo" 时代表离线规则模式,apiKey 仍必填但不会被 slg_analyzer 使用。
+model OpinionSettings {
+  id         Int      @id @default(1)  // 单例锁:业务代码只写 id=1
+  provider   String                     // "anthropic" | "openai" | "echo"
+  model      String                     // 如 "claude-sonnet-4-5" / "gpt-4o" / "echo"
+  apiKeyEnc  String   @default("")      // AES-256-GCM 密文的 base64;初始为空表示"未配置"
+  apiKeyMask String   @default("")      // 打码后的展示串
+  baseUrl    String?                    // OpenAI 兼容端点(如 https://api.deepseek.com/v1)
+  updatedBy  String?                    // username 快照;seed 时为 "<system>"
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@map("opinion_settings")
+}
