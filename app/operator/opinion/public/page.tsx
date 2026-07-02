@@ -43,6 +43,7 @@ export default async function OperatorOpinionPublicPage({
         scope="public"
         initialItems={data.items}
         total={data.total}
+        counts={data.counts}
         page={page}
         pageSize={pageSize}
         isAdmin={isAdmin}

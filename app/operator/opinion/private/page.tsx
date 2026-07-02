@@ -48,6 +48,7 @@ export default async function OperatorOpinionPrivatePage({
         scope="private"
         initialItems={data.items}
         total={data.total}
+        counts={data.counts}
         page={page}
         pageSize={pageSize}
         isAdmin={isAdmin}

@@ -11,6 +11,16 @@ import type { ActivityStatus } from "@prisma/client";
 import { Play, Square, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ActivityBadge } from "@/app/(creator)/_components/StatusBadge";
 
 const NEXT_STATUS: Record<
@@ -24,14 +34,17 @@ const NEXT_STATUS: Record<
 
 export default function ActivityActions({
   id,
+  name,
   status,
 }: {
   id: string;
+  name: string;
   status: ActivityStatus;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function changeStatus(next: ActivityStatus) {
     setError(null);
@@ -54,18 +67,18 @@ export default function ActivityActions({
   }
 
   async function destroy() {
-    if (!confirm("确认删除该草稿活动?此操作不可恢复。")) return;
     setError(null);
     setBusy(true);
     try {
       const res = await fetch(`/api/operator/activities/${id}`, {
         method: "DELETE",
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.error?.message ?? "删除失败");
         return;
       }
+      setConfirmOpen(false);
       router.push("/operator/activities");
     } finally {
       setBusy(false);
@@ -100,7 +113,7 @@ export default function ActivityActions({
               type="button"
               size="sm"
               variant="ghost"
-              onClick={destroy}
+              onClick={() => setConfirmOpen(true)}
               disabled={busy}
               className="text-muted-foreground hover:text-destructive"
             >
@@ -113,6 +126,40 @@ export default function ActivityActions({
       {error && (
         <p className="text-xs text-destructive">{error}</p>
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除该草稿活动?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <div>
+                  即将删除:<span className="font-medium text-foreground">{name}</span>
+                </div>
+                <div>此操作不可恢复。</div>
+                {error && (
+                  <div className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">
+                    {error}
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void destroy();
+              }}
+              disabled={busy}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {busy ? "删除中…" : "确认删除"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

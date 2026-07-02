@@ -133,6 +133,27 @@ export async function triggerCombined(args: {
   return (await res.json()) as TaskCreated;
 }
 
+export interface AnalysisTaskCounts {
+  total: number;
+  pending: number;
+  running: number;
+  done: number;
+  failed: number;
+}
+
+/** 计数(4 态桶),用于列表页顶部卡片。 */
+export async function getTaskCounts(scope?: string): Promise<AnalysisTaskCounts> {
+  const q = scope ? `?scope=${encodeURIComponent(scope)}` : "";
+  const res = await fetch(`${BASE}/tasks/counts${q}`, {
+    headers: { Authorization: bearer() },
+    cache: "no-store",
+  }).catch((err) => {
+    throw new AppError("INTERNAL", `分析服务不可达:${err instanceof Error ? err.message : String(err)}`);
+  });
+  if (!res.ok) return unpackError(res);
+  return (await res.json()) as AnalysisTaskCounts;
+}
+
 /** 列表。 */
 export async function listTasks(params: {
   scope?: string; status?: string; limit?: number; offset?: number;

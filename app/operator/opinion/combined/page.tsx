@@ -43,6 +43,7 @@ export default async function OperatorOpinionCombinedPage({
         scope="combined"
         initialItems={data.items}
         total={data.total}
+        counts={data.counts}
         page={page}
         pageSize={pageSize}
         isAdmin={isAdmin}

@@ -15,6 +15,8 @@ import { OpinionTriggerFileDialog } from "./OpinionTriggerFileDialog";
 import { OpinionTriggerCombinedDialog } from "./OpinionTriggerCombinedDialog";
 import OpinionPager from "./OpinionPager";
 import OpinionPageSizeSelect from "./OpinionPageSizeSelect";
+import OpinionStatsCards from "./OpinionStatsCards";
+import type { AnalysisTaskCounts } from "@/lib/opinion/client";
 
 const SCOPE_LABEL = {
   private: { title: "私域舆情", desc: "基于聊天记录导出的社群深度报告。" },
@@ -26,6 +28,7 @@ export default function OpinionListPageShell({
   scope,
   initialItems,
   total,
+  counts,
   page,
   pageSize,
   isAdmin,
@@ -35,6 +38,7 @@ export default function OpinionListPageShell({
   scope: "private" | "public" | "combined";
   initialItems: OpinionTaskItem[];
   total: number;
+  counts: AnalysisTaskCounts;
   page: number;
   pageSize: number;
   isAdmin: boolean;
@@ -68,6 +72,8 @@ export default function OpinionListPageShell({
           </div>
         )}
       </header>
+
+      <OpinionStatsCards scope={scope} initialCounts={counts} />
 
       {isAdmin && !configured && (
         <Card className="mb-5 border-amber-400/50 bg-amber-50 p-4 text-sm text-amber-900">

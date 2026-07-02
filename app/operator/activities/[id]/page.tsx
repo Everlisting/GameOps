@@ -140,7 +140,7 @@ export default async function ActivityDetailPage({
             上次更新 {fmtDateTime(a.updatedAt)}
           </p>
         </div>
-        <ActivityActions id={a.id} status={a.status} />
+        <ActivityActions id={a.id} name={a.name} status={a.status} />
       </header>
 
       <div className="mb-6">
