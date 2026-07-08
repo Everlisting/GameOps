@@ -74,6 +74,9 @@ ckxxxxxxxxxxxx.AbCdEfGhIjKlMnOpQrStUvWxYzABC
 ### 2.1 必填两个变量(不再需要 csvType)
 
 ```ini
+#cloudflared 虚拟通道
+cloudflared tunnel --url http://localhost:3000
+
 # 中台地址(生产强烈建议 https)
 CRAWLER_BASE_URL=https://gameops.example.com
 

@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>游戏运营中台 · 阿里云上线部署指引</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1f2430; --muted:#5b6473; --line:#e4e7ec;
+    --brand:#2f6feb; --brand-weak:#eaf1ff; --code-bg:#0f1626; --code-ink:#e6edf6;
+    --ok:#188a5a; --warn:#b7791f; --danger:#c23b3b; --warn-bg:#fff7e6; --danger-bg:#fdecec; --ok-bg:#e9f7f0;
+    --radius:12px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0e1117; --panel:#161b22; --ink:#e6edf6; --muted:#9aa4b2; --line:#232a35;
+      --brand:#5b8dff; --brand-weak:#182238; --code-bg:#0b1020; --code-ink:#e6edf6;
+      --warn-bg:#2a2410; --danger-bg:#2a1616; --ok-bg:#12251c; }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,sans-serif;}
+  .wrap{display:grid;grid-template-columns:264px minmax(0,1fr);gap:0;max-width:1180px;margin:0 auto;}
+  /* Sidebar */
+  aside{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:26px 18px;border-right:1px solid var(--line);}
+  aside h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;}
+  aside a{display:block;padding:6px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:13.5px;}
+  aside a:hover{background:var(--brand-weak);color:var(--brand);}
+  aside .grp{margin-top:16px;font-weight:600;color:var(--ink);font-size:12.5px;padding:4px 10px;}
+  /* Main */
+  main{padding:34px 40px 120px;min-width:0;}
+  header.hero{margin-bottom:8px;}
+  .kicker{color:var(--brand);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;}
+  h1{font-size:30px;margin:6px 0 6px;line-height:1.25;}
+  .sub{color:var(--muted);font-size:15px;margin:0 0 8px;}
+  .meta{color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:12px;margin-top:14px;}
+  h2.sec{font-size:21px;margin:44px 0 10px;padding-top:14px;border-top:2px solid var(--line);}
+  h2.sec .n{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;
+    background:var(--brand);color:#fff;font-size:14px;margin-right:10px;vertical-align:2px;}
+  h3{font-size:16px;margin:24px 0 8px;}
+  p{margin:8px 0;}
+  code{background:var(--brand-weak);color:var(--brand);padding:1px 6px;border-radius:5px;font-size:13px;
+    font-family:"SF Mono",Consolas,"Liberation Mono",monospace;}
+  pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:var(--radius);overflow:auto;
+    font-family:"SF Mono",Consolas,"Liberation Mono",monospace;font-size:13px;line-height:1.6;position:relative;margin:12px 0;}
+  pre code{background:none;color:inherit;padding:0;}
+  pre .c{color:#7d8aa3;} /* comment */
+  .copy{position:absolute;top:8px;right:8px;background:#ffffff1a;border:1px solid #ffffff33;color:#cfe0ff;
+    font-size:11px;padding:3px 9px;border-radius:6px;cursor:pointer;}
+  .copy:hover{background:#ffffff2e;}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px;display:block;overflow-x:auto;}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top;}
+  th{background:var(--brand-weak);color:var(--ink);font-weight:600;white-space:nowrap;}
+  td code{white-space:nowrap;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:2px 20px;margin:14px 0;}
+  .note,.warn,.danger,.ok{border-left:4px solid;border-radius:8px;padding:12px 16px;margin:14px 0;font-size:14px;}
+  .note{background:var(--brand-weak);border-color:var(--brand);}
+  .warn{background:var(--warn-bg);border-color:var(--warn);}
+  .danger{background:var(--danger-bg);border-color:var(--danger);}
+  .ok{background:var(--ok-bg);border-color:var(--ok);}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--brand-weak);color:var(--brand);margin-left:6px;}
+  ul,ol{margin:8px 0;padding-left:22px;}
+  li{margin:4px 0;}
+  .topo{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin:14px 0;overflow-x:auto;}
+  .topo pre{background:none;color:var(--ink);margin:0;font-size:12.5px;line-height:1.5;}
+  .kbd{font-size:12px;color:var(--muted);}
+  .chk{list-style:none;padding-left:0;}
+  .chk li{padding-left:28px;position:relative;}
+  .chk li:before{content:"☐";position:absolute;left:4px;color:var(--brand);font-size:15px;}
+  hr{border:none;border-top:1px solid var(--line);margin:20px 0;}
+  a.inl{color:var(--brand);}
+  @media (max-width:860px){
+    .wrap{grid-template-columns:1fr;}
+    aside{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line);}
+    main{padding:24px 18px 80px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<aside>
+  <h2>目录</h2>
+  <a href="#overview">0 · 方案总览</a>
+  <div class="grp">一、准备阶段</div>
+  <a href="#prep">1 · 阿里云资源准备</a>
+  <a href="#rds">2 · RDS 数据库配置</a>
+  <a href="#server">3 · ECS 服务器初始化</a>
+  <div class="grp">二、部署中台</div>
+  <a href="#code">4 · 上传代码</a>
+  <a href="#env">5 · 环境变量 .env</a>
+  <a href="#build">6 · 安装 · 迁移 · 构建</a>
+  <a href="#pm2">7 · PM2 启动常驻</a>
+  <a href="#nginx">8 · Nginx 反代 + HTTPS</a>
+  <div class="grp">三、周边与收尾</div>
+  <a href="#analyzer">9 · 舆情分析服务</a>
+  <a href="#persist">10 · 持久化与备份</a>
+  <a href="#verify">11 · 上线验证清单</a>
+  <a href="#update">12 · 更新与回滚</a>
+  <a href="#trouble">13 · 常见问题排查</a>
+</aside>
+
+<main>
+<header class="hero">
+  <div class="kicker">Deployment Guide · Aliyun</div>
+  <h1>游戏运营中台 · 阿里云上线部署指引</h1>
+  <p class="sub">Next.js 14 中台主体 + RDS PostgreSQL + PM2 + Nginx/HTTPS + 舆情分析 Docker（同机）</p>
+  <div class="meta">
+    适用分支：<code>feature/gameops</code>（发布前请合并至 <code>main</code>）&nbsp;·&nbsp;
+    包管理：pnpm&nbsp;·&nbsp;运行时：Node 20 LTS&nbsp;·&nbsp;文档生成：2026-07-08
+  </div>
+</header>
+
+<!-- ============ 0 OVERVIEW ============ -->
+<h2 class="sec" id="overview"><span class="n">0</span>方案总览</h2>
+<p>本项目是<strong>单进程长驻</strong>的一体化 Next.js 应用：<code>instrumentation.ts</code> 在进程内启动了 node-cron 调度器、日志清理、舆情报告 downloader，且 Agent 并发=1。因此它<strong>不能</strong>做 Serverless、<strong>不能</strong>多实例横向扩容 —— 只能由 <strong>PM2 以单实例（fork 模式）</strong>常驻。</p>
+
+<div class="topo"><pre>
+                      ┌───────────────────────── 公网 ─────────────────────────┐
+   用户浏览器 ──HTTPS──▶  域名 (yourdomain.com)  ──▶  阿里云 ECS 安全组:443/80
+                      └──────────────────────────────┬──────────────────────────┘
+                                                     ▼
+   ┌───────────────────────────── 阿里云 ECS (Ubuntu 22.04) ─────────────────────────────┐
+   │   Nginx  ──反向代理──▶  127.0.0.1:3000  (PM2 → next start, 单实例 fork)              │
+   │                                   │                                                 │
+   │                                   ├─ 本地磁盘: data/  storage/  public/uploads/     │
+   │                                   │                                                 │
+   │   slg_analyzer (Docker) ◀─────────┘  ANALYSIS_BASE_URL = http://127.0.0.1:8000      │
+   └───────────────────────────────────────────────────┬─────────────────────────────────┘
+                                                        │ 内网 VPC
+                                                        ▼
+                              阿里云 RDS PostgreSQL  (timezone = UTC)
+                                                        ▲
+                                                        │ 领任务 / 回传 CSV（单向出站）
+   本地 Windows 内网 ──▶ 爬虫 Agent + Python 爬虫（不在本指南范围，见 agent-setup-guide.md）
+</pre></div>
+
+<table>
+<tr><th>组件</th><th>选型</th><th>说明</th></tr>
+<tr><td>计算</td><td>阿里云 ECS · Ubuntu 22.04 LTS</td><td>建议 ≥ 2 vCPU / 4 GB（含 Docker 分析服务则 ≥ 4 vCPU / 8 GB）</td></tr>
+<tr><td>数据库</td><td>阿里云 RDS PostgreSQL 15/16</td><td>内网连中台，参数 <code>timezone=UTC</code></td></tr>
+<tr><td>运行</td><td>Node 20 + pnpm + PM2</td><td>单实例 <code>next start</code>，开机自启</td></tr>
+<tr><td>入口</td><td>Nginx + HTTPS</td><td>反代 3000；证书用 Let's Encrypt 或阿里云免费 SSL</td></tr>
+<tr><td>舆情分析</td><td>slg_analyzer Docker</td><td>与中台同机，仅监听 127.0.0.1:8000</td></tr>
+</table>
+
+<div class="note"><strong>整体顺序：</strong>准备资源 → 建 RDS 库 → 装服务器环境 → 传代码 → 写 <code>.env</code> → 迁移+构建 → PM2 起服务 → Nginx 上 HTTPS → 起分析容器 → 验证清单。全程约 60–90 分钟。</div>
+
+<!-- ============ 1 PREP ============ -->
+<h2 class="sec" id="prep"><span class="n">1</span>阿里云资源准备</h2>
+<ol>
+  <li><strong>ECS 实例</strong>：Ubuntu 22.04 LTS，系统盘 ≥ 40 GB。若跑分析容器另挂一块数据盘或系统盘给到 80 GB+。记录<strong>公网 IP</strong> 与 <strong>VPC/交换机</strong>。</li>
+  <li><strong>RDS PostgreSQL</strong>：与 ECS 选<strong>同一 VPC、同一可用区</strong>（走内网、低延迟、免公网费）。</li>
+  <li><strong>安全组（ECS）</strong>：入方向放行 <code>80</code>、<code>443</code>；<code>22</code> 仅对你的运维 IP 放行。<strong>不要</strong>对公网放行 <code>3000</code>／<code>8000</code>（只走本机回环）。</li>
+  <li><strong>域名</strong>：把 A 记录解析到 ECS 公网 IP；国内服务器域名需完成 <strong>ICP 备案</strong>。</li>
+</ol>
+<div class="warn"><strong>3000 与 8000 端口永不对公网开放。</strong>外部只经 Nginx（443）进入；分析服务只监听 <code>127.0.0.1</code>。</div>
+
+<!-- ============ 2 RDS ============ -->
+<h2 class="sec" id="rds"><span class="n">2</span>RDS 数据库配置</h2>
+<ol>
+  <li><strong>创建数据库与账号</strong>：库名如 <code>gameops</code>，创建高权限账号（迁移需建表权限）。</li>
+  <li><strong>白名单</strong>：把 ECS 的<strong>内网 IP</strong> 加入 RDS 白名单（或加整个 VPC 网段）。获取 RDS <strong>内网连接地址</strong>。</li>
+  <li><strong>时区</strong>：本项目要求数据库时区为 UTC。在 RDS 参数设置里把 <code>timezone</code> 设为 <code>UTC</code> 并应用（前端用 <code>lib/format.ts</code> 锁 Asia/Shanghai 渲染）。</li>
+</ol>
+<p>组装连接串（稍后写进 <code>.env</code> 的 <code>DATABASE_URL</code>）：</p>
+<pre><button class="copy">复制</button><code>postgresql://<span class="c">账号</span>:<span class="c">密码</span>@<span class="c">rds内网地址</span>:5432/gameops?schema=public</code></pre>
+<div class="note">密码若含 <code>@ : / ?</code> 等特殊字符，需做 URL 编码（例如 <code>@</code>→<code>%40</code>）。</div>
+
+<!-- ============ 3 SERVER ============ -->
+<h2 class="sec" id="server"><span class="n">3</span>ECS 服务器初始化</h2>
+<p>SSH 登录 ECS 后依次执行。建议用普通用户 + <code>sudo</code>，不要长期用 root 跑应用。</p>
+
+<h3>3.1 基础工具与 Node 20</h3>
+<pre><button class="copy">复制</button><code>sudo apt update &amp;&amp; sudo apt -y upgrade
+sudo apt -y install git curl build-essential ca-certificates
+
+<span class="c"># Node 20 LTS（NodeSource）</span>
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt -y install nodejs
+node -v   <span class="c"># 应为 v20.x</span></code></pre>
+
+<h3>3.2 pnpm 与 PM2</h3>
+<pre><button class="copy">复制</button><code>sudo corepack enable
+corepack prepare pnpm@latest --activate
+pnpm -v
+
+sudo npm i -g pm2
+pm2 -v</code></pre>
+
+<div class="note"><strong>argon2 说明：</strong>鉴权用了原生模块 <code>argon2</code>，<code>build-essential</code> 已装好编译链，<code>pnpm install</code> 会自动为当前平台构建，无需额外操作。</div>
+
+<h3>3.3 Docker（给舆情分析服务用）</h3>
+<p>若<strong>暂不部署</strong>舆情分析可跳过本节，回到 <a class="inl" href="#code">第 4 步</a>。</p>
+<pre><button class="copy">复制</button><code>curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER    <span class="c"># 重新登录后生效</span>
+docker version</code></pre>
+
+<!-- ============ 4 CODE ============ -->
+<h2 class="sec" id="code"><span class="n">4</span>上传代码</h2>
+<p>推荐用 <strong>Git</strong> 拉取（后续更新一条 <code>git pull</code> 即可）。选一个部署目录，例如 <code>/opt/gameops</code>。</p>
+<pre><button class="copy">复制</button><code>sudo mkdir -p /opt/gameops &amp;&amp; sudo chown $USER:$USER /opt/gameops
+cd /opt/gameops
+git clone <span class="c">&lt;你的仓库地址&gt;</span> .
+git checkout main            <span class="c"># 发布分支</span></code></pre>
+<p>若仓库不便联网克隆，可本机打包上传（在 Windows PowerShell 里用 <code>scp</code>）：</p>
+<pre><button class="copy">复制</button><code><span class="c"># 本机：排除 node_modules/.next/.git 后打包</span>
+tar --exclude=node_modules --exclude=.next --exclude=.git -czf gameops.tgz .
+scp gameops.tgz user@ECS公网IP:/opt/gameops/
+<span class="c"># 服务器：解包</span>
+cd /opt/gameops &amp;&amp; tar xzf gameops.tgz</code></pre>
+<div class="warn"><code>.env</code>、<code>data/</code>、<code>storage/</code>、<code>public/uploads/</code> 已在 <code>.gitignore</code> 内 —— 它们<strong>不会</strong>随 Git 过来，属于服务器本地状态，下面单独处理。</div>
+
+<!-- ============ 5 ENV ============ -->
+<h2 class="sec" id="env"><span class="n">5</span>环境变量 <code>.env</code></h2>
+<p>在项目根 <code>/opt/gameops/.env</code> 写入以下内容。先生成三个随机密钥：</p>
+<pre><button class="copy">复制</button><code><span class="c"># AUTH_SECRET（≥32 字符）</span>
+node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
+<span class="c"># ANALYSIS_SHARED_SECRET（与分析服务同源，hex）</span>
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+<span class="c"># OPINION_AES_KEY（32 字节 base64，加密 LLM apiKey 用）</span>
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"</code></pre>
+
+<pre><button class="copy">复制</button><code><span class="c"># ── 数据库（RDS 内网地址）──</span>
+DATABASE_URL="postgresql://账号:密码@rds内网地址:5432/gameops?schema=public"
+
+<span class="c"># ── 会话 JWT 密钥（上一步生成）──</span>
+AUTH_SECRET="&lt;randomBytes(48) base64&gt;"
+
+<span class="c"># ── 应用对外地址：构建期注入，必须是最终 HTTPS 域名 ──</span>
+NEXT_PUBLIC_APP_URL="https://yourdomain.com"
+
+<span class="c"># ── 飞书群机器人 webhook（阶段6，可先留空）──</span>
+FEISHU_WEBHOOK_URL=""
+
+<span class="c"># ── 抖音 access_token（可选，可留空）──</span>
+DOUYIN_ACCESS_TOKEN=""
+
+NODE_ENV="production"
+
+<span class="c"># ── 阶段9 · 舆情监控 ──</span>
+ANALYSIS_BASE_URL="http://127.0.0.1:8000"
+ANALYSIS_SHARED_SECRET="&lt;randomBytes(32) hex&gt;"
+OPINION_AES_KEY="&lt;randomBytes(32) base64&gt;"</code></pre>
+
+<div class="danger"><strong>⚠ <code>NEXT_PUBLIC_APP_URL</code> 是构建期注入。</strong>凡 <code>NEXT_PUBLIC_*</code> 变量都会在 <code>pnpm build</code> 时被内联进前端包。必须在<strong>构建之前</strong>就设成最终域名；改了它<strong>必须重新 build</strong>，只重启不生效。</div>
+<div class="note">舆情三项 env 缺失只 <code>warn</code> 不阻塞其它功能（首次触发舆情接口时才懒失败）。若本次不上分析服务，可先留占位。<code>AUTH_SECRET</code> 一旦上线不要更换，否则所有登录态失效。</div>
+
+<table>
+<tr><th>变量</th><th>必填</th><th>作用</th></tr>
+<tr><td><code>DATABASE_URL</code></td><td>是</td><td>Prisma 连接 RDS</td></tr>
+<tr><td><code>AUTH_SECRET</code></td><td>是</td><td>jose 签发/校验 JWT（httpOnly cookie）</td></tr>
+<tr><td><code>NEXT_PUBLIC_APP_URL</code></td><td>是</td><td>构建期注入的对外地址</td></tr>
+<tr><td><code>ANALYSIS_BASE_URL</code></td><td>舆情</td><td>分析服务地址（同机 127.0.0.1:8000）</td></tr>
+<tr><td><code>ANALYSIS_SHARED_SECRET</code></td><td>舆情</td><td>与分析服务共享的 Bearer</td></tr>
+<tr><td><code>OPINION_AES_KEY</code></td><td>舆情</td><td>AES-256-GCM 加密 LLM apiKey</td></tr>
+<tr><td><code>FEISHU_WEBHOOK_URL</code> / <code>DOUYIN_ACCESS_TOKEN</code></td><td>否</td><td>飞书外发 / 抖音审核，可留空</td></tr>
+</table>
+
+<!-- ============ 6 BUILD ============ -->
+<h2 class="sec" id="build"><span class="n">6</span>安装依赖 · 数据库迁移 · 构建</h2>
+<pre><button class="copy">复制</button><code>cd /opt/gameops
+
+<span class="c"># 1) 安装依赖（会自动编译 argon2）</span>
+pnpm install --frozen-lockfile
+
+<span class="c"># 2) 生成 Prisma Client</span>
+pnpm db:generate
+
+<span class="c"># 3) 应用数据库迁移（生产用 deploy，不是 dev）</span>
+pnpm exec prisma migrate deploy
+
+<span class="c"># 4)（首次上线可选）灌入种子数据 / 初始管理员账号</span>
+pnpm db:seed
+
+<span class="c"># 5) 生产构建（此刻 .env 里的 NEXT_PUBLIC_APP_URL 会被内联）</span>
+pnpm build</code></pre>
+
+<div class="warn"><strong>用 <code>prisma migrate deploy</code>，不要用 <code>db:migrate</code>（=<code>migrate dev</code>）。</strong><code>dev</code> 会尝试改写迁移历史、可能触发重置，属于开发命令，严禁在生产库执行。</div>
+<p>确保运行时目录存在（Git 不带内容，只带 <code>.gitkeep</code>）：</p>
+<pre><button class="copy">复制</button><code>mkdir -p data/raw data/logs storage/opinion-reports public/uploads</code></pre>
+<div class="note"><code>pnpm db:seed</code> 是否含默认管理员账号，请对照 <code>prisma/seed.ts</code>；上线后<strong>立即修改</strong>任何默认口令。</div>
+
+<!-- ============ 7 PM2 ============ -->
+<h2 class="sec" id="pm2"><span class="n">7</span>PM2 启动常驻</h2>
+<p>在项目根建 <code>ecosystem.config.js</code>：</p>
+<pre><button class="copy">复制</button><code>module.exports = {
+  apps: [{
+    name: "gameops",
+    script: "node_modules/next/dist/bin/next",
+    args: "start -p 3000",
+    cwd: "/opt/gameops",
+    instances: 1,              <span class="c">// 必须单实例：进程内 cron/downloader</span>
+    exec_mode: "fork",         <span class="c">// 不可 cluster</span>
+    autorestart: true,
+    max_memory_restart: "1G",
+    env: { NODE_ENV: "production" }
+  }]
+};</code></pre>
+<div class="danger"><strong>严禁 <code>instances: "max"</code> 或 <code>exec_mode: "cluster"</code>。</strong>多实例会让 node-cron 调度器、舆情 downloader 重复触发，且违背 Agent 并发=1 语义。永远只跑<strong>一个</strong>实例。</div>
+
+<pre><button class="copy">复制</button><code>cd /opt/gameops
+pm2 start ecosystem.config.js
+
+<span class="c"># 开机自启（按提示复制它输出的那条 sudo 命令执行一次）</span>
+pm2 startup
+pm2 save
+
+pm2 status
+pm2 logs gameops --lines 50   <span class="c"># 看启动日志，确认 cron/downloader 已起</span></code></pre>
+<p>此时本机应可访问：<code>curl -I http://127.0.0.1:3000</code> 返回 200/3xx。</p>
+
+<!-- ============ 8 NGINX ============ -->
+<h2 class="sec" id="nginx"><span class="n">8</span>Nginx 反向代理 + HTTPS</h2>
+<pre><button class="copy">复制</button><code>sudo apt -y install nginx
+sudo tee /etc/nginx/sites-available/gameops &gt; /dev/null &lt;&lt;'EOF'
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    client_max_body_size 50m;   # EXCEL/封面上传，放开体积
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;   # 任务日志/长响应
+    }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/gameops /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
+
+<h3>8.1 上 HTTPS</h3>
+<p><strong>方式 A · Let's Encrypt（免费自动续期）：</strong></p>
+<pre><button class="copy">复制</button><code>sudo apt -y install certbot python3-certbot-nginx
+sudo certbot --nginx -d yourdomain.com
+<span class="c"># certbot 会自动改写上面的 server 块，加 443 + 证书 + 80→443 跳转</span></code></pre>
+<p><strong>方式 B · 阿里云免费 SSL：</strong>在阿里云申请证书，下载 Nginx 格式，把 <code>listen 443 ssl;</code> + <code>ssl_certificate</code> / <code>ssl_certificate_key</code> 指到证书文件，并加 80→443 跳转。</p>
+<div class="ok"><strong>为什么必须 HTTPS：</strong>登录态是 httpOnly cookie，生产环境需 <code>Secure</code> 属性走 HTTPS 才安全；<code>NEXT_PUBLIC_APP_URL</code> 也应与此域名一致。</div>
+
+<!-- ============ 9 ANALYZER ============ -->
+<h2 class="sec" id="analyzer"><span class="n">9</span>舆情分析服务（slg_analyzer · 同机 Docker）</h2>
+<p>该服务是独立仓库 <code>slg_analyzer</code>（FastAPI 包装 run.py/run_public.py/run_combined.py），本项目通过中台代理调用。</p>
+<ol>
+  <li>把 <code>slg_analyzer</code> 传到服务器，例如 <code>/opt/slg_analyzer</code>。</li>
+  <li>在其 <code>.env</code> 里设与中台<strong>相同</strong>的 <code>ANALYSIS_SHARED_SECRET</code>（Bearer 同源），以及各 LLM 配置。</li>
+  <li>启动容器，仅绑定回环端口：</li>
+</ol>
+<pre><button class="copy">复制</button><code>cd /opt/slg_analyzer
+docker compose up -d
+docker compose ps
+<span class="c"># 从中台机验证（应带 Bearer 才通）</span>
+curl -H "Authorization: Bearer $ANALYSIS_SHARED_SECRET" http://127.0.0.1:8000/health</code></pre>
+<div class="warn"><code>docker compose</code> 的端口映射请写成 <code>127.0.0.1:8000:8000</code>，<strong>不要</strong> <code>0.0.0.0</code>，避免分析服务暴露公网。中台侧 <code>ANALYSIS_BASE_URL=http://127.0.0.1:8000</code> 已匹配。</div>
+<div class="note">中台<strong>不落</strong> OpinionReport 表：任务状态在分析服务的 SQLite，产物 HTML/JSON 由中台 downloader 每 10s 拉回 <code>storage/opinion-reports/&lt;taskId&gt;/</code>。所以这个目录必须持久化（见下一节）。具体见 <code>docs/opinion-monitor.md</code>。</div>
+
+<!-- ============ 10 PERSIST ============ -->
+<h2 class="sec" id="persist"><span class="n">10</span>持久化目录与备份</h2>
+<table>
+<tr><th>路径</th><th>内容</th><th>随 Git</th><th>备份策略</th></tr>
+<tr><td><code>data/raw/</code></td><td>爬虫原始 CSV 留底</td><td>否</td><td>随云盘快照</td></tr>
+<tr><td><code>data/logs/</code></td><td>Task 执行日志（90 天自动清理）</td><td>否</td><td>可不备份</td></tr>
+<tr><td><code>storage/opinion-reports/</code></td><td>舆情报告 HTML/JSON 产物</td><td>否</td><td>随云盘快照</td></tr>
+<tr><td><code>public/uploads/</code></td><td>活动封面 / 创作灵感上传</td><td>否</td><td>随云盘快照</td></tr>
+<tr><td>RDS 全库</td><td>业务数据单一事实源</td><td>—</td><td><strong>RDS 自动备份</strong></td></tr>
+</table>
+<ul>
+  <li><strong>数据库</strong>：在 RDS 控制台开启自动备份 + 保留策略，这是最重要的一环。</li>
+  <li><strong>本地磁盘</strong>：给 ECS 系统盘/数据盘配置<strong>自动快照策略</strong>，覆盖上面几个目录。</li>
+  <li>确保这些目录的属主是运行 PM2 的用户，避免写入 <code>EACCES</code>。</li>
+</ul>
+
+<!-- ============ 11 VERIFY ============ -->
+<h2 class="sec" id="verify"><span class="n">11</span>上线验证清单</h2>
+<div class="card">
+<ul class="chk">
+  <li><code>https://yourdomain.com/login</code> 能打开，证书有效（绿锁）。</li>
+  <li>用管理员账号登录成功，按 role 正确跳转（ADMIN/OPERATOR → <code>/operator</code>，CREATOR → <code>/dashboard</code>）。</li>
+  <li><code>pm2 status</code> 显示 <code>gameops</code> online，重启计数为 0。</li>
+  <li><code>pm2 logs gameops</code> 中可见 cron-scheduler / downloader 启动日志，无 <code>DATABASE_URL</code> / 连接报错。</li>
+  <li>后台能建 Job / 触发 Task（若爬虫机 Agent 已就绪）。</li>
+  <li>上传一张活动封面 / 一个 EXCEL 参数，无 413（体积）报错 → 验证 Nginx <code>client_max_body_size</code>。</li>
+  <li>舆情：ADMIN 保存 LLM 设置成功（AES 加密），触发一次报告，10s 后能在列表看到并打开 HTML。</li>
+  <li>重启一次 ECS，确认 PM2 与 Docker 容器都<strong>开机自启</strong>。</li>
+</ul>
+</div>
+
+<!-- ============ 12 UPDATE ============ -->
+<h2 class="sec" id="update"><span class="n">12</span>更新与回滚</h2>
+<h3>日常更新（无破坏性迁移）</h3>
+<pre><button class="copy">复制</button><code>cd /opt/gameops
+git pull
+pnpm install --frozen-lockfile
+pnpm db:generate
+pnpm exec prisma migrate deploy
+pnpm build
+pm2 reload gameops        <span class="c"># 平滑重启</span></code></pre>
+<div class="note">若本次改了 <code>NEXT_PUBLIC_APP_URL</code> 或任何 <code>NEXT_PUBLIC_*</code>，<code>pnpm build</code> 已覆盖它们；只 <code>reload</code> 不 build 不生效。</div>
+
+<h3>回滚</h3>
+<pre><button class="copy">复制</button><code>cd /opt/gameops
+git log --oneline -5           <span class="c"># 找上一个好版本</span>
+git checkout &lt;good-commit&gt;
+pnpm install --frozen-lockfile &amp;&amp; pnpm db:generate &amp;&amp; pnpm build
+pm2 reload gameops</code></pre>
+<div class="danger"><strong>数据库迁移不会随代码回滚。</strong>若新版本含破坏性迁移，回滚代码前先评估数据兼容性；重大迁移上线前务必先在 RDS 做一次<strong>手动备份/快照</strong>。</div>
+
+<!-- ============ 13 TROUBLE ============ -->
+<h2 class="sec" id="trouble"><span class="n">13</span>常见问题排查</h2>
+<table>
+<tr><th>现象</th><th>排查方向</th></tr>
+<tr><td>启动即崩 / DB 连接超时</td><td>RDS 白名单是否含 ECS 内网 IP；<code>DATABASE_URL</code> 用的是<strong>内网</strong>地址；密码特殊字符是否 URL 编码。</td></tr>
+<tr><td>502 Bad Gateway</td><td>PM2 是否 online（<code>pm2 status</code>）；<code>curl 127.0.0.1:3000</code> 是否通；Nginx <code>proxy_pass</code> 端口。</td></tr>
+<tr><td>时间显示差 8 小时</td><td>RDS 参数 <code>timezone</code> 是否为 UTC；前端渲染由 <code>lib/format.ts</code> 锁 Asia/Shanghai。</td></tr>
+<tr><td>上传 413 Request Entity Too Large</td><td>Nginx <code>client_max_body_size</code> 调大（示例 50m）。</td></tr>
+<tr><td>argon2 报错 / 装不上</td><td>确认 <code>build-essential</code> 已装；删 <code>node_modules</code> 后重 <code>pnpm install</code>。</td></tr>
+<tr><td>cron/舆情任务重复触发</td><td>PM2 是否被误配成多实例/cluster；本项目必须<strong>单实例 fork</strong>。</td></tr>
+<tr><td>舆情报告一直不出现</td><td>分析容器是否 up；两侧 <code>ANALYSIS_SHARED_SECRET</code> 是否一致；<code>ANALYSIS_BASE_URL</code> 是否 127.0.0.1:8000；<code>storage/opinion-reports/</code> 是否可写。</td></tr>
+<tr><td>改了 NEXT_PUBLIC_APP_URL 不生效</td><td>该变量构建期内联，必须 <code>pnpm build</code> 后再 reload。</td></tr>
+</table>
+
+<hr>
+<p class="meta">相关文档：<code>docs/architecture.md</code> · <code>docs/agent-protocol.md</code> · <code>docs/agent-setup-guide.md</code>（爬虫机 Agent）· <code>docs/opinion-monitor.md</code>（舆情监控）。本指南聚焦阿里云中台上线，不含爬虫机 Agent 部署。</p>
+
+</main>
+</div>
+
+<script>
+document.querySelectorAll('.copy').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var code = btn.parentElement.querySelector('code');
+    var text = code.innerText;
+    navigator.clipboard.writeText(text).then(function(){
+      var old = btn.textContent; btn.textContent = '已复制';
+      setTimeout(function(){ btn.textContent = old; }, 1400);
+    });
+  });
+});
+</script>
+</body>
+</html>

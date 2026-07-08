@@ -11,7 +11,13 @@
       "Bash(pnpm install *)",
       "Bash(pnpm typecheck *)",
       "Bash(pnpm prisma *)",
-      "WebFetch(domain:api.anthropic.com)"
+      "WebFetch(domain:api.anthropic.com)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(pnpm db:migrate *)",
+      "PowerShell(pnpm test *)",
+      "Bash(docker exec *)",
+      "Bash(docker compose *)",
+      "Bash(pnpm add *)"
     ]
   }
 }

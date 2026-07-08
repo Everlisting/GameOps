@@ -6,6 +6,7 @@
  */
 import * as React from "react";
 import {
+  BarChart3,
   CalendarRange,
   ClipboardCheck,
   Database,
@@ -39,6 +40,15 @@ import { OperatorNavUser } from "./OperatorNavUser";
 const NAV_ITEMS: NavItem[] = [
   { title: "概览", url: "/operator/dashboard", icon: LayoutGrid, exact: true },
   { title: "BI 大屏", url: "/operator/bi", icon: MonitorSmartphone, exact: true },
+  {
+    title: "项目数据",
+    url: "/operator/data/videos",
+    icon: BarChart3,
+    items: [
+      { title: "视频数据", url: "/operator/data/videos" },
+      { title: "主播数据", url: "/operator/data/streamers" },
+    ],
+  },
   {
     title: "活动管理",
     url: "/operator/activities",
