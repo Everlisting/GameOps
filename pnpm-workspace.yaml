@@ -1,0 +1,9 @@
+# pnpm 10+ 把 onlyBuiltDependencies 等设置从 package.json 挪到了这里。
+# 允许运行 postinstall 构建脚本的依赖白名单。
+# argon2 是原生模块(密码哈希),不构建会导致登录在运行时崩溃 —— 必须保留。
+onlyBuiltDependencies:
+  - argon2
+  - esbuild
+  - "@prisma/client"
+  - "@prisma/engines"
+  - prisma
