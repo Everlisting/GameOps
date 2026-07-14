@@ -46,6 +46,7 @@ export type JobFormInitial = {
   outputs: OutputItem[];
   cronExpression: string;
   enabled: boolean;
+  active: boolean;
 };
 
 export const EMPTY_INITIAL: JobFormInitial = {
@@ -62,6 +63,7 @@ export const EMPTY_INITIAL: JobFormInitial = {
   outputs: [],
   cronExpression: "",
   enabled: true,
+  active: true,
 };
 
 export default function JobForm({
@@ -102,6 +104,7 @@ export default function JobForm({
         outputs: data.outputs,
         cronExpression: data.cronExpression.trim() || null,
         enabled: data.enabled,
+        active: data.active,
       };
       const url =
         mode === "create"
@@ -292,7 +295,15 @@ export default function JobForm({
             checked={data.enabled}
             onChange={(e) => set("enabled", e.target.checked)}
           />
-          启用(关掉后 cron 不会触发,手动触发也会被拒)
+          定时启用(仅控 cron 自动触发;关掉后不定时跑,手动触发仍可)
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={data.active}
+            onChange={(e) => set("active", e.target.checked)}
+          />
+          任务启用(整体开关;停用后任何方式都不可触发,含手动 / rerun)
         </label>
       </Card>
 

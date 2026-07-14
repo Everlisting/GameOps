@@ -17,14 +17,17 @@ import { isOffline } from "@/lib/agent-offline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import JobActiveToggle from "./_components/JobActiveToggle";
 
 export default async function AdminJobsPage({
   searchParams,
 }: {
-  searchParams?: { agentId?: string; enabled?: string; q?: string };
+  searchParams?: { agentId?: string; active?: string; enabled?: string; q?: string };
 }) {
   const where: Prisma.CrawlerJobWhereInput = {};
   if (searchParams?.agentId) where.agentId = searchParams.agentId;
+  if (searchParams?.active === "true") where.active = true;
+  if (searchParams?.active === "false") where.active = false;
   if (searchParams?.enabled === "true") where.enabled = true;
   if (searchParams?.enabled === "false") where.enabled = false;
   const q = searchParams?.q?.trim() ?? "";
@@ -42,6 +45,7 @@ export default async function AdminJobsPage({
       id: true,
       name: true,
       description: true,
+      active: true,
       enabled: true,
       cronExpression: true,
       timeoutMinutes: true,
@@ -150,19 +154,22 @@ export default async function AdminJobsPage({
                       </div>
                     </td>
                     <td className="px-4 text-center align-middle">
-                      {j.enabled ? (
-                        <Badge variant="success">启用</Badge>
-                      ) : (
-                        <Badge variant="muted">停用</Badge>
-                      )}
+                      <JobActiveToggle jobId={j.id} active={j.active} />
                     </td>
                     <td className="px-4 align-middle text-center text-xs">
                       {j.cronExpression ? (
-                        <div>
-                          <div className="truncate">
+                        <div className="space-y-1">
+                          <div>
+                            {j.enabled ? (
+                              <Badge variant="success" className="text-[10px]">定时开</Badge>
+                            ) : (
+                              <Badge variant="muted" className="text-[10px]">定时关</Badge>
+                            )}
+                          </div>
+                          <div className={`truncate ${j.enabled ? "" : "text-muted-foreground line-through"}`}>
                             {describeCron(j.cronExpression)}
                           </div>
-                          <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+                          <div className="truncate font-mono text-[10px] text-muted-foreground">
                             {j.cronExpression}
                           </div>
                         </div>

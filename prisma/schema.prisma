@@ -291,7 +291,8 @@ model CrawlerJob {
   paramSchema    Json                @default("[]")      // [{name, type, required, default?, options?[]}]
   outputs        Json                @default("[]")      // [{path, csvType?}] 仅带 csvType 的产物会上传中台入库
   cronExpression String?                                  // 5 段标准 cron;null = 仅手动
-  enabled        Boolean             @default(true)
+  enabled        Boolean             @default(true)       // 仅控 cron 自动触发开关(定时开/关)
+  active         Boolean             @default(true)       // 任务整体启用/停用;停用 = 不可触发(含手动),与 enabled 分离
   createdById    String
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt

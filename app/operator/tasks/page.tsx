@@ -20,6 +20,7 @@ import { describeCron } from "@/lib/cron-describe";
 import { isOffline } from "@/lib/agent-offline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import JobActiveToggle from "@/app/operator/admin/jobs/_components/JobActiveToggle";
 import { Card } from "@/components/ui/card";
 
 import TaskStatusBadge from "./_components/TaskStatusBadge";
@@ -27,12 +28,19 @@ import TaskStatusBadge from "./_components/TaskStatusBadge";
 export default async function OperatorTasksPage({
   searchParams,
 }: {
-  searchParams?: { enabled?: string; q?: string };
+  searchParams?: { active?: string; enabled?: string; q?: string };
 }) {
   await requireRole("OPERATOR");
   const session = await getSession();
   const isAdmin = session?.role === "ADMIN";
 
+  // active = 任务整体启停(侧边栏「启用中/已停用」按它筛);enabled = 定时开关
+  const activeFilter =
+    searchParams?.active === "true"
+      ? true
+      : searchParams?.active === "false"
+        ? false
+        : undefined;
   const enabledFilter =
     searchParams?.enabled === "true"
       ? true
@@ -42,6 +50,7 @@ export default async function OperatorTasksPage({
   const q = searchParams?.q?.trim() || undefined;
 
   const where: Prisma.CrawlerJobWhereInput = {};
+  if (activeFilter !== undefined) where.active = activeFilter;
   if (enabledFilter !== undefined) where.enabled = enabledFilter;
   if (q) {
     where.OR = [
@@ -57,6 +66,7 @@ export default async function OperatorTasksPage({
       id: true,
       name: true,
       description: true,
+      active: true,
       enabled: true,
       cronExpression: true,
       timeoutMinutes: true,
@@ -122,7 +132,7 @@ export default async function OperatorTasksPage({
                 <th className="px-4 text-left font-medium">任务名 / 描述</th>
                 <th className="px-4 text-center font-medium">总次数</th>
                 <th className="px-4 text-center font-medium">爬虫机</th>
-                <th className="px-4 text-center font-medium">启用</th>
+                <th className="px-4 text-center font-medium">状态</th>
                 <th className="px-4 text-center font-medium">定时</th>
                 <th className="px-4 text-center font-medium">最近执行</th>
               </tr>
@@ -182,17 +192,26 @@ export default async function OperatorTasksPage({
                       )}
                     </td>
                     <td className="px-4 text-center align-middle">
-                      {j.enabled ? (
-                        <Badge variant="success">启用</Badge>
-                      ) : (
-                        <Badge variant="muted">停用</Badge>
-                      )}
+                      <JobActiveToggle
+                        jobId={j.id}
+                        active={j.active}
+                        canToggle={isAdmin}
+                      />
                     </td>
                     <td className="px-4 align-middle text-center text-xs">
                       {j.cronExpression ? (
-                        <div>
-                          <div className="truncate">{describeCron(j.cronExpression)}</div>
-                          <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+                        <div className="space-y-1">
+                          <div>
+                            {j.enabled ? (
+                              <Badge variant="success" className="text-[10px]">定时开</Badge>
+                            ) : (
+                              <Badge variant="muted" className="text-[10px]">定时关</Badge>
+                            )}
+                          </div>
+                          <div className={`truncate ${j.enabled ? "" : "text-muted-foreground line-through"}`}>
+                            {describeCron(j.cronExpression)}
+                          </div>
+                          <div className="truncate font-mono text-[10px] text-muted-foreground">
                             {j.cronExpression}
                           </div>
                         </div>

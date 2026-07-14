@@ -100,8 +100,8 @@ const NAV_ITEMS: NavItem[] = [
     icon: ListChecks,
     items: [
       { title: "全部", url: "/operator/tasks" },
-      { title: "启用中", url: "/operator/tasks?enabled=true" },
-      { title: "已停用", url: "/operator/tasks?enabled=false" },
+      { title: "启用中", url: "/operator/tasks?active=true" },
+      { title: "已停用", url: "/operator/tasks?active=false" },
     ],
   },
   {
@@ -147,8 +147,8 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
     icon: Workflow,
     items: [
       { title: "全部 Job", url: "/operator/admin/jobs" },
-      { title: "启用中", url: "/operator/admin/jobs?enabled=true" },
-      { title: "已停用", url: "/operator/admin/jobs?enabled=false" },
+      { title: "启用中", url: "/operator/admin/jobs?active=true" },
+      { title: "已停用", url: "/operator/admin/jobs?active=false" },
     ],
   },
   {

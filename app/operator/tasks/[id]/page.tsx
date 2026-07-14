@@ -54,6 +54,7 @@ export default async function JobDetailPage({
       id: true,
       name: true,
       description: true,
+      active: true,
       enabled: true,
       repoType: true,
       repoUrl: true,
@@ -122,10 +123,17 @@ export default async function JobDetailPage({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">{job.name}</h1>
-            {job.enabled ? (
+            {job.active ? (
               <Badge variant="success">启用</Badge>
             ) : (
               <Badge variant="muted">已停用</Badge>
+            )}
+            {job.cronExpression && (
+              job.enabled ? (
+                <Badge variant="success" className="text-[10px]">定时开</Badge>
+              ) : (
+                <Badge variant="muted" className="text-[10px]">定时关</Badge>
+              )
             )}
           </div>
           {job.description && (
@@ -208,11 +216,15 @@ export default async function JobDetailPage({
             <p className="text-xs text-destructive">
               绑定的爬虫机不可用,任务会卡在 PENDING。先恢复爬虫机再触发。
             </p>
+          ) : !job.active ? (
+            <p className="text-xs text-destructive">
+              任务已停用,不能触发。请先在采集任务列表点「启用」。
+            </p>
           ) : (
             <>
-              {!job.enabled && (
+              {job.cronExpression && !job.enabled && (
                 <p className="rounded-md border border-amber-300/40 bg-amber-50/60 px-2 py-1 text-[11px] text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300">
-                  Job 已停用 cron 自动触发,但仍可手动运行。
+                  定时已关,cron 不会自动触发,但可在此手动运行。
                 </p>
               )}
               <JobTriggerSection

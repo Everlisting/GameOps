@@ -73,6 +73,7 @@ export const PATCH = route(async (req, { params }) => {
     "command",
     "timeoutMinutes",
     "enabled",
+    "active",
   ] as const) {
     if (input[k] !== undefined) data[k] = input[k];
   }

@@ -60,7 +60,7 @@
 - Agent 取消监听:跑命令期间每 5s 空 POST `/log`,返回 4xx 即视为被取消 → kill 子进程。
 - Task 日志页默认折叠,展开后只渲染尾 100 行;`?lines=N` / `?tail=N` / `?offset=N` / `?download=1` 四种模式。
 - **舆情监控 env**:`ANALYSIS_BASE_URL`(分析服务地址,dev 默认 `http://127.0.0.1:8000`)/ `ANALYSIS_SHARED_SECRET`(Bearer token,与分析服务同源)/ `OPINION_AES_KEY`(32 字节 base64,加密 apiKey 用)。缺失只 warn 不阻塞其他功能,首次触发接口时懒失败。
-- **分析服务本地起法**:`cd F:\Kaifa\slg_analyzer && docker compose up -d`(先在 shell 或 `slg_analyzer/.env` 设 `ANALYSIS_SHARED_SECRET`)。中台 dev 侧同一台机器起 `pnpm dev` 即可。
+- **分析服务本地起法**:`cd F:\Kaifa\data-hub\services\slg && docker compose up -d`(先在 shell 或该目录 `.env` 设 `ANALYSIS_SHARED_SECRET`)。中台 dev 侧同一台机器起 `pnpm dev` 即可。分析服务已迁入爬虫总集仓 `data-hub`(见 `docs/crawler-monorepo-plan.md`);旧 `slg_analyzer` 目录仅作回溯保留。
 
 ## 开发阶段(当前:阶段 9 完成,舆情监控上线)
 1.✅地基+认证+RBAC+登录分流  2.✅创作者端MVP(活动/报名/投稿)  3.✅运营端核心(含创作灵感)

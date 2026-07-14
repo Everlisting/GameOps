@@ -219,7 +219,8 @@ const jobFieldShape = {
   paramSchema: z.array(paramItemSchema).max(30).default([]),
   outputs: z.array(outputItemSchema).max(20).default([]),
   cronExpression: cronExpressionSchema.nullable().optional(),
-  enabled: z.boolean().default(true),
+  enabled: z.boolean().default(true),   // cron 自动触发开关
+  active: z.boolean().default(true),    // 任务整体启停(独立于 enabled)
 };
 
 /** 检查 paramSchema 内 name 唯一、outputs 内 path 唯一,以及 command 引用的 {{var}} 都在 paramSchema 里。 */
@@ -302,6 +303,7 @@ export const updateJobSchema = z
     outputs: z.array(outputItemSchema).max(20).optional(),
     cronExpression: cronExpressionSchema.nullable().optional(),
     enabled: z.boolean().optional(),
+    active: z.boolean().optional(),
   })
   .superRefine(refineJobCrossField);
 

@@ -38,15 +38,20 @@ export async function createTaskFromJob(opts: CreateTaskFromJobOpts): Promise<Cr
     select: {
       id: true,
       enabled: true,
+      active: true,
       agentId: true,
       paramSchema: true,
     },
   });
   if (!job) throw notFound("Job 不存在");
-  // enabled 现在只控制 cron 自动触发(AUTO)。手动触发(MANUAL / rerun)即使停用也允许跑,
-  // 方便临时关掉定时但偶尔手工补数据;真要禁用 Job 直接删除即可。
+  // active = 任务整体启停,停用后任何方式都不可触发(手动 / rerun / cron)。
+  if (!job.active) {
+    throw conflict("任务已停用,请先在任务列表启用后再运行");
+  }
+  // enabled 只控制 cron 自动触发(AUTO)。手动触发(MANUAL / rerun)即使 cron 关着也允许,
+  // 方便临时关掉定时但偶尔手工补数据。
   if (!job.enabled && opts.trigger === "AUTO") {
-    throw conflict("Job 已停用,cron 不再自动触发");
+    throw conflict("Job 的 cron 已关闭,不再自动触发");
   }
 
   // paramValues 对照 Job 的 paramSchema 校验

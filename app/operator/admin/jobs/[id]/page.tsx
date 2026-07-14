@@ -75,6 +75,7 @@ export default async function EditJobPage({
           outputs: (job.outputs as unknown as OutputItem[]) ?? [],
           cronExpression: job.cronExpression ?? "",
           enabled: job.enabled,
+          active: job.active,
         }}
       />
     </div>

@@ -31,7 +31,7 @@ export async function start(): Promise<void> {
   started = true;
 
   const jobs = await prisma.crawlerJob.findMany({
-    where: { enabled: true, NOT: { cronExpression: null } },
+    where: { active: true, enabled: true, NOT: { cronExpression: null } },
     select: { id: true },
   });
   for (const j of jobs) {
@@ -53,12 +53,12 @@ export async function start(): Promise<void> {
 export async function syncJob(jobId: string): Promise<void> {
   const job = await prisma.crawlerJob.findUnique({
     where: { id: jobId },
-    select: { id: true, name: true, enabled: true, cronExpression: true },
+    select: { id: true, name: true, active: true, enabled: true, cronExpression: true },
   });
 
   const existing = scheduled.get(jobId);
 
-  if (!job || !job.enabled || !job.cronExpression) {
+  if (!job || !job.active || !job.enabled || !job.cronExpression) {
     if (existing) {
       existing.task.stop();
       scheduled.delete(jobId);
