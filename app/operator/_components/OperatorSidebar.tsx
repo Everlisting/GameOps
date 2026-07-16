@@ -42,11 +42,12 @@ const NAV_ITEMS: NavItem[] = [
   { title: "BI 大屏", url: "/operator/bi", icon: MonitorSmartphone, exact: true },
   {
     title: "项目数据",
-    url: "/operator/data/videos",
+    url: "/operator/data/streamers",
     icon: BarChart3,
     items: [
-      { title: "视频数据", url: "/operator/data/videos" },
       { title: "主播数据", url: "/operator/data/streamers" },
+      { title: "视频数据", url: "/operator/data/videos" },
+      { title: "直播数据", url: "/operator/data/live" },
     ],
   },
   {

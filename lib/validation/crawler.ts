@@ -9,10 +9,16 @@
 import { z } from "zod";
 
 // ── csvType 注册 ───────────────────────────────────
-export const KNOWN_CSV_TYPES = ["douyin_video_detail"] as const;
+export const KNOWN_CSV_TYPES = [
+  "douyin_video_detail",
+  "anchor_roster",
+  "live_detail",
+] as const;
 
 export const CSV_TYPE_LABEL: Record<string, string> = {
   douyin_video_detail: "抖音视频明细表",
+  anchor_roster: "主播名单",
+  live_detail: "直播明细表",
 };
 
 // ── 管理员侧:Agent CRUD ────────────────────────────

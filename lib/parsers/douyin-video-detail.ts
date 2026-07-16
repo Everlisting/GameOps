@@ -10,7 +10,7 @@
  *
  * 易踩坑点:
  *   - UID 被 Excel 转成科学计数法(如 "1.00449E+11"),要还原成长整数字串
- *   - 发布时间格式 "2026/5/1 20:19"(月日不补零、可能无秒)
+ *   - 发布时间格式 "2026/5/1 20:19" 或 "2026-07-01 13:12:51"(斜杠或短横线、月日可能不补零、可能无秒)
  *   - 标题里的逗号是中文全角逗号 "," → CSV 仍以英文 "," 分隔,但 parser 必须支持 quoted 字段以防将来源换成 Excel 加引号导出
  *
  * 上库:
@@ -84,6 +84,10 @@ export const parseDouyinVideoDetail: Parser = async (csv, ctx) => {
   // 数据行:跳过全空行;按列名查值,允许 CSV 里多余的列(忽略)
   const minCols = Math.max(...REQUIRED_COLUMNS.map((c) => headerIndex.get(c)!)) + 1;
   const dataRows: ParsedRow[] = [];
+  // 本次导入声明的「发布日期窗口」:取所有行的 视频发布日期起(最小)~ 视频发布日期止(最大)。
+  // 删除/隐藏检测只在这个窗口内比对,避免跨月/跨区间的导入误判往月稿件(见 sweep 处说明)。
+  let declStartMs = Infinity;
+  let declEndMs = -Infinity;
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (row.every((c) => c.trim() === "")) continue;
@@ -103,6 +107,12 @@ export const parseDouyinVideoDetail: Parser = async (csv, ctx) => {
     const parsed = mapRow(row, headerIndex, r + 1);
     if (!parsed) continue;
     dataRows.push(parsed);
+
+    // 声明窗口(可选列,缺失则后面用 publishedAt 的 min/max 兜底)
+    const qs = parseDateOnly(rowByName["视频发布日期起"] ?? "");
+    const qe = parseDateOnly(rowByName["视频发布日期止"] ?? "");
+    if (qs) declStartMs = Math.min(declStartMs, qs.getTime());
+    if (qe) declEndMs = Math.max(declEndMs, qe.getTime());
   }
 
   if (dataRows.length === 0) return { rowCount: 0 };
@@ -124,7 +134,7 @@ export const parseDouyinVideoDetail: Parser = async (csv, ctx) => {
   const uidToCreator = new Map<string, string>();
   for (const c of creators) if (c.dyUid) uidToCreator.set(c.dyUid, c.id);
 
-  // 分批 upsert
+  // 分批 upsert(命中行 hidden=false + lastDatasetId=本次)
   let processed = 0;
   for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
     const batch = dataRows.slice(i, i + BATCH_SIZE);
@@ -134,8 +144,62 @@ export const parseDouyinVideoDetail: Parser = async (csv, ctx) => {
     processed += batch.length;
   }
 
-  return { rowCount: processed };
+  // 删除/隐藏检测(按「发布日期窗口」比对):
+  //   每次导入只覆盖某个发布日期区间(如某月 / 某几日),不是全库快照。
+  //   所以只在本次导入声明的窗口 [起, 止] 内比对:窗口内、在库、但本次没写到的稿件
+  //   (lastDatasetId ≠ 本次)判定为达人删除/隐藏;窗口外的往月/其它区间稿件一律不动。
+  //   重新出现的稿件已在上面 upsert 时置回 hidden=false。
+  // 窗口来源:优先 视频发布日期起/止 列;缺失时用本次 publishedAt 的最早/最晚天兜底。
+  // 无法确定窗口(无起止列且 publishedAt 全空)则跳过检测,宁可不标也不误标。
+  const { windowStart, windowEnd } = resolveWindow(declStartMs, declEndMs, dataRows);
+  let hiddenCount = 0;
+  if (windowStart && windowEnd) {
+    const hiddenResult = await prisma.$executeRaw`
+      UPDATE "VideoStat"
+      SET "hidden" = true, "hiddenAt" = COALESCE("hiddenAt", NOW())
+      WHERE "platform" = 'douyin'
+        AND "hidden" = false
+        AND "lastDatasetId" IS DISTINCT FROM ${ctx.datasetId}
+        AND "publishedAt" >= ${windowStart}
+        AND "publishedAt" < ${windowEnd}`;
+    hiddenCount = Number(hiddenResult);
+  }
+
+  // 本次命中但无标题的条目也算删除/隐藏(已在 buildUpsert 直接置 hidden=true,这里只做计数)
+  const titlelessCount = dataRows.filter((r) => r.title.trim() === "").length;
+
+  return { rowCount: processed, hiddenCount: hiddenCount + titlelessCount };
 };
+
+/** 由声明窗口(视频发布日期起/止)或 publishedAt min/max 推出比对窗口 [start, end)。
+ *  end 为排他上界:声明的「止」是含当天的日期 → +1 天;兜底同理取最晚天的次日零点。 */
+function resolveWindow(
+  declStartMs: number,
+  declEndMs: number,
+  dataRows: ParsedRow[],
+): { windowStart: Date | null; windowEnd: Date | null } {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  if (Number.isFinite(declStartMs) && Number.isFinite(declEndMs)) {
+    return {
+      windowStart: new Date(declStartMs),
+      windowEnd: new Date(declEndMs + DAY_MS),
+    };
+  }
+  // 兜底:用本次入库行的 publishedAt 天区间
+  let minMs = Infinity;
+  let maxMs = -Infinity;
+  for (const r of dataRows) {
+    if (!r.publishedAt) continue;
+    const day = localDayStart(r.publishedAt).getTime();
+    minMs = Math.min(minMs, day);
+    maxMs = Math.max(maxMs, day);
+  }
+  if (!Number.isFinite(minMs)) return { windowStart: null, windowEnd: null };
+  return {
+    windowStart: new Date(minMs),
+    windowEnd: new Date(maxMs + DAY_MS),
+  };
+}
 
 function mapRow(
   cells: string[],
@@ -183,6 +247,8 @@ function buildUpsert(
   datasetId: string,
 ): Prisma.PrismaPromise<unknown> {
   const creatorId = r.creatorUid ? uidToCreator.get(r.creatorUid) ?? null : null;
+  // 有链接但无标题 = 平台已删除/隐藏(只剩链接、取不到标题),即便本次"出现"也判为删除/隐藏。
+  const titleMissing = r.title.trim() === "";
   const shared = {
     url: r.url,
     title: r.title,
@@ -201,6 +267,9 @@ function buildUpsert(
     recruitAgent: r.recruitAgent,
     note: r.note,
     lastDatasetId: datasetId,
+    // 命中且有标题 = 作品仍在,恢复正常态;命中但无标题 = 判删除/隐藏
+    hidden: titleMissing,
+    hiddenAt: titleMissing ? new Date() : null,
   };
   return prisma.videoStat.upsert({
     where: {
@@ -235,11 +304,13 @@ function normalizeUid(s: string): string | null {
   return cut > 0 ? digits.slice(0, cut) : null;
 }
 
-/** "2026/5/1 20:19" / "2026/05/01 20:19:30" → Date;失败返回 null。
+/** "2026/5/1 20:19" / "2026/05/01 20:19:30" / "2026-07-01 13:12:51" → Date;失败返回 null。
+ *  分隔符 `/` 或 `-` 都认:Excel 单元格显示成斜杠,但导出的 CSV 实际写的是 ISO 短横线。
+ *  必须带时:纯日期(如 "2026-05-01")仍返回 null,避免与 视频发布日期起/止 那类日期列混淆。
  *  以本地时区构造,与中台运行时区一致(部署在阿里云上海,CSV 来源也是国内)。*/
 function parseChineseDate(s: string): Date | null {
   if (!s) return null;
-  const m = /^(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(
+  const m = /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(
     s,
   );
   if (!m) return null;
@@ -253,6 +324,21 @@ function parseChineseDate(s: string): Date | null {
     Number(se),
   );
   return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+/** "2026-06-01" / "2026/6/1" → 本地零点 Date;失败返回 null。用于解析「视频发布日期起/止」。 */
+function parseDateOnly(s: string): Date | null {
+  if (!s) return null;
+  const m = /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/.exec(s.trim());
+  if (!m) return null;
+  const [, y, mo, d] = m;
+  const dt = new Date(Number(y), Number(mo) - 1, Number(d));
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+/** 取某时刻所在「本地日」的零点(与页面发布日期筛选、publishedAt 构造同口径)。 */
+function localDayStart(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 function parseIntSafe(s: string | undefined): number {
@@ -275,5 +361,6 @@ export const _testing = {
   parseVideoId,
   normalizeUid,
   parseChineseDate,
+  parseDateOnly,
   parseIntSafe,
 };

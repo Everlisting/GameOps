@@ -22,6 +22,10 @@
 - **时区**:PG 数据库强制 `timezone='UTC'`,前端用 `lib/format.ts` 锁 Asia/Shanghai 渲染;raw SQL 用 `(NOW() AT TIME ZONE 'UTC')` 显式 UTC。
 - CSV→表映射写在代码内(每种 csvType 一个解析器,见 lib/parsers/index.ts)。
 - 数据三层:原始层(留底)→ 明细层(upsert 只留最新)→ 每日汇总层(历史趋势)。
+- **手动导入**:运营可在「视频数据」页直接上传视频明细表(`POST /api/operator/data/videos/import`,收 CSV/Excel,固定 csvType=`douyin_video_detail`),复用同一 parser + snapshotter,`RawDataset.taskId=null`,审计 `data.import`,用于补录/回填。
+- **主播数据(`app/operator/data/streamers`)**:**名单 = `AnchorStat` 表(运营导入维护,为主;未来可加爬虫),`@@unique([platform, uid])`**——保证「本月没发作品的主播也在名单内」。导入走 `POST /api/operator/data/streamers/import`(csvType=`anchor_roster`,parser `lib/parsers/anchor-roster.ts` 按 `(platform, uid)` upsert,**只写身份/花名册字段、缺列不冲空**、无 snapshotter,审计 `data.import`)。识别列:主播平台 / UID(必需)/ 主播昵称 / 抖音号 / 入会时间 / 团号 / 运营经纪人 / 招募经纪人 /(可选)粉丝量。页面 = 以 `AnchorStat` 为基表,**按 UID `LEFT JOIN` 聚合明细**得数值列(`_lib/query.ts` 用 `Prisma.sql`/`Prisma.join` 拼名单 where + 视频聚合子查询 + 白名单 orderBy):作品数 / 作品播放量 / 作品推荐播放量 / 涨粉 ← 视频明细 `VideoStat`(`hidden=false`);粉丝量 ← 名单自带或后续直播明细覆盖;**直播维度(直播天数 / 直播时长 / ACU / 曝光人数·次数 / 进直播间人数·次数 / 人均观看时长)← 直播明细 `LiveStat` 第二段 LEFT JOIN**(SUM 类累计,率·均值类如 ACU / 人均观看时长按开播天数 AVG;直播天数 = 开播天数 = LiveStat 行数,因只入库开播时长>0)。**无 `直播场次`(源表无此列)**。名单筛选(搜索 / 团号)作用于名单,日期窗口(默认本月)同时收窄视频与直播两段聚合子查询(不影响主播在列)。
+- **直播数据(`app/operator/data/live`)**:数据源 `LiveStat` 表(直播明细,**主播 × 自然日一行**,`@@unique([platform, uid, date])`),来自脚本「所有主播画像表」CSV。导入走 `POST /api/operator/data/live/import`(csvType=`live_detail`,parser `lib/parsers/live-detail.ts` 按 `(platform, uid, date)` upsert,无 snapshotter,审计 `data.import`),爬虫上报同一 parser。**入库规则**:①只入「有效开播时长 > 0」的行(空开播行跳过,`skippedCount` 计数);②UID 取 `UID2` 列去前缀(普通 `UID` 列会被 Excel 转科学计数法丢精度),回退还原 `UID`;③排除两列不入库:`直播-游戏流水(分成前)(元)` / `直播-主播游戏收入(分成后)(元)`;④`日期` 用 `Date.UTC` 存 `@db.Date`(避免本地时区偏移);⑤备注列即团号存 `note`。页面默认仅显示本月(按 `date`),往月用日期筛选,带导入/导出。字段:音浪 / 有效开播时长 / 曝光人数·次数 / 进直播间人数·次数 / 进直播间转化率 / 人均观看时长 / 打赏人数·次数 / 新增粉丝 / ACU。
+- **达人删除/隐藏(VideoStat.hidden)**:每次导入(手动 + 爬虫)按 `externalId` **在本次「发布日期窗口」内比对**——导入只覆盖某发布区间(某月/某几日),不是全库快照,所以窗口取自 CSV 的 `视频发布日期起/止` 列(缺失时用本次 `publishedAt` 的最早/最晚天兜底)。命中且有标题的行 `hidden=false`;**窗口内**在库但本次缺失(`lastDatasetId ≠ 本次` 且当前正常)→ `hidden=true` + `hiddenAt`;**命中但只有链接无视频标题**(平台已删/隐,取不到标题)也判 `hidden=true`;**窗口外**(往月/其它区间)一律不动;重新出现(且有标题)自动恢复。无法确定窗口则跳过检测(宁可不标不误标)。**hidden 行不参与任何统计/激励计算**(激励聚合、BI、视频页统计卡均排除),仅留存并在视频数据表格展示(附「正常/已删除隐藏/全部」筛选)。
 - **激励引擎**:7 类规则块可叠加(TIER / FORMULA / SHARE_POOL / RANK / PER_SUBMISSION / ACTIVITY_THRESHOLD / BASE_PLUS_STEP),每条规则可挂 `cap`(元)与 `cpmCap`(元/千播放,创作者 views=0 不生效)。引擎纯函数 `lib/incentive/engine.ts`,聚合层 `lib/incentive/aggregate.ts`(候选 = 报名 ∪ 投稿)。结果落 `Incentive` 表(`(creatorId, activityId)` 唯一);重算覆盖 `estimated/breakdown/computedAt`,人工 `adjusted` 字段保留。审计:`incentive.compute`(全活动重算) / `incentive.adjust`(单条调整)。
 - **舆情监控**(详见 `docs/opinion-monitor.md`):三份报告(私域 / 公域 / 对比)由独立 Docker 容器 `slg_analyzer/service`(FastAPI wrapper of run.py / run_public.py / run_combined.py)生成,中台代理调用。**中台不落 OpinionReport 表**,任务状态与元数据由分析服务 SQLite 持有,中台只存单例 `OpinionSettings`(LLM 配置,`apiKey` AES-256-GCM 加密)。产物 HTML+JSON 由后台 downloader 每 10s 从分析服务拉回 `storage/opinion-reports/<taskId>/`,通过鉴权 route `/operator/opinion/reports/<id>/view` 新页面打开(不用 iframe)。权限:OPERATOR 只读列表/查看报告,ADMIN 触发/删除/重跑/改设置。审计:`opinion.trigger / rerun / delete / settings.update`(明文 apiKey 永不入日志)。
 
@@ -73,3 +77,74 @@
 7.✅BI 大屏(shadcn Card + 交互式 LineChart + Donut + Fullscreen API)
 8.✅管理员面板(运营账户 / Job / 爬虫机 / csvType / **审计日志查看**:近 60 天硬底 + 多维筛选 + 详情 Dialog + 可选每页条数)
 9.✅舆情监控(私域 / 公域 / 对比 三份报告:独立 FastAPI 分析容器 + 中台代理 + 后台 downloader + 鉴权跳转打开 HTML + AES 加密 apiKey 单例配置面板)
+
+# 对话规范
+
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

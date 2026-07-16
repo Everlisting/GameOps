@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { _testing } from "./douyin-video-detail";
 
-const { parseVideoId, normalizeUid, parseChineseDate, parseIntSafe } = _testing;
+const { parseVideoId, normalizeUid, parseChineseDate, parseDateOnly, parseIntSafe } =
+  _testing;
 
 describe("parseVideoId", () => {
   it("命中标准 douyin 视频 URL", () => {
@@ -51,11 +52,43 @@ describe("parseChineseDate", () => {
     const d = parseChineseDate("2026/5/1 20:19:30");
     expect(d!.getSeconds()).toBe(30);
   });
+  it("短横线格式 2026-07-01 13:12:51(CSV 实际导出格式)", () => {
+    const d = parseChineseDate("2026-07-01 13:12:51");
+    expect(d).toBeInstanceOf(Date);
+    expect(d!.getFullYear()).toBe(2026);
+    expect(d!.getMonth()).toBe(6); // 7月 = index 6
+    expect(d!.getDate()).toBe(1);
+    expect(d!.getHours()).toBe(13);
+    expect(d!.getMinutes()).toBe(12);
+    expect(d!.getSeconds()).toBe(51);
+  });
   it("空串返 null", () => {
     expect(parseChineseDate("")).toBeNull();
   });
-  it("格式错误返 null", () => {
+  it("纯日期(无时刻)返 null", () => {
     expect(parseChineseDate("2026-05-01")).toBeNull();
+    expect(parseChineseDate("2026/05/01")).toBeNull();
+  });
+});
+
+describe("parseDateOnly(发布日期窗口 起/止)", () => {
+  it("短横线 2026-06-01 → 本地零点", () => {
+    const d = parseDateOnly("2026-06-01");
+    expect(d).toBeInstanceOf(Date);
+    expect(d!.getFullYear()).toBe(2026);
+    expect(d!.getMonth()).toBe(5); // 6月
+    expect(d!.getDate()).toBe(1);
+    expect(d!.getHours()).toBe(0);
+  });
+  it("斜杠 2026/6/4 也认", () => {
+    const d = parseDateOnly("2026/6/4");
+    expect(d!.getMonth()).toBe(5);
+    expect(d!.getDate()).toBe(4);
+  });
+  it("带时刻 / 空 / 乱码 → null", () => {
+    expect(parseDateOnly("2026-06-01 13:00")).toBeNull();
+    expect(parseDateOnly("")).toBeNull();
+    expect(parseDateOnly("abc")).toBeNull();
   });
 });
 

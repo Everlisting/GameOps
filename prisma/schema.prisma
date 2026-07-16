@@ -38,17 +38,17 @@ enum ReviewStatus {
 // 创作灵感:大类
 enum InspirationType {
   VIDEO_TUTORIAL // 视频教程
-  DOC_TUTORIAL   // 文档教程
-  MATERIAL       // 创作素材
+  DOC_TUTORIAL // 文档教程
+  MATERIAL // 创作素材
 }
 
 // 创作素材子分类(仅 type=MATERIAL 时使用,其他场景为 null)
 enum MaterialCategory {
-  VIDEO       // 视频素材
-  IMAGE       // 图片素材
+  VIDEO // 视频素材
+  IMAGE // 图片素材
   TEXT_PROMPT // 文本素材 - 提示词
-  TEXT_STORY  // 文本素材 - 故事
-  TEXT_OTHER  // 文本素材 - 其他
+  TEXT_STORY // 文本素材 - 故事
+  TEXT_OTHER // 文本素材 - 其他
 }
 
 // 爬虫机/Agent 状态
@@ -60,11 +60,11 @@ enum CrawlerAgentStatus {
 // 爬虫任务状态机:PENDING → RUNNING → SUCCEEDED/FAILED;CANCELED 是管理员手动终止。
 // 重构后(2026-06 阶段4 改造):废抢占式,所有任务必定绑定一台 Agent,/claim 时直接 RUNNING。
 enum CrawlerTaskStatus {
-  PENDING   // 在绑定 Agent 的队列里排队
-  RUNNING   // 已被 Agent 领取,执行中
+  PENDING // 在绑定 Agent 的队列里排队
+  RUNNING // 已被 Agent 领取,执行中
   SUCCEEDED // 完成
-  FAILED    // git pull 失败 / 命令非零退出 / 产物缺失
-  CANCELED  // 管理员手动取消
+  FAILED // git pull 失败 / 命令非零退出 / 产物缺失
+  CANCELED // 管理员手动取消
 }
 
 // 任务触发方式:AUTO 是 cron 自动派,MANUAL 是管理员手动 trigger
@@ -81,10 +81,10 @@ enum CrawlerRepoType {
 
 // Job 参数类型,前端按此渲染表单控件
 enum CrawlerJobParamType {
-  DATE   // 日期(DatePickerField)
+  DATE // 日期(DatePickerField)
   STRING // 文本(Input)
   NUMBER // 数值(Input type=number)
-  ENUM   // 枚举,从 options 选(Select)
+  ENUM // 枚举,从 options 选(Select)
 }
 
 model User {
@@ -98,7 +98,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   creator      Creator?
-  inspirations Inspiration[]  // 创建的创作灵感(运营/管理员)
+  inspirations Inspiration[] // 创建的创作灵感(运营/管理员)
 
   // 阶段4 · 爬虫体系反向关系
   createdAgents   CrawlerAgent[] @relation("createdAgents")
@@ -110,7 +110,7 @@ model User {
   adjustedIncentives Incentive[] @relation("adjustedIncentives")
 
   // 审计:作为操作人留下的痕迹
-  auditLogs       AuditLog[]
+  auditLogs AuditLog[]
 }
 
 /// 操作审计日志:trigger / cancel / rerun / 改模板 / 改 agent 等关键动作都落一条
@@ -123,9 +123,9 @@ model User {
 model AuditLog {
   id            String   @id @default(cuid())
   actorId       String?
-  actorUsername String                              // 快照,删用户后仍可读
-  action        String                              // task.trigger / task.cancel / ...
-  targetType    String                              // task / job / agent / dataset
+  actorUsername String // 快照,删用户后仍可读
+  action        String // task.trigger / task.cancel / ...
+  targetType    String // task / job / agent / dataset
   targetId      String?
   details       Json?
   createdAt     DateTime @default(now())
@@ -139,9 +139,9 @@ model AuditLog {
 }
 
 model Creator {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   nickname  String
   avatarUrl String? // 头像 URL
   tier      String? // 分级
@@ -160,9 +160,9 @@ model Creator {
 
   submissions     Submission[]
   enrollments     ActivityEnrollment[]
-  videoStats      VideoStat[]      // 阶段4 · 抖音视频明细按 dyUid 匹配
+  videoStats      VideoStat[] // 阶段4 · 抖音视频明细按 dyUid 匹配
   dailyVideoStats DailyVideoStat[] // 阶段4.3 · 当日快照
-  incentives      Incentive[]     // 阶段5 · 各活动激励快照
+  incentives      Incentive[] // 阶段5 · 各活动激励快照
 }
 
 model Activity {
@@ -200,7 +200,7 @@ model ActivityEnrollment {
 }
 
 model Submission {
-  id         String           @id @default(cuid())
+  id         String  @id @default(cuid())
   creatorId  String
   activityId String?
   title      String
@@ -239,11 +239,11 @@ model Inspiration {
   type        InspirationType
   category    MaterialCategory? // 仅 type=MATERIAL 时使用
   title       String
-  summary     String?           // 列表短描述
-  content     String?           // 详细正文(文档教程 / 文本素材)
-  url         String?           // 视频教程 / 视频素材 / 图片素材 的资源链接
-  coverImage  String?           // 封面图(可选)
-  tags        String[]          // 标签(AI创作 / 实拍指引 / 图文创作 …)
+  summary     String? // 列表短描述
+  content     String? // 详细正文(文档教程 / 文本素材)
+  url         String? // 视频教程 / 视频素材 / 图片素材 的资源链接
+  coverImage  String? // 封面图(可选)
+  tags        String[] // 标签(AI创作 / 实拍指引 / 图文创作 …)
   published   Boolean           @default(true) // 是否对创作者可见(草稿 = false)
   createdById String?
   createdAt   DateTime          @default(now())
@@ -258,19 +258,19 @@ model Inspiration {
 // 爬虫机:管理员创建,token 以 `<agentId>.<secret>` 形式发给 agent,服务端只存 secret 段 argon2 哈希。
 // 一台 Agent 可绑定多个 Job,但并发=1(串行执行队列);离线判定走 lastSeenAt(>10min 视为离线)。
 model CrawlerAgent {
-  id           String             @id @default(cuid())
-  name         String             @unique           // 机器名 / 标识(管理员设置)
-  tokenHash    String                                // <secret> 段的 argon2 哈希
-  status       CrawlerAgentStatus @default(ACTIVE)
-  lastSeenAt   DateTime?                             // 最近一次成功鉴权时间;离线判定依据
-  lastSeenIp   String?
-  createdById  String
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id          String             @id @default(cuid())
+  name        String             @unique // 机器名 / 标识(管理员设置)
+  tokenHash   String // <secret> 段的 argon2 哈希
+  status      CrawlerAgentStatus @default(ACTIVE)
+  lastSeenAt  DateTime? // 最近一次成功鉴权时间;离线判定依据
+  lastSeenIp  String?
+  createdById String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   createdBy User          @relation("createdAgents", fields: [createdById], references: [id], onDelete: Restrict)
-  jobs      CrawlerJob[]                            // 绑定到本机的 Job
-  tasks     CrawlerTask[]                           // 派给本机执行的 Task
+  jobs      CrawlerJob[] // 绑定到本机的 Job
+  tasks     CrawlerTask[] // 派给本机执行的 Task
 
   @@index([status])
 }
@@ -278,60 +278,60 @@ model CrawlerAgent {
 // 爬虫 Job(模板):管理员维护,定义一次"任务怎么跑"——绑哪台机、拉哪个仓库、跑什么命令、参数表单、产物清单、可选 cron。
 // 每次"执行"是一条 CrawlerTask;Jenkins 风格的 Job/Build 两层。
 model CrawlerJob {
-  id             String              @id @default(cuid())
-  name           String              @unique
+  id             String          @id @default(cuid())
+  name           String          @unique
   description    String?
-  agentId        String                                  // 绑定的爬虫机,N:1
+  agentId        String // 绑定的爬虫机,N:1
   repoType       CrawlerRepoType
-  repoUrl        String                                  // git/svn 仓库地址
-  repoBranch     String?                                 // git 用,svn 忽略
-  workdir        String              @default(".")       // 命令工作目录(仓库根的相对路径)
-  command        String                                  // 命令模板,内含 {{paramName}} 占位符
-  timeoutMinutes Int                 @default(30)        // 单次执行超时(到点 agent kill)
-  paramSchema    Json                @default("[]")      // [{name, type, required, default?, options?[]}]
-  outputs        Json                @default("[]")      // [{path, csvType?}] 仅带 csvType 的产物会上传中台入库
-  cronExpression String?                                  // 5 段标准 cron;null = 仅手动
-  enabled        Boolean             @default(true)       // 仅控 cron 自动触发开关(定时开/关)
-  active         Boolean             @default(true)       // 任务整体启用/停用;停用 = 不可触发(含手动),与 enabled 分离
+  repoUrl        String // git/svn 仓库地址
+  repoBranch     String? // git 用,svn 忽略
+  workdir        String          @default(".") // 命令工作目录(仓库根的相对路径)
+  command        String // 命令模板,内含 {{paramName}} 占位符
+  timeoutMinutes Int             @default(30) // 单次执行超时(到点 agent kill)
+  paramSchema    Json            @default("[]") // [{name, type, required, default?, options?[]}]
+  outputs        Json            @default("[]") // [{path, csvType?}] 仅带 csvType 的产物会上传中台入库
+  cronExpression String? // 5 段标准 cron;null = 仅手动
+  enabled        Boolean         @default(true) // 仅控 cron 自动触发开关(定时开/关)
+  active         Boolean         @default(true) // 任务整体启用/停用;停用 = 不可触发(含手动),与 enabled 分离
   createdById    String
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   agent     CrawlerAgent  @relation(fields: [agentId], references: [id], onDelete: Restrict)
   createdBy User          @relation("createdJobs", fields: [createdById], references: [id], onDelete: Restrict)
   tasks     CrawlerTask[]
 
   @@index([agentId, enabled])
-  @@index([enabled, cronExpression])  // cron scheduler 扫描用
+  @@index([enabled, cronExpression]) // cron scheduler 扫描用
 }
 
 // 爬虫任务(一次执行):来源 = 手动 trigger 或 cron 自动建。
 // jobId / agentId / sequenceNumber / paramValues 在新模型下均必填,但历史数据(改造前)允许 null。
 model CrawlerTask {
   id             String             @id @default(cuid())
-  jobId          String?                                  // 关联 Job;历史任务为 null
-  agentId        String?                                  // 冗余 job.agentId 加速队列查询;历史任务可能 null
-  sequenceNumber Int?                                     // Job 内第 N 次执行(展示用 #42);历史任务 null
-  paramValues    Json               @default("{}")        // 本次执行的参数实际值
+  jobId          String? // 关联 Job;历史任务为 null
+  agentId        String? // 冗余 job.agentId 加速队列查询;历史任务可能 null
+  sequenceNumber Int? // Job 内第 N 次执行(展示用 #42);历史任务 null
+  paramValues    Json               @default("{}") // 本次执行的参数实际值
   trigger        CrawlerTaskTrigger
-  priority       Int                @default(0)           // 大的优先
+  priority       Int                @default(0) // 大的优先
   status         CrawlerTaskStatus  @default(PENDING)
-  startedAt      DateTime?                                // Agent /claim 时设
+  startedAt      DateTime? // Agent /claim 时设
   finishedAt     DateTime?
   errorMessage   String?
-  exitCode       Int?                                     // 命令子进程退出码
-  logPath        String?                                  // 日志文件路径,默认 data/logs/<id>.log
-  createdById    String?                                  // AUTO 任务为 null
+  exitCode       Int? // 命令子进程退出码
+  logPath        String? // 日志文件路径,默认 data/logs/<id>.log
+  createdById    String? // AUTO 任务为 null
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  job       CrawlerJob?    @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  agent     CrawlerAgent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
-  createdBy User?          @relation("createdTasks", fields: [createdById], references: [id], onDelete: SetNull)
-  datasets  RawDataset[]                                  // 1:N 一个 Task 可上传多份带 csvType 的 CSV
+  job       CrawlerJob?   @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  agent     CrawlerAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  createdBy User?         @relation("createdTasks", fields: [createdById], references: [id], onDelete: SetNull)
+  datasets  RawDataset[] // 1:N 一个 Task 可上传多份带 csvType 的 CSV
 
   @@index([status, priority, createdAt])
-  @@index([agentId, status, priority, createdAt])         // agent 队列查询主索引
+  @@index([agentId, status, priority, createdAt]) // agent 队列查询主索引
   @@index([jobId, sequenceNumber])
 }
 
@@ -339,21 +339,23 @@ model CrawlerTask {
 // 不入 public/,运营要下载得走鉴权 API。改造后一个 Task 可有多份 RawDataset(对应 Job.outputs 中带 csvType 的产物)。
 model RawDataset {
   id           String    @id @default(cuid())
-  csvType      String?                                 // 入库类别;null = 仅留底下载,不入解析层
-  taskId       String?                                 // 来源 Task,可空兼容历史 / 手动导入数据
-  fileName     String?                                // agent 报上来的原始文件名
-  fileSize     Int                                    // 字节
-  contentHash  String                                 // sha256 hex,审计 / 防重
-  storagePath  String                                 // 项目相对路径(OSS 上线后换成 OSS key)
-  rowCount     Int?                                   // 4.2 解析时填
+  csvType      String? // 入库类别;null = 仅留底下载,不入解析层
+  taskId       String? // 来源 Task,可空兼容历史 / 手动导入数据
+  fileName     String? // agent 报上来的原始文件名
+  fileSize     Int // 字节
+  contentHash  String // sha256 hex,审计 / 防重
+  storagePath  String // 项目相对路径(OSS 上线后换成 OSS key)
+  rowCount     Int? // 4.2 解析时填
   parsedAt     DateTime?
   parseError   String?
-  uploadedById String?                                // CrawlerAgent.id 冗余
+  uploadedById String? // CrawlerAgent.id 冗余
   createdAt    DateTime  @default(now())
 
-  task            CrawlerTask?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  videoStats      VideoStat[]      // 最近一次更新该 VideoStat 的数据集
+  task            CrawlerTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  videoStats      VideoStat[] // 最近一次更新该 VideoStat 的数据集
   dailyVideoStats DailyVideoStat[] // 本次写入的当日快照
+  anchorStats     AnchorStat[] // 最近一次更新该 AnchorStat 的数据集
+  liveStats       LiveStat[] // 最近一次更新该 LiveStat 的数据集
 
   @@index([csvType, createdAt])
   @@index([taskId])
@@ -365,10 +367,10 @@ model RawDataset {
 /// 若想做 parser 入解析层,仍要在 lib/parsers/ 里写一个 Parser 并挂进 PARSERS 表(代码侧)。
 model CsvType {
   id          String   @id @default(cuid())
-  name        String   @unique                // 程序 key,如 "douyin_video_detail"
-  label       String                          // 显示名,如 "抖音视频明细表"
+  name        String   @unique // 程序 key,如 "douyin_video_detail"
+  label       String // 显示名,如 "抖音视频明细表"
   description String?
-  columns     Json                            // [{ name, label?, type: "string"|"number"|"date"|"url" }]
+  columns     Json // [{ name, label?, type: "string"|"number"|"date"|"url" }]
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -381,19 +383,19 @@ model CsvType {
 // 明细层:抖音视频维度,按 (platform, externalId) upsert,只保留最新快照。
 // csvType=douyin_video_detail 的 parser 负责写。后续阶段 6 用历史快照做每日趋势。
 model VideoStat {
-  id              String   @id @default(cuid())
-  platform        String   // "douyin"
-  externalId      String   // 平台稿件 id(从 url 解析)
+  id         String @id @default(cuid())
+  platform   String // "douyin"
+  externalId String // 平台稿件 id(从 url 解析)
 
-  url             String
-  title           String
-  publishedAt     DateTime?
+  url         String
+  title       String
+  publishedAt DateTime?
 
   // CSV 自带的创作者三元组(未必都能匹配到系统 Creator)
-  creatorUid      String?
-  creatorName     String?
-  creatorAccount  String?
-  creatorId       String?  // 解析时按 dyUid 匹配系统 Creator,匹不到为 null
+  creatorUid     String?
+  creatorName    String?
+  creatorAccount String?
+  creatorId      String? // 解析时按 dyUid 匹配系统 Creator,匹不到为 null
 
   views            Int @default(0)
   recommendedViews Int @default(0)
@@ -402,14 +404,21 @@ model VideoStat {
   shares           Int @default(0)
   fansGained       Int @default(0)
 
-  operatorAgent   String?  // 运营经纪人
-  recruitAgent    String?  // 招募经纪人
-  note            String?  // CSV 备注列
+  operatorAgent String? // 运营经纪人
+  recruitAgent  String? // 招募经纪人
+  note          String? // CSV 备注列
 
-  lastDatasetId   String?  // 最近一次写本行的 RawDataset(审计)
+  lastDatasetId String? // 最近一次写本行的 RawDataset(审计)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  // 达人删除/隐藏标记:每次导入(手动 / 爬虫)按 externalId 全表比对,
+  // 在库但本次导入缺失 → hidden=true;重新出现 → 改回 false。
+  // 约定:本表只承载单个游戏的数据,故用「全表比对」;hidden 行不参与任何统计/计算,
+  // 仅留存并在视频数据表格中展示(附筛选)。
+  hidden   Boolean   @default(false)
+  hiddenAt DateTime? // 首次判定为删除/隐藏的时间(重新出现则清空)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   creator     Creator?         @relation(fields: [creatorId], references: [id], onDelete: SetNull)
   lastDataset RawDataset?      @relation(fields: [lastDatasetId], references: [id], onDelete: SetNull)
@@ -419,6 +428,7 @@ model VideoStat {
   @@index([creatorId, updatedAt])
   @@index([creatorUid])
   @@index([publishedAt])
+  @@index([platform, hidden])
 }
 
 // 每日汇总层:Detail 写入后立刻按"北京时间今日"upsert 一份当日快照。
@@ -455,6 +465,89 @@ model DailyVideoStat {
   @@index([videoStatId, snapshotDate])
 }
 
+// 主播数据明细层:按 platform+uid 唯一,导入(手动 / 爬虫)覆盖只留最新。
+// 与 VideoStat 同构:承载单个游戏的主播明细,可挂 lastDatasetId 审计来源。
+// 数值口径:计数类用 Int;可能为小数的(ACU / 直播时长 / 人均观看时长)用 Float。
+model AnchorStat {
+  id       String  @id @default(cuid())
+  platform String // 主播平台,如 "douyin"
+  uid      String // 平台 UID
+  nickname String? // 主播昵称
+  account  String? // 抖音号
+
+  joinedAt      DateTime? // 入会时间
+  groupNo       String? // 团号
+  operatorAgent String? // 运营经纪人
+  recruitAgent  String? // 招募经纪人
+
+  fans                  Int   @default(0) // 粉丝量
+  worksCount            Int   @default(0) // 作品数
+  worksViews            Int   @default(0) // 作品播放量
+  worksRecommendedViews Int   @default(0) // 作品推荐播放量
+  anchorDays            Int   @default(0) // 直播天数(=开播天数)
+  acu                   Float @default(0) // ACU(平均同时在线)
+  liveDuration          Float @default(0) // 直播时长
+  liveSessions          Int   @default(0) // 直播场次
+  exposureUsers         Int   @default(0) // 曝光人数
+  exposureCount         Int   @default(0) // 曝光次数
+  enterRoomUsers        Int   @default(0) // 进直播间人数
+  enterRoomCount        Int   @default(0) // 进直播间次数
+  avgWatchDuration      Float @default(0) // 人均观看时长
+
+  lastDatasetId String? // 最近一次写本行的 RawDataset(审计)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lastDataset RawDataset? @relation(fields: [lastDatasetId], references: [id], onDelete: SetNull)
+
+  @@unique([platform, uid])
+  @@index([groupNo])
+  @@index([updatedAt])
+}
+
+// 直播明细层:脚本产出的「所有主播画像表」——按 主播 × 自然日 一行。
+// 导入(手动 / 爬虫)按 (platform, uid, date) upsert 只留最新。
+// 约定:只入库「有效开播时长 > 0」的条目(没开播的空行不入);排除游戏流水/主播收入两列。
+// 数值口径:计数类用 Int;可能为小数的(开播时长 / 转化率 / 人均观看时长 / ACU)用 Float。
+model LiveStat {
+  id       String   @id @default(cuid())
+  platform String // 主播平台,如 "douyin"
+  uid      String // 平台 UID(取 UID2 列去前缀,避免 Excel 科学计数法丢精度)
+  date     DateTime @db.Date // 日期(自然日)
+  nickname String? // 主播名称
+  account  String? // 主播账号(抖音号)
+
+  soundWave        Int   @default(0) // 音浪(火力)
+  liveDuration     Float @default(0) // 有效开播时长(小时)
+  exposureUsers    Int   @default(0) // 曝光人数
+  exposureCount    Int   @default(0) // 曝光次数
+  enterRoomUsers   Int   @default(0) // 进直播间人数
+  enterRoomCount   Int   @default(0) // 进直播间次数
+  enterRoomRate    Float @default(0) // 进直播间转化率(%)
+  avgWatchDuration Float @default(0) // 人均观看时长(分钟)
+  tipUsers         Int   @default(0) // 打赏人数
+  tipCount         Int   @default(0) // 打赏次数
+  newFans          Int   @default(0) // 新增粉丝
+  acu              Float @default(0) // ACU(平均同时在线)
+
+  operatorAgent String? // 运营经纪人
+  recruitAgent  String? // 招募经纪人
+  note          String? // 备注(团号)
+
+  lastDatasetId String? // 最近一次写本行的 RawDataset(审计)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lastDataset RawDataset? @relation(fields: [lastDatasetId], references: [id], onDelete: SetNull)
+
+  @@unique([platform, uid, date])
+  @@index([uid, date])
+  @@index([date])
+  @@index([note])
+}
+
 // 阶段5 · 激励 / 结算快照。
 // 每个 (creatorId, activityId) 一行;运营点"计算预估"时 upsert(重跑覆盖 estimated/breakdown/computedAt)。
 // adjusted 是人工调整后的最终值;有值则结算以它为准,审计写在 AuditLog(action="incentive.adjust")。
@@ -465,11 +558,11 @@ model Incentive {
   activityId   String
   estimated    Decimal   @db.Decimal(12, 2) // 引擎最新一次计算结果
   adjusted     Decimal?  @db.Decimal(12, 2) // 人工调整后的金额;null = 沿用 estimated
-  adjustedById String?                       // 调整操作人;null = 未调整
+  adjustedById String? // 调整操作人;null = 未调整
   adjustedAt   DateTime?
-  adjustReason String?                       // 调整原因(便于审计 / 创作者沟通)
-  breakdown    Json      @default("[]")      // IncentiveContribution[] 快照
-  computedAt   DateTime  @default(now())     // 最近一次跑引擎时间
+  adjustReason String? // 调整原因(便于审计 / 创作者沟通)
+  breakdown    Json      @default("[]") // IncentiveContribution[] 快照
+  computedAt   DateTime  @default(now()) // 最近一次跑引擎时间
   status       String    @default("estimated") // estimated / settled(阶段5 只做 estimated,settled 留位)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -488,13 +581,13 @@ model Incentive {
 /// apiKeyMask 是打码后的显示串(如 "sk-****abcd"),用于 UI 回显,不含真实密钥。
 /// provider = "echo" 时代表离线规则模式,apiKey 仍必填但不会被 slg_analyzer 使用。
 model OpinionSettings {
-  id         Int      @id @default(1)  // 单例锁:业务代码只写 id=1
-  provider   String                     // "anthropic" | "openai" | "echo"
-  model      String                     // 如 "claude-sonnet-4-5" / "gpt-4o" / "echo"
-  apiKeyEnc  String   @default("")      // AES-256-GCM 密文的 base64;初始为空表示"未配置"
-  apiKeyMask String   @default("")      // 打码后的展示串
-  baseUrl    String?                    // OpenAI 兼容端点(如 https://api.deepseek.com/v1)
-  updatedBy  String?                    // username 快照;seed 时为 "<system>"
+  id         Int      @id @default(1) // 单例锁:业务代码只写 id=1
+  provider   String // "anthropic" | "openai" | "echo"
+  model      String // 如 "claude-sonnet-4-5" / "gpt-4o" / "echo"
+  apiKeyEnc  String   @default("") // AES-256-GCM 密文的 base64;初始为空表示"未配置"
+  apiKeyMask String   @default("") // 打码后的展示串
+  baseUrl    String? // OpenAI 兼容端点(如 https://api.deepseek.com/v1)
+  updatedBy  String? // username 快照;seed 时为 "<system>"
   updatedAt  DateTime @updatedAt
   createdAt  DateTime @default(now())
 

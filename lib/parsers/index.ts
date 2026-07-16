@@ -8,10 +8,16 @@
  */
 import type { Parser } from "./types";
 import { parseDouyinVideoDetail } from "./douyin-video-detail";
+import { parseAnchorRoster } from "./anchor-roster";
+import { parseLiveDetail } from "./live-detail";
 import { snapshotVideoStatsForDataset } from "./snapshot";
 
 export const PARSERS: Record<string, Parser> = {
   douyin_video_detail: parseDouyinVideoDetail,
+  // 主播名单(花名册):按 (platform, uid) upsert 到 AnchorStat;无每日快照
+  anchor_roster: parseAnchorRoster,
+  // 直播明细(主播×日):按 (platform, uid, date) upsert 到 LiveStat;无每日快照
+  live_detail: parseLiveDetail,
 };
 
 /**

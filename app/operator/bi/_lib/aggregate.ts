@@ -84,7 +84,11 @@ export async function aggregateDashboard() {
       SELECT c."id" AS "creatorId", c."nickname", COALESCE(SUM(d."views"), 0)::bigint AS views
       FROM "DailyVideoStat" d
       JOIN "Creator" c ON c."id" = d."creatorId"
+      -- 排除已被判定删除/隐藏的作品(不做任何统计)
+      LEFT JOIN "VideoStat" v
+        ON v."platform" = d."platform" AND v."externalId" = d."externalId"
       WHERE d."snapshotDate" >= ${thirtyDaysAgo}
+        AND COALESCE(v."hidden", false) = false
       GROUP BY c."id", c."nickname"
       ORDER BY views DESC
       LIMIT 8`,

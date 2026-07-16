@@ -48,7 +48,10 @@
       "Bash(npx prisma *)",
       "Bash(F:/Kaifa/slg_analyzer/.slg_analyzer/Scripts/python.exe -m pytest -q --no-header)",
       "Bash(sed -n '/^scrapers:/,$p' config.example.yaml)",
-      "Bash(sed -n '/^scrapers:/,$p' F:/Kaifa/slg_analyzer/config.yaml)"
+      "Bash(sed -n '/^scrapers:/,$p' F:/Kaifa/slg_analyzer/config.yaml)",
+      "Bash(pnpm test *)",
+      "Bash(python -c ' *)",
+      "Bash(npx vitest *)"
     ]
   }
 }

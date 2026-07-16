@@ -27,6 +27,8 @@ export type AuditAction =
   | "agent.update"
   | "agent.delete"
   | "agent.rotateToken"
+  // 数据手动导入(运营在数据页直接上传 CSV/Excel,绕过爬虫 agent)
+  | "data.import"
   // 阶段5 · 激励引擎
   | "incentive.compute"   // 全活动重算预估
   | "incentive.adjust"    // 单条人工调整

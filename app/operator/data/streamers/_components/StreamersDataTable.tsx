@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * 视频数据 · TanStack Table 客户端组件
+ * 主播数据 · TanStack Table 客户端组件
  *
- * 服务端已按 sortBy/order/page/pageSize 出结果,客户端只负责:
+ * 服务端已按 sortBy/order/page/pageSize 出结果(按 UID 聚合视频明细),客户端只负责:
  *  - 表头点击 → 更新 URL(?sortBy=&order=)
  *  - 分页按钮 → 更新 URL(?page=&pageSize=)
- *  - 搜索栏 debounce 300ms → 更新 URL(?q=)
- *  - 列显隐(TanStack columnVisibility state,不入 URL)
+ *  - 搜索 / 团号 debounce 300ms → 更新 URL
+ *  - 作品发布日期范围 → 更新 URL
+ *  - 列显隐(纯客户端 state,不入 URL)
  *
  * 服务端可排序字段(白名单):
- *   updatedAt / publishedAt / views / recommendedViews / likes / comments / shares / fansGained
+ *   worksViews / worksRecommendedViews / worksCount / fansGained / fans / joinedAt / updatedAt
  */
 import * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   type ColumnDef,
@@ -31,8 +31,8 @@ import {
   ChevronRight,
   Columns3,
   Eye,
-  ExternalLink,
   Play,
+  Radio,
   Search,
   ThumbsUp,
   Users,
@@ -56,17 +56,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
 import {
   Table,
   TableBody,
@@ -75,21 +75,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDate, fmtDateTime } from "@/lib/format";
 
 import {
-  DEFAULT_STATUS,
   PAGE_SIZE_OPTIONS,
+  type AnchorRow,
+  type AnchorStats,
   type SortField,
-  type StatusFilter,
-  type VideoRow,
-  type VideoStats,
 } from "./config";
 
 type Props = {
-  items: VideoRow[];
+  items: AnchorRow[];
   total: number;
-  stats: VideoStats;
+  stats: AnchorStats;
   page: number;
   pageSize: number;
   sortBy: SortField;
@@ -98,14 +96,16 @@ type Props = {
   groupNo: string;
   publishedFrom: string;
   publishedTo: string;
-  status: StatusFilter;
-  /** 非空(如 "2026-07")= 当前处于「本月发布」默认视图,用于文案提示 */
+  /** 非空(如 "2026-07")= 作品指标处于「本月默认」范围,用于文案提示 */
   defaultMonth: string | null;
 };
 
 const NUM_FMT = new Intl.NumberFormat("en-US");
 function fmtNum(n: number) {
   return NUM_FMT.format(n);
+}
+function fmtFloat(n: number) {
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
 function DashIfEmpty({ value }: { value: string | null | undefined }) {
@@ -116,17 +116,10 @@ function DashIfEmpty({ value }: { value: string | null | undefined }) {
   );
 }
 
-const EMPTY_STATS: VideoStats = {
-  totalRows: 0,
-  distinctCreators: 0,
-  sumViews: 0,
-  sumRecommended: 0,
-};
-
-export default function VideosDataTable({
+export default function StreamersDataTable({
   items,
   total,
-  stats = EMPTY_STATS,
+  stats,
   page,
   pageSize,
   sortBy,
@@ -135,14 +128,12 @@ export default function VideosDataTable({
   groupNo,
   publishedFrom,
   publishedTo,
-  status,
   defaultMonth,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  // 更新 URL:保留其它参数,只覆盖传入的 kv;null = 移除
   const pushQuery = React.useCallback(
     (patch: Record<string, string | number | null>) => {
       const sp = new URLSearchParams(searchParams?.toString() ?? "");
@@ -167,7 +158,6 @@ export default function VideosDataTable({
       pushQuery({ q: qDraft || null, page: null });
     }, 300);
     return () => clearTimeout(t);
-    // 只监听 qDraft;q 是回填参考,pushQuery 已通过 useCallback 稳定
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qDraft]);
 
@@ -185,7 +175,6 @@ export default function VideosDataTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupNoDraft]);
 
-
   // ---------- TanStack sorting ↔ URL ----------
   const sorting: SortingState = React.useMemo(
     () => [{ id: sortBy, desc: order === "desc" }],
@@ -199,31 +188,20 @@ export default function VideosDataTable({
         pushQuery({ sortBy: null, order: null, page: null });
         return;
       }
-      pushQuery({
-        sortBy: s.id,
-        order: s.desc ? "desc" : "asc",
-        page: null,
-      });
+      pushQuery({ sortBy: s.id, order: s.desc ? "desc" : "asc", page: null });
     },
     [pushQuery, sorting],
   );
 
   // ---------- 列显隐(纯客户端 state) ----------
-  // key = column id / accessorKey;false = 默认隐藏
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    likes: false,
-    comments: false,
-    shares: false,
     fansGained: false,
-    operatorAgent: false,
-    recruitAgent: false,
+    exposureCount: false,
+    enterRoomCount: false,
     updatedAt: false,
   });
 
-  // 列顺序:平台 → 稿件ID → 稿件标题 → 发布时间 → 主播昵称 → UID → 抖音号
-  //        → 播放量 → 推荐播放量 → 点赞 → 评论 → 分享 → 涨粉
-  //        → 团号(note 字段,表头显示"团号") → 运营经纪人 → 招募经纪人 → 更新时间
-  const columns = React.useMemo<ColumnDef<VideoRow>[]>(
+  const columns = React.useMemo<ColumnDef<AnchorRow>[]>(
     () => [
       {
         accessorKey: "platform",
@@ -237,173 +215,55 @@ export default function VideosDataTable({
         ),
       },
       {
-        accessorKey: "hidden",
-        header: "状态",
-        size: 96,
-        enableSorting: false,
-        cell: ({ row }) => {
-          if (!row.original.hidden) {
-            return (
-              <Badge
-                variant="outline"
-                className="border-emerald-500/40 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"
-              >
-                正常
-              </Badge>
-            );
-          }
-          const at = row.original.hiddenAt;
-          return (
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <Badge
-                  variant="outline"
-                  className="cursor-default border-muted-foreground/30 bg-muted text-[10px] text-muted-foreground"
-                >
-                  删除/隐藏
-                </Badge>
-              </HoverCardTrigger>
-              <HoverCardContent align="center" side="top" className="w-auto max-w-[280px]">
-                <p className="text-xs leading-relaxed">
-                  达人已删除或隐藏该作品(某次导入中缺失判定)。
-                  {at && (
-                    <>
-                      <br />
-                      首次判定:{fmtDateTime(at)}
-                    </>
-                  )}
-                  <br />
-                  不参与任何统计 / 激励计算,仅留存展示。
-                </p>
-              </HoverCardContent>
-            </HoverCard>
-          );
-        },
-      },
-      {
-        accessorKey: "externalId",
-        header: "稿件ID",
-        size: 165,
-        enableSorting: false,
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">{row.original.externalId}</span>
-        ),
-      },
-      {
-        accessorKey: "title",
-        header: "稿件标题",
-        size: 260,
-        enableSorting: false,
-        cell: ({ row }) => {
-          const t = row.original.title;
-          return (
-            <div className="mx-auto flex max-w-[280px] items-center justify-center gap-1">
-              {t ? (
-                <HoverCard>
-                  <HoverCardTrigger asChild>
-                    <span className="min-w-0 cursor-default truncate text-xs font-medium">
-                      {t}
-                    </span>
-                  </HoverCardTrigger>
-                  <HoverCardContent align="center" side="top" className="w-auto max-w-[420px]">
-                    <p className="text-xs leading-relaxed break-words whitespace-pre-wrap select-text">
-                      {t}
-                    </p>
-                  </HoverCardContent>
-                </HoverCard>
-              ) : (
-                <span className="italic text-muted-foreground text-xs">(无标题)</span>
-              )}
-              {row.original.url && (
-                <a
-                  href={row.original.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="shrink-0 text-muted-foreground hover:text-primary"
-                  aria-label="打开原视频"
-                >
-                  <ExternalLink className="size-3" />
-                </a>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "publishedAt",
-        header: "发布时间",
-        size: 150,
-        enableSorting: true,
-        cell: ({ row }) => (
-          <span className="text-[11px] text-muted-foreground">
-            {row.original.publishedAt ? fmtDateTime(row.original.publishedAt) : "—"}
-          </span>
-        ),
-      },
-      {
-        id: "creator",
-        header: "主播昵称",
-        size: 120,
-        enableSorting: false,
-        cell: ({ row }) => {
-          const r = row.original;
-          if (r.creator) {
-            return (
-              <Link
-                href={`/operator/creators/${r.creator.id}`}
-                className="text-xs font-medium hover:text-primary"
-              >
-                <TruncatedName value={r.creator.nickname} />
-              </Link>
-            );
-          }
-          return r.creatorName ? (
-            <div className="flex flex-col items-center">
-              <TruncatedName value={r.creatorName} className="text-xs" />
-              <span className="text-[10px] text-muted-foreground">未匹配</span>
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground">—</span>
-          );
-        },
-      },
-      {
-        accessorKey: "creatorUid",
+        accessorKey: "uid",
         header: "UID",
         size: 155,
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="font-mono text-xs">
-            <DashIfEmpty value={row.original.creatorUid} />
-          </span>
+          <span className="font-mono text-xs">{row.original.uid}</span>
         ),
       },
       {
-        accessorKey: "creatorAccount",
+        accessorKey: "nickname",
+        header: "主播昵称",
+        size: 120,
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.nickname ? (
+            <TruncatedName value={row.original.nickname} className="text-xs font-medium" />
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        accessorKey: "account",
         header: "抖音号",
         size: 130,
         enableSorting: false,
         cell: ({ row }) => (
           <span className="font-mono text-xs">
-            <DashIfEmpty value={row.original.creatorAccount} />
+            <DashIfEmpty value={row.original.account} />
           </span>
         ),
       },
-      numericColumn("views", "播放量", { wan: true }),
-      numericColumn("recommendedViews", "推荐播放量", { wan: true, size: 120 }),
-      numericColumn("likes", "点赞"),
-      numericColumn("comments", "评论"),
-      numericColumn("shares", "分享"),
-      numericColumn("fansGained", "涨粉"),
       {
-        // 使用 note 字段,但表头显示为"团号"
-        accessorKey: "note",
+        accessorKey: "joinedAt",
+        header: "入会时间",
+        size: 120,
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="text-[11px] text-muted-foreground">
+            {row.original.joinedAt ? fmtDate(row.original.joinedAt) : "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "groupNo",
         header: "团号",
-        size: 110,
         enableSorting: false,
         cell: ({ row }) => {
-          const n = row.original.note;
-          if (!n) return <span className="text-muted-foreground text-xs">—</span>;
+          const n = row.original.groupNo;
+          if (!n) return <span className="text-xs text-muted-foreground">—</span>;
           return (
             <HoverCard>
               <HoverCardTrigger asChild>
@@ -442,6 +302,20 @@ export default function VideosDataTable({
           </span>
         ),
       },
+      numericColumn("fans", "粉丝量", { wan: true, size: 110 }),
+      numericColumn("worksCount", "作品数"),
+      numericColumn("worksViews", "作品播放量", { wan: true, size: 120 }),
+      numericColumn("worksRecommendedViews", "作品推荐播放量", { wan: true, size: 135 }),
+      numericColumn("fansGained", "涨粉"),
+      // 直播维度(聚合 LiveStat)
+      numericColumn("anchorDays", "直播天数"),
+      numericColumn("liveDuration", "直播时长", { float: true }),
+      numericColumn("acu", "ACU", { float: true }),
+      numericColumn("exposureUsers", "曝光人数", { wan: true }),
+      numericColumn("exposureCount", "曝光次数", { sortable: false, wan: true }),
+      numericColumn("enterRoomUsers", "进直播间人数", { wan: true, size: 120 }),
+      numericColumn("enterRoomCount", "进直播间次数", { sortable: false, wan: true, size: 120 }),
+      numericColumn("avgWatchDuration", "人均观看时长", { float: true, sortable: false, size: 120 }),
       {
         accessorKey: "updatedAt",
         header: "更新时间",
@@ -460,9 +334,8 @@ export default function VideosDataTable({
   const table = useReactTable({
     data: items,
     columns,
-    // 固定列宽:table-fixed 下按 size 定宽,排序/翻页换数据时列宽不再跳动。
-    // 未显式 size 的列取此默认(数值列够用)。
-    defaultColumn: { size: 110 },
+    // 固定列宽:table-fixed 下按 size 定宽,排序/翻页换数据时列宽不再跳动
+    defaultColumn: { size: 100 },
     state: { sorting, columnVisibility },
     onSortingChange,
     onColumnVisibilityChange: setColumnVisibility,
@@ -474,41 +347,41 @@ export default function VideosDataTable({
 
   return (
     <div className="flex min-h-0 flex-1 min-w-0 max-w-full flex-col gap-3">
-      {/* 顶部统计卡片:作品条数 / 作品人数 / 总播放量 / 总推荐播放量 */}
+      {/* 顶部统计卡片:主播数 / 总作品数 / 总作品播放量 / 总推荐播放量 */}
       <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
         <StatCard
-          label="作品条数"
-          value={stats.totalRows}
+          label="名单主播数"
+          value={stats.anchorCount}
+          icon={<Users className="size-4 text-muted-foreground" />}
+          hint="来自导入名单"
+        />
+        <StatCard
+          label="总作品数"
+          value={stats.totalWorks}
           icon={<Play className="size-4 text-muted-foreground" />}
           hint="不含删除/隐藏"
         />
         <StatCard
-          label="作品人数"
-          value={stats.distinctCreators}
-          icon={<Users className="size-4 text-muted-foreground" />}
-          hint="按 UID 去重"
-        />
-        <StatCard
-          label="总播放量"
-          value={stats.sumViews}
+          label="总作品播放量"
+          value={stats.totalViews}
           icon={<Eye className="size-4 text-muted-foreground" />}
         />
         <StatCard
           label="总推荐播放量"
-          value={stats.sumRecommended}
+          value={stats.totalRecommended}
           icon={<ThumbsUp className="size-4 text-muted-foreground" />}
         />
       </div>
 
-      {/* 筛选栏:搜索 / 团号 / 发布日期范围 / 列显隐 */}
+      {/* 筛选栏:搜索 / 团号 / 作品发布日期范围 / 列显隐 */}
       <Card className="shrink-0 p-3">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="relative w-175">
+          <div className="relative w-220">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={qDraft}
               onChange={(e) => setQDraft(e.target.value)}
-              placeholder="视频ID / 视频标题 / UID / 抖音昵称 / 抖音号"
+              placeholder="UID / 主播昵称 / 抖音号"
               className="pl-9 pr-9"
             />
             {qDraft && <InlineClearButton onClear={() => setQDraft("")} />}
@@ -527,67 +400,47 @@ export default function VideosDataTable({
             to={publishedTo}
             clearable
             width="w-64"
-            placeholder="发布日期范围"
+            placeholder="作品发布范围"
             onChange={(f, t) =>
               pushQuery({ publishedFrom: f || null, publishedTo: t || null, page: null })
             }
           />
-          <div className="flex items-end gap-3">
-            <div className="w-36">
-              {/* <label className="mb-1 block text-xs text-muted-foreground">状态</label> */}
-              <Select
-                value={status}
-                onValueChange={(v) =>
-                  pushQuery({
-                    status: v === DEFAULT_STATUS ? null : v,
-                    page: null,
-                  })
-                }
-              >
-                <SelectTrigger size="sm" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">正常</SelectItem>
-                  <SelectItem value="hidden">已删除 / 隐藏</SelectItem>
-                  <SelectItem value="all">全部</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Columns3 className="size-3.5" />
-                  列显隐
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuLabel className="text-xs">显示列</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {table
-                  .getAllLeafColumns()
-                  .filter((c) => c.getCanHide())
-                  .map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.id}
-                      checked={col.getIsVisible()}
-                      onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                      onSelect={(e) => e.preventDefault()}
-                      className="text-xs"
-                    >
-                      {columnLabel(col.id)}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Columns3 className="size-3.5" />
+                列显隐
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel className="text-xs">显示列</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table
+                .getAllLeafColumns()
+                .filter((c) => c.getCanHide())
+                .map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={col.id}
+                    checked={col.getIsVisible()}
+                    onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                    onSelect={(e) => e.preventDefault()}
+                    className="text-xs"
+                  >
+                    {columnLabel(col.id)}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          共 {fmtNum(total)} 条 · 第 {page} / {totalPages} 页
+        <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          第 {page} / {totalPages} 页
           {q ? ` · 命中 "${q}"` : ""}
-          {defaultMonth
-            ? ` · 默认仅显示本月(${defaultMonth})发布 · 查看往月请用「发布日期」筛选`
-            : ""}
+          <span className="ml-1 inline-flex items-center gap-1 text-muted-foreground/80">
+            <Radio className="size-3" />
+            {defaultMonth
+              ? `作品指标默认仅统计本月(${defaultMonth})发布,不含删除/隐藏;往月/全时段用「作品发布」筛选`
+              : "作品指标按发布区间聚合视频明细(不含删除/隐藏)"}
+          </span>
         </p>
       </Card>
 
@@ -595,10 +448,8 @@ export default function VideosDataTable({
       {items.length === 0 ? (
         <Card className="shrink-0 border-dashed p-10 text-center text-sm text-muted-foreground">
           {q
-            ? `没有匹配 "${q}" 的视频。`
-            : defaultMonth
-              ? `本月(${defaultMonth})暂无发布的稿件。查看往月请用「发布日期」筛选。`
-              : "暂无数据。"}
+            ? `没有匹配 "${q}" 的主播。`
+            : "名单为空。点右上角「导入名单」上传主播花名册后,这里会按 UID 聚合出作品等指标。"}
         </Card>
       ) : (
         <Card className="min-h-0 min-w-0 max-w-full flex-1 overflow-hidden p-0">
@@ -643,7 +494,7 @@ export default function VideosDataTable({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="overflow-hidden text-center align-middle"
+                      className="overflow-hidden whitespace-nowrap text-center align-middle"
                       style={{ width: cell.column.getSize() }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -706,27 +557,28 @@ export default function VideosDataTable({
 }
 
 function numericColumn(
-  id: SortField,
+  id: keyof AnchorRow,
   label: string,
-  opts: { wan?: boolean; size?: number } = {},
-): ColumnDef<VideoRow> {
+  opts: { float?: boolean; sortable?: boolean; wan?: boolean; size?: number } = {},
+): ColumnDef<AnchorRow> {
+  const { float = false, sortable = true, wan = false } = opts;
   return {
     accessorKey: id,
     header: label,
     size: opts.size,
-    enableSorting: true,
+    enableSorting: sortable,
     cell: ({ row }) => {
-      const v = row.original[id as keyof VideoRow] as number;
+      const v = row.original[id] as number;
+      if (wan) return <span className="text-xs"><WanNumber value={v} /></span>;
       return (
-        <span className="text-xs">
-          {opts.wan ? <WanNumber value={v} /> : <span className="tabular-nums">{fmtNum(v)}</span>}
+        <span className="text-xs tabular-nums">
+          {float ? fmtFloat(v) : fmtNum(v)}
         </span>
       );
     },
   };
 }
 
-/** 输入框右侧的灰色 × 清除按钮(用于 Input 内嵌);父容器需 relative */
 function InlineClearButton({ onClear }: { onClear: () => void }) {
   return (
     <button
@@ -771,22 +623,26 @@ function SortIcon({ dir }: { dir: false | "asc" | "desc" }) {
 
 const COLUMN_LABELS: Record<string, string> = {
   platform: "平台",
-  externalId: "稿件ID",
-  title: "稿件标题",
-  publishedAt: "发布时间",
-  hidden: "状态",
-  creator: "主播昵称",
-  creatorUid: "UID",
-  creatorAccount: "抖音号",
-  views: "播放量",
-  recommendedViews: "推荐播放量",
-  likes: "点赞",
-  comments: "评论",
-  shares: "分享",
-  fansGained: "涨粉",
-  note: "团号",
+  uid: "UID",
+  nickname: "主播昵称",
+  account: "抖音号",
+  joinedAt: "入会时间",
+  groupNo: "团号",
   operatorAgent: "运营经纪人",
   recruitAgent: "招募经纪人",
+  fans: "粉丝量",
+  worksCount: "作品数",
+  worksViews: "作品播放量",
+  worksRecommendedViews: "作品推荐播放量",
+  fansGained: "涨粉",
+  anchorDays: "直播天数",
+  liveDuration: "直播时长",
+  acu: "ACU",
+  exposureUsers: "曝光人数",
+  exposureCount: "曝光次数",
+  enterRoomUsers: "进直播间人数",
+  enterRoomCount: "进直播间次数",
+  avgWatchDuration: "人均观看时长",
   updatedAt: "更新时间",
 };
 function columnLabel(id: string) {

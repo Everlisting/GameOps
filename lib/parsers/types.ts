@@ -22,6 +22,10 @@ export type ParserContext = {
 
 export type ParserResult = {
   rowCount: number;
+  /** 本次导入判定为「达人删除/隐藏」的行数(全表比对,缺失即标记);无此语义的 parser 可不返回。 */
+  hiddenCount?: number;
+  /** 本次导入按规则跳过、未入库的行数(如直播明细「开播时长≤0」的空行);无此语义的 parser 可不返回。 */
+  skippedCount?: number;
 };
 
 export type Parser = (csv: string, ctx: ParserContext) => Promise<ParserResult>;

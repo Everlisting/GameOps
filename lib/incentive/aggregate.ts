@@ -101,7 +101,8 @@ export async function aggregateActivityMetrics(
   const stats =
     externalIds.length > 0
       ? await prisma.videoStat.findMany({
-          where: { platform: "douyin", externalId: { in: externalIds } },
+          // hidden(达人删除/隐藏)的作品不参与任何激励计算
+          where: { platform: "douyin", externalId: { in: externalIds }, hidden: false },
           select: {
             externalId: true,
             views: true,
