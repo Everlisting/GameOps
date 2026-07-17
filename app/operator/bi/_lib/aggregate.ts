@@ -8,10 +8,20 @@
  * 大屏指标按天的聚合接受 ±8h 的边界漂移,后续如需精确北京时区再加 AT TIME ZONE 偏移。
  */
 import { prisma } from "@/lib/db";
+import { chinaDateStart } from "@/lib/time";
 
 const DAY_MS = 86_400_000;
+const TREND_MAX_DAYS = 366; // 趋势窗口硬顶,防止超大区间拖垮查询
 
 export type DashboardData = Awaited<ReturnType<typeof aggregateDashboard>>;
+
+/** 解析 "YYYY-MM-DD" → UTC 零点 Date;非法返回 undefined。 */
+function parseYmd(s: string | undefined): Date | undefined {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return Number.isNaN(dt.getTime()) ? undefined : dt;
+}
 
 // 单个核心指标的时序:value=当月最新一日的值,increment=最新一日 − 前一快照日
 // (当月不足两个快照日时为 null,即无可比基线),spark=当月各快照日的取值序列。
@@ -26,7 +36,10 @@ function metricFromDays<T>(rows: T[], pick: (r: T) => number): KpiMetric {
   return { value, increment, spark };
 }
 
-export async function aggregateDashboard() {
+export async function aggregateDashboard(opts?: {
+  trendFrom?: string;
+  trendTo?: string;
+}) {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS);
 
@@ -39,15 +52,29 @@ export async function aggregateDashboard() {
     Date.UTC(beijing.getUTCFullYear(), beijing.getUTCMonth() + 1, 1),
   );
 
+  // ── 趋势窗口:默认结束日 = 昨天(T-1,数据最新只到前一日),向前 30 天 ──
+  // 单位为北京自然日(UTC 零点),与 snapshotDate 同口径。可由 trendFrom/trendTo 覆盖。
+  const trendEndDay =
+    parseYmd(opts?.trendTo) ?? new Date(chinaDateStart(now).getTime() - DAY_MS);
+  let trendStartDay =
+    parseYmd(opts?.trendFrom) ?? new Date(trendEndDay.getTime() - 29 * DAY_MS);
+  if (trendStartDay.getTime() > trendEndDay.getTime()) {
+    trendStartDay = new Date(trendEndDay.getTime() - 29 * DAY_MS);
+  }
+  // 区间过大则从末尾回夹到硬顶
+  if (trendEndDay.getTime() - trendStartDay.getTime() > TREND_MAX_DAYS * DAY_MS) {
+    trendStartDay = new Date(trendEndDay.getTime() - (TREND_MAX_DAYS - 1) * DAY_MS);
+  }
+
   const [
     // 核心指标 · 视频维度(按快照日):累计播放 / 作品数 / 优质作品(>10w)
     videoDays,
     // 核心指标 · 作者维度(按快照日):创作者数 / 优质作者(月播放>30w)
     authorDays,
 
-    // 趋势:30 天每日 投稿/通过
-    submissionsByDay,
-    approvedByDay,
+    // 趋势(窗口内每快照日):累计播放 + 作品数(相邻日相减 → 当日增量)
+    trendRows,
+    trendSeedRows,
 
     // Top 创作者:30d 总播放
     topCreatorsRaw,
@@ -100,16 +127,31 @@ export async function aggregateDashboard() {
       GROUP BY day
       ORDER BY day`,
 
-    prisma.$queryRaw<{ day: Date; n: bigint }[]>`
-      SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS n
-      FROM "Submission"
-      WHERE "createdAt" >= ${thirtyDaysAgo}
-      GROUP BY 1 ORDER BY 1`,
-    prisma.$queryRaw<{ day: Date; n: bigint }[]>`
-      SELECT date_trunc('day', "updatedAt") AS day, COUNT(*)::bigint AS n
-      FROM "Submission"
-      WHERE "updatedAt" >= ${thirtyDaysAgo} AND "status" = 'APPROVED'
-      GROUP BY 1 ORDER BY 1`,
+    // 窗口内每快照日:累计播放之和 + 在库作品数(相邻两日相减 → 当日增量)
+    prisma.$queryRaw<{ day: Date; views: bigint; works: bigint }[]>`
+      SELECT d."snapshotDate" AS day,
+             COALESCE(SUM(d."views"), 0)::bigint AS views,
+             COUNT(*)::bigint AS works
+      FROM "DailyVideoStat" d
+      LEFT JOIN "VideoStat" v
+        ON v."platform" = d."platform" AND v."externalId" = d."externalId"
+      WHERE d."snapshotDate" >= ${trendStartDay} AND d."snapshotDate" <= ${trendEndDay}
+        AND COALESCE(v."hidden", false) = false
+      GROUP BY d."snapshotDate" ORDER BY d."snapshotDate"`,
+    // 种子:窗口开始前最近一个快照日的累计播放 / 作品数(算窗口第一天的增量)。
+    // hasPrev 标记窗口前是否存在任何快照——无基线(数据首日)时首点增量置 0,不画尖峰。
+    prisma.$queryRaw<{ views: bigint; works: bigint; hasPrev: boolean }[]>`
+      SELECT COALESCE(SUM(d."views"), 0)::bigint AS views,
+             COUNT(*)::bigint AS works,
+             EXISTS(
+               SELECT 1 FROM "DailyVideoStat" WHERE "snapshotDate" < ${trendStartDay}
+             ) AS "hasPrev"
+      FROM "DailyVideoStat" d
+      LEFT JOIN "VideoStat" v
+        ON v."platform" = d."platform" AND v."externalId" = d."externalId"
+      WHERE d."snapshotDate" = (
+        SELECT MAX("snapshotDate") FROM "DailyVideoStat" WHERE "snapshotDate" < ${trendStartDay}
+      ) AND COALESCE(v."hidden", false) = false`,
 
     prisma.$queryRaw<
       { creatorId: string; nickname: string; views: bigint }[]
@@ -146,17 +188,34 @@ export async function aggregateDashboard() {
     }),
   ]);
 
-  // ── 拼成图表需要的形状 ────────────────────────────────────
-  const trendDays = buildDailyBuckets(now, 30);
-  const submissionsMap = bucketize(submissionsByDay);
-  const approvedMap = bucketize(approvedByDay);
+  // ── 趋势:窗口内每日「作品增量」+「播放量增量」────────────────
+  // 两者都是累计快照,相邻两个快照日相减 = 当日新增;无快照的日增量记 0。
+  const trendDays = buildDayRange(trendStartDay, trendEndDay);
+  const trendMap = new Map(
+    trendRows.map((r) => [
+      new Date(r.day).toISOString().slice(0, 10),
+      { views: Number(r.views), works: Number(r.works) },
+    ]),
+  );
+  let prevViews = Number(trendSeedRows[0]?.views ?? 0);
+  let prevWorks = Number(trendSeedRows[0]?.works ?? 0);
+  // 窗口前无任何快照 = 数据首日,首个快照点只作基线,增量置 0(不画整段累计的尖峰)
+  let seeded = trendSeedRows[0]?.hasPrev ?? false;
   const trend = trendDays.map((d) => {
     const key = d.toISOString().slice(0, 10);
-    return {
-      date: key,
-      submitted: submissionsMap.get(key) ?? 0,
-      approved: approvedMap.get(key) ?? 0,
-    };
+    const cur = trendMap.get(key);
+    let viewsDelta = 0;
+    let worksDelta = 0;
+    if (cur) {
+      if (seeded) {
+        viewsDelta = cur.views - prevViews;
+        worksDelta = cur.works - prevWorks;
+      }
+      prevViews = cur.views;
+      prevWorks = cur.works;
+      seeded = true;
+    }
+    return { date: key, worksDelta, viewsDelta };
   });
 
   // 核心指标(当月,按快照日)——每项 { value, increment, spark }
@@ -201,6 +260,11 @@ export async function aggregateDashboard() {
   return {
     kpi,
     trend,
+    // 回传解析后的窗口(YYYY-MM-DD),供日期控件回显
+    trendRange: {
+      from: trendStartDay.toISOString().slice(0, 10),
+      to: trendEndDay.toISOString().slice(0, 10),
+    },
     topCreators,
     pies: {
       submissionStatus: submissionStatusPie,
@@ -213,23 +277,17 @@ export async function aggregateDashboard() {
 
 // ── 工具 ────────────────────────────────────────────────────
 
-function buildDailyBuckets(end: Date, days: number): Date[] {
+/** 生成 [start, end] 闭区间内每一天(UTC 零点)的序列。 */
+function buildDayRange(start: Date, end: Date): Date[] {
   const out: Date[] = [];
+  const s = new Date(start);
+  s.setUTCHours(0, 0, 0, 0);
   const e = new Date(end);
   e.setUTCHours(0, 0, 0, 0);
-  for (let i = days - 1; i >= 0; i--) {
-    out.push(new Date(e.getTime() - i * DAY_MS));
+  for (let t = s.getTime(); t <= e.getTime(); t += DAY_MS) {
+    out.push(new Date(t));
   }
   return out;
-}
-
-function bucketize(rows: { day: Date; n: bigint }[]): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const r of rows) {
-    const key = new Date(r.day).toISOString().slice(0, 10);
-    m.set(key, Number(r.n));
-  }
-  return m;
 }
 
 const STATUS_LABEL: Record<string, string> = {

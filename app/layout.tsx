@@ -1,6 +1,8 @@
 import "./globals.css";
 import type { Metadata } from "next";
 
+import FilterResetOnEntry from "./_components/FilterResetOnEntry";
+
 export const metadata: Metadata = {
   title: "游戏运营中台",
   description: "创作者与运营协作平台",
@@ -28,7 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <FilterResetOnEntry />
+        {children}
+      </body>
     </html>
   );
 }

@@ -7,7 +7,7 @@
  * 关键:选择过程用本地 draft 暂存,起止都选好才提交 onChange(触发导航/翻页)——
  * 避免点第一下就 router.push 导致弹层关闭、选不了第二个日期。
  */
-import { useEffect, useState } from "react";
+import { type ComponentProps, useEffect, useState } from "react";
 import { format } from "date-fns";
 import { CalendarDays, X } from "lucide-react";
 import type { DateRange } from "react-day-picker";
@@ -36,6 +36,7 @@ export default function DateRangeField({
   width = "w-64",
   placeholder = "选择日期范围",
   clearable = true,
+  disabled,
 }: {
   from: string;
   to: string;
@@ -44,6 +45,8 @@ export default function DateRangeField({
   width?: string;
   placeholder?: string;
   clearable?: boolean;
+  /** 透传给日历的禁用匹配器(如 { after: 昨天 } 禁用未来日期) */
+  disabled?: ComponentProps<typeof Calendar>["disabled"];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -111,6 +114,7 @@ export default function DateRangeField({
           selected={draft}
           defaultMonth={draft?.from}
           captionLayout="dropdown"
+          disabled={disabled}
           // 不依赖 react-day-picker 的 range 累积(v10 首点可能直接给出完整 {from,to}),
           // 自己按「点击的那一天」驱动两步选择:第一下定起始(弹层不关),第二下定终止再提交收起。
           onSelect={(_range, triggerDate) => {

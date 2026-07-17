@@ -14,15 +14,26 @@ import { PiesCard } from "./_components/PiesCard";
 // 大屏读时实时拉,避免缓存把"实时"字样打脸
 export const dynamic = "force-dynamic";
 
-export default async function OperatorBiPage() {
+export default async function OperatorBiPage({
+  searchParams,
+}: {
+  searchParams?: { trendFrom?: string; trendTo?: string };
+}) {
   await requireRole("OPERATOR");
-  const data = await aggregateDashboard();
+  const data = await aggregateDashboard({
+    trendFrom: searchParams?.trendFrom,
+    trendTo: searchParams?.trendTo,
+  });
 
   return (
     <FullscreenShell>
       <div className="grid gap-4 lg:grid-cols-4">
         <KpiStack kpi={data.kpi} className="lg:col-span-1" />
-        <TrendCard trend={data.trend} className="lg:col-span-2" />
+        <TrendCard
+          trend={data.trend}
+          range={data.trendRange}
+          className="lg:col-span-2"
+        />
         <TopCard creators={data.topCreators} className="lg:col-span-1" />
       </div>
       <PiesCard pies={data.pies} />
