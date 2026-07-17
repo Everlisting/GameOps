@@ -1,11 +1,13 @@
 /**
  * 核心指标 — 6 个 KPI 单元(2 列 × 3 行)排在一张 shadcn Card 内。
- * 每个单元右上角带 14 天 sparkline,只示意趋势,不交互。
+ * 每个单元右上角带当月「每日曲线」sparkline,大数字下方小字显示较上一快照的增量。
+ * 数据口径:当月(北京时间自然月),日期按导入时选择的「数据日期」(snapshotDate)。
+ * 第 6 格「激励预估」暂留空,后续接入。
  */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-import type { DashboardData } from "../_lib/aggregate";
+import type { DashboardData, KpiMetric } from "../_lib/aggregate";
 import { Sparkline } from "./Sparkline";
 
 export function KpiStack({
@@ -15,52 +17,18 @@ export function KpiStack({
   kpi: DashboardData["kpi"];
   className?: string;
 }) {
-  const incentive = formatYuan(kpi.incentiveTotal);
-
   return (
     <Card className={cn("flex flex-col", className)}>
       <CardHeader>
         <CardTitle>核心指标</CardTitle>
       </CardHeader>
       <CardContent className="grid flex-1 grid-cols-2 gap-3">
-        <KpiCell
-          label="待审稿件"
-          value={kpi.pendingSubmissions.toLocaleString()}
-          spark={kpi.sparkSubmissions}
-          sparkColor="var(--chart-3)"
-        />
-        <KpiCell
-          label="进行中活动"
-          value={kpi.ongoingActivities.toLocaleString()}
-          spark={[1, 1, 1, 1, 1, 1, 1]}
-          sparkColor="var(--chart-2)"
-        />
-        <KpiCell
-          label="30D 新增稿件"
-          value={kpi.submissions30d.toLocaleString()}
-          spark={kpi.sparkSubmissions}
-          sparkColor="var(--chart-1)"
-        />
-        <KpiCell
-          label="30D 通过率"
-          value={kpi.approvalRate30d.toFixed(1)}
-          unit="%"
-          spark={kpi.sparkApprovalRate}
-          sparkColor="var(--chart-2)"
-        />
-        <KpiCell
-          label="累计创作者"
-          value={kpi.creatorTotal.toLocaleString()}
-          spark={[1, 2, 2, 3, 4, 4, 5, 5, 6, 7]}
-          sparkColor="var(--chart-1)"
-        />
-        <KpiCell
-          label="累计预估激励"
-          value={incentive.val}
-          unit={incentive.unit}
-          spark={[1, 2, 3, 3, 4, 5, 6, 7, 8, 9]}
-          sparkColor="var(--chart-1)"
-        />
+        <KpiCell label="播放总量" metric={kpi.playTotal} compact sparkColor="var(--chart-1)" />
+        <KpiCell label="稿件总量" metric={kpi.workTotal} sparkColor="var(--chart-2)" />
+        <KpiCell label="优质作者数" metric={kpi.qualityCreators} sparkColor="var(--chart-3)" />
+        <KpiCell label="优质作品数" metric={kpi.qualityWorks} sparkColor="var(--chart-4)" />
+        <KpiCell label="活跃作者" metric={kpi.creators} sparkColor="var(--chart-5)" />
+        <KpiPlaceholder label="激励预估" />
       </CardContent>
     </Card>
   );
@@ -68,38 +36,69 @@ export function KpiStack({
 
 function KpiCell({
   label,
-  value,
-  unit,
-  spark,
+  metric,
+  compact = false,
   sparkColor,
 }: {
   label: string;
-  value: string;
-  unit?: string;
-  spark: number[];
+  metric: KpiMetric;
+  /** 大数字是否按 万/亿 压缩(播放量用) */
+  compact?: boolean;
   sparkColor?: string;
 }) {
+  const value = compact ? formatCompact(metric.value) : metric.value.toLocaleString();
   return (
     <div className="relative rounded-md border bg-muted/40 px-3 py-2.5">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-1 text-2xl font-semibold leading-none tabular-nums">
         {value}
-        {unit && (
-          <span className="ml-1 text-sm font-medium text-muted-foreground">
-            {unit}
-          </span>
-        )}
       </div>
-      <div className="absolute right-2 top-2">
-        <Sparkline points={spark} color={sparkColor} />
+      <Delta value={metric.increment} compact={compact} />
+      <div className="absolute right-2 top-6">
+        <Sparkline points={metric.spark} color={sparkColor} />
       </div>
     </div>
   );
 }
 
-/** 把金额按量级拆成"主值 + 单位",复用 KPI 视觉风格 */
-function formatYuan(v: number): { val: string; unit: string } {
-  if (v >= 100_000_000) return { val: (v / 100_000_000).toFixed(2), unit: "亿元" };
-  if (v >= 10_000) return { val: (v / 10_000).toFixed(1), unit: "万元" };
-  return { val: Math.round(v).toLocaleString(), unit: "元" };
+/** 空占位单元:保留 2×3 网格,标注「暂无」。 */
+function KpiPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="relative rounded-md border border-dashed bg-muted/20 px-3 py-2.5">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-2xl font-semibold leading-none tabular-nums text-muted-foreground/50">
+        —
+      </div>
+      <div className="mt-1 text-[11px] text-muted-foreground/60">敬请期待</div>
+    </div>
+  );
+}
+
+/** 增量小字:较上一快照日的变化,+ 绿 / − 红 / 0 灰;无基线(当月仅一次快照)显示 —。 */
+function Delta({ value, compact }: { value: number | null; compact: boolean }) {
+  if (value === null) {
+    return <div className="mt-1 text-[11px] text-muted-foreground/50">—</div>;
+  }
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  const mag = compact ? formatCompact(Math.abs(value)) : Math.abs(value).toLocaleString();
+  const color =
+    value > 0
+      ? "text-emerald-600 dark:text-emerald-500"
+      : value < 0
+        ? "text-rose-600 dark:text-rose-500"
+        : "text-muted-foreground/60";
+  return (
+    <div className={cn("mt-3 text-[11px] tabular-nums", color)}>
+      {sign}
+      {mag}
+      {/* <span className="ml-1 text-muted-foreground/50">较上次</span> */}
+    </div>
+  );
+}
+
+/** 把大数字按量级压成 "1.2亿" / "3.4万" / "123"。 */
+function formatCompact(v: number): string {
+  if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(2)}亿`;
+  if (v >= 10_000) return `${(v / 10_000).toFixed(1)}万`;
+  return Math.round(v).toLocaleString();
 }
