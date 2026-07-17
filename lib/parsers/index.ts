@@ -26,7 +26,11 @@ export const PARSERS: Record<string, Parser> = {
  *   - 返回写入的快照行数(供观测,不强制使用)
  *   - 找不到 snapshotter 视为该 csvType 不参与每日汇总
  */
-export type Snapshotter = (datasetId: string) => Promise<number>;
+export type Snapshotter = (
+  datasetId: string,
+  /** 快照所属日期;不传则用北京时间今天(见各 snapshotter 实现) */
+  snapshotDate?: Date,
+) => Promise<number>;
 
 export const SNAPSHOTTERS: Record<string, Snapshotter> = {
   douyin_video_detail: snapshotVideoStatsForDataset,

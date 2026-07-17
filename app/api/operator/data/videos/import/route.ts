@@ -31,6 +31,17 @@ const CSV_TYPE = "douyin_video_detail";
 const MAX_BYTES = 200 * 1024 * 1024; // 与 agent 上报同上限
 const MAX_STEM_LEN = 120;
 
+/** 解析「数据所属日期」表单字段(YYYY-MM-DD → @db.Date 用的 UTC 零点 Date)。
+ *  空 → undefined(交给 snapshotter 用今天兜底);格式非法 → 400。 */
+function parseDataDate(raw: FormDataEntryValue | null): Date | undefined {
+  if (typeof raw !== "string" || raw.trim() === "") return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
+  if (!m) throw badRequest("数据日期格式应为 YYYY-MM-DD");
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (Number.isNaN(dt.getTime())) throw badRequest("数据日期非法");
+  return dt;
+}
+
 /** 取上传文件名的 stem(去扩展名)并清成可安全落盘的形式。 */
 function sanitizeStem(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "";
@@ -57,6 +68,9 @@ export const POST = route(async (req) => {
   if (!(file instanceof File)) throw badRequest("缺少上传文件 file");
   if (file.size === 0) throw badRequest("文件为空");
   if (file.size > MAX_BYTES) throw badRequest("文件超过 200 MB");
+
+  // 数据所属日期(快照落到这一天);常是 T-1。缺省 → snapshotter 用北京时间今天兜底。
+  const dataDate = parseDataDate(form.get("dataDate"));
 
   const original = typeof file.name === "string" && file.name ? file.name : "import.csv";
   const lower = original.toLowerCase();
@@ -125,7 +139,7 @@ export const POST = route(async (req) => {
     const snapshotter = getSnapshotter(CSV_TYPE);
     if (snapshotter) {
       try {
-        snapshotCount = await snapshotter(datasetId);
+        snapshotCount = await snapshotter(datasetId, dataDate);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         parseError = `[snapshot 失败] ${msg}`.slice(0, 2000);
@@ -154,6 +168,7 @@ export const POST = route(async (req) => {
       fileSize: raw.byteLength,
       rowCount,
       hiddenCount,
+      dataDate: dataDate ? dataDate.toISOString().slice(0, 10) : null,
       parseError,
     },
   });
@@ -169,6 +184,7 @@ export const POST = route(async (req) => {
     rowCount: rowCount ?? 0,
     hiddenCount: hiddenCount ?? 0,
     snapshotCount: snapshotCount ?? 0,
+    dataDate: dataDate ? dataDate.toISOString().slice(0, 10) : null,
     fileName: original,
   });
 });

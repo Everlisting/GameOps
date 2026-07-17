@@ -11,6 +11,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Upload } from "lucide-react";
 
+import DatePickerField from "@/app/(creator)/_components/DatePickerField";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,13 +27,25 @@ type ImportResult = {
   rowCount: number;
   hiddenCount: number;
   snapshotCount: number;
+  dataDate: string | null;
   fileName: string;
 };
+
+/** 北京时区口径的「昨天」YYYY-MM-DD(运营机在国内,本地时间即北京时间)。 */
+function yesterdayStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function ImportVideosButton() {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [file, setFile] = React.useState<File | null>(null);
+  const [dataDate, setDataDate] = React.useState<string>(yesterdayStr);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<ImportResult | null>(null);
@@ -43,6 +56,7 @@ export default function ImportVideosButton() {
     setOpen(next);
     if (!next) {
       setFile(null);
+      setDataDate(yesterdayStr());
       setError(null);
       setResult(null);
       setSubmitting(false);
@@ -58,6 +72,7 @@ export default function ImportVideosButton() {
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("dataDate", dataDate);
       const res = await fetch("/api/operator/data/videos/import", {
         method: "POST",
         body: fd,
@@ -109,7 +124,7 @@ export default function ImportVideosButton() {
               <div className="mt-1">
                 入库 <strong className="tabular-nums">{result.rowCount}</strong> 条明细
                 <span className="ml-2 text-xs text-muted-foreground">
-                  · 当日快照 {result.snapshotCount} 条
+                  · {result.dataDate ?? "今日"} 快照 {result.snapshotCount} 条
                 </span>
               </div>
               {result.hiddenCount > 0 && (
@@ -122,6 +137,18 @@ export default function ImportVideosButton() {
           </div>
         ) : (
           <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <DatePickerField
+                id="import-data-date"
+                label="数据日期"
+                value={dataDate}
+                onChange={setDataDate}
+                width="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                这批数据实际所属的日期(趋势快照落到这一天)。一般是昨天,可改。
+              </p>
+            </div>
             <input
               ref={inputRef}
               type="file"
@@ -161,7 +188,11 @@ export default function ImportVideosButton() {
               >
                 取消
               </Button>
-              <Button size="sm" onClick={submit} disabled={!file || submitting}>
+              <Button
+                size="sm"
+                onClick={submit}
+                disabled={!file || !dataDate || submitting}
+              >
                 {submitting ? "导入中…" : "开始导入"}
               </Button>
             </>

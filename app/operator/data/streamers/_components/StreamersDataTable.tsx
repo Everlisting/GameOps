@@ -260,6 +260,7 @@ export default function StreamersDataTable({
       {
         accessorKey: "groupNo",
         header: "团号",
+        size:80,
         enableSorting: false,
         cell: ({ row }) => {
           const n = row.original.groupNo;
@@ -302,20 +303,20 @@ export default function StreamersDataTable({
           </span>
         ),
       },
-      numericColumn("fans", "粉丝量", { wan: true, size: 110 }),
-      numericColumn("worksCount", "作品数"),
+      numericColumn("fans", "粉丝量", { wan: true, size: 100 }),
+      numericColumn("worksCount", "作品数", { size: 70 }),
       numericColumn("worksViews", "作品播放量", { wan: true, size: 120 }),
-      numericColumn("worksRecommendedViews", "作品推荐播放量", { wan: true, size: 135 }),
-      numericColumn("fansGained", "涨粉"),
+      numericColumn("worksRecommendedViews", "作品推荐播放量", { wan: true, size: 120 }),
+      numericColumn("fansGained", "涨粉", { size: 70 }),
       // 直播维度(聚合 LiveStat)
-      numericColumn("anchorDays", "直播天数"),
-      numericColumn("liveDuration", "直播时长", { float: true }),
-      numericColumn("acu", "ACU", { float: true }),
-      numericColumn("exposureUsers", "曝光人数", { wan: true }),
-      numericColumn("exposureCount", "曝光次数", { sortable: false, wan: true }),
-      numericColumn("enterRoomUsers", "进直播间人数", { wan: true, size: 120 }),
-      numericColumn("enterRoomCount", "进直播间次数", { sortable: false, wan: true, size: 120 }),
-      numericColumn("avgWatchDuration", "人均观看时长", { float: true, sortable: false, size: 120 }),
+      numericColumn("anchorDays", "直播天数", { size: 80 }),
+      numericColumn("liveDuration", "直播时长", { float: true, size: 80 }),
+      numericColumn("acu", "ACU", { float: true, size: 80 }),
+      numericColumn("exposureUsers", "曝光人数", { wan: true, size: 90  }),
+      numericColumn("exposureCount", "曝光次数", { sortable: false, wan: true, size: 90  }),
+      numericColumn("enterRoomUsers", "进直播间人数", { wan: true, size: 100 }),
+      numericColumn("enterRoomCount", "进直播间次数", { sortable: false, wan: true, size: 100 }),
+      numericColumn("avgWatchDuration", "人均观看时长", { float: true, sortable: false, size: 100 }),
       {
         accessorKey: "updatedAt",
         header: "更新时间",

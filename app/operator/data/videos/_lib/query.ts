@@ -38,7 +38,7 @@ export type VideoQuery = {
 function clampSortBy(raw: string | undefined): SortField {
   return (ALLOWED_SORT_BY as readonly string[]).includes(raw ?? "")
     ? (raw as SortField)
-    : "updatedAt";
+    : "views"; // 默认按播放量降序(order 默认 desc)
 }
 
 function clampOrder(raw: string | undefined): "asc" | "desc" {

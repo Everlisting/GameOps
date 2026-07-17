@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 
 import DateRangeField from "@/app/operator/_components/DateRangeField";
+import VideoTrendDialog from "./VideoTrendDialog";
 
 import { TruncatedName } from "@/components/truncated-name";
 import { WanNumber } from "@/components/wan-number";
@@ -281,6 +282,27 @@ export default function VideosDataTable({
         },
       },
       {
+        id: "trend",
+        header: "趋势",
+        size: 60,
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+          const r = row.original;
+          // 已删除/隐藏的视频不提供趋势(不参与快照统计)
+          if (r.hidden) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <VideoTrendDialog
+              externalId={r.externalId}
+              platform={r.platform}
+              publishedAt={r.publishedAt}
+            />
+          );
+        },
+      },
+      {
         accessorKey: "externalId",
         header: "稿件ID",
         size: 165,
@@ -389,12 +411,12 @@ export default function VideosDataTable({
           </span>
         ),
       },
-      numericColumn("views", "播放量", { wan: true }),
-      numericColumn("recommendedViews", "推荐播放量", { wan: true, size: 120 }),
-      numericColumn("likes", "点赞"),
-      numericColumn("comments", "评论"),
-      numericColumn("shares", "分享"),
-      numericColumn("fansGained", "涨粉"),
+      numericColumn("views", "播放量", { wan: true, size: 100 }),
+      numericColumn("recommendedViews", "推荐播放量", { wan: true, size: 100 }),
+      numericColumn("likes", "点赞",{ size: 100 }),
+      numericColumn("comments", "评论",{ size: 90 }),
+      numericColumn("shares", "分享",{ size: 80 }),
+      numericColumn("fansGained", "涨粉",{ size: 80 }),
       {
         // 使用 note 字段,但表头显示为"团号"
         accessorKey: "note",
