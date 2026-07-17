@@ -34,7 +34,11 @@ export default async function OperatorBiPage({
           range={data.trendRange}
           className="lg:col-span-2"
         />
-        <TopCard creators={data.topCreators} className="lg:col-span-1" />
+        <TopCard
+          anchors={data.topAnchors}
+          videos={data.topVideos}
+          className="lg:col-span-1"
+        />
       </div>
       <PiesCard pies={data.pies} />
     </FullscreenShell>

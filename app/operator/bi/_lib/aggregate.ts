@@ -41,7 +41,6 @@ export async function aggregateDashboard(opts?: {
   trendTo?: string;
 }) {
   const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS);
 
   // 「本月」按北京时间自然月切;snapshotDate 存的是 UTC 零点 = 北京自然日。
   const beijing = new Date(now.getTime() + 8 * 3_600_000);
@@ -76,8 +75,9 @@ export async function aggregateDashboard(opts?: {
     trendRows,
     trendSeedRows,
 
-    // Top 创作者:30d 总播放
-    topCreatorsRaw,
+    // 右侧榜单:主播 TOP30(总播放) + 作品 TOP30(单作品播放)
+    topAnchorsRaw,
+    topVideosRaw,
 
     // 饼 1 · 稿件状态
     submissionStatusGroups,
@@ -153,20 +153,26 @@ export async function aggregateDashboard(opts?: {
         SELECT MAX("snapshotDate") FROM "DailyVideoStat" WHERE "snapshotDate" < ${trendStartDay}
       ) AND COALESCE(v."hidden", false) = false`,
 
-    prisma.$queryRaw<
-      { creatorId: string; nickname: string; views: bigint }[]
-    >`
-      SELECT c."id" AS "creatorId", c."nickname", COALESCE(SUM(d."views"), 0)::bigint AS views
-      FROM "DailyVideoStat" d
-      JOIN "Creator" c ON c."id" = d."creatorId"
-      -- 排除已被判定删除/隐藏的作品(不做任何统计)
-      LEFT JOIN "VideoStat" v
-        ON v."platform" = d."platform" AND v."externalId" = d."externalId"
-      WHERE d."snapshotDate" >= ${thirtyDaysAgo}
-        AND COALESCE(v."hidden", false) = false
-      GROUP BY c."id", c."nickname"
+    // 主播 TOP30:按作者(creatorUid,回退 creatorName)聚合总播放,取昵称
+    prisma.$queryRaw<{ author: string; name: string | null; views: bigint }[]>`
+      SELECT COALESCE("creatorUid", "creatorName") AS author,
+             MAX("creatorName") AS name,
+             COALESCE(SUM("views"), 0)::bigint AS views
+      FROM "VideoStat"
+      WHERE "hidden" = false AND COALESCE("creatorUid", "creatorName") IS NOT NULL
+      GROUP BY COALESCE("creatorUid", "creatorName")
       ORDER BY views DESC
-      LIMIT 8`,
+      LIMIT 30`,
+
+    // 作品 TOP30:按单作品播放量排序(带 url 用于跳抖音)
+    prisma.$queryRaw<
+      { externalId: string; title: string; url: string; views: number }[]
+    >`
+      SELECT "externalId", "title", "url", "views"
+      FROM "VideoStat"
+      WHERE "hidden" = false
+      ORDER BY "views" DESC
+      LIMIT 30`,
 
     prisma.submission.groupBy({
       by: ["status"],
@@ -249,11 +255,18 @@ export async function aggregateDashboard(opts?: {
     key: g.groupNo ?? "_",
   }));
 
-  // Top 创作者
-  const topCreators = topCreatorsRaw.map((r, i) => ({
+  // 右侧榜单
+  const topAnchors = topAnchorsRaw.map((r, i) => ({
     rank: i + 1,
-    creatorId: r.creatorId,
-    nickname: r.nickname,
+    name: r.name ?? r.author,
+    search: r.author, // 跳视频页搜索用(优先 uid)
+    views: Number(r.views),
+  }));
+  const topVideos = topVideosRaw.map((r, i) => ({
+    rank: i + 1,
+    externalId: r.externalId,
+    title: r.title,
+    url: r.url,
     views: Number(r.views),
   }));
 
@@ -265,7 +278,8 @@ export async function aggregateDashboard(opts?: {
       from: trendStartDay.toISOString().slice(0, 10),
       to: trendEndDay.toISOString().slice(0, 10),
     },
-    topCreators,
+    topAnchors,
+    topVideos,
     pies: {
       submissionStatus: submissionStatusPie,
       activityStatus: activityStatusPie,

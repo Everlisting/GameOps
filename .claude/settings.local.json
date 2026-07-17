@@ -53,7 +53,8 @@
       "Bash(python -c ' *)",
       "Bash(npx vitest *)",
       "Bash(npx eslint *)",
-      "Bash(pnpm lint *)"
+      "Bash(pnpm lint *)",
+      "Bash(npx tsx *)"
     ]
   }
 }

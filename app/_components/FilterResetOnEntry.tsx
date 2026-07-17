@@ -55,8 +55,16 @@ export default function FilterResetOnEntry() {
     const isFirst = !mounted.current;
     mounted.current = true;
 
-    // 清掉当前 URL 上的筛选参数(若有)
     const url = new URL(window.location.href);
+
+    // 带 keepFilters 标记的主动跳转(如榜单点主播跳视频页搜索):保留筛选,只去掉标记本身
+    if (url.searchParams.has("keepFilters")) {
+      url.searchParams.delete("keepFilters");
+      router.replace(`${url.pathname}${url.search}`, { scroll: false });
+      return;
+    }
+
+    // 清掉当前 URL 上的筛选参数(若有)
     let changed = false;
     for (const key of FILTER_KEYS) {
       if (url.searchParams.has(key)) {
