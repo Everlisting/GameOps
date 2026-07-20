@@ -90,7 +90,10 @@ export function TopCard({
   );
 }
 
-/** 纵向循环滚动:items 复制两份,匀速上移一份高度后无缝回到起点。父容器负责 overflow-hidden。 */
+/**
+ * 纵向循环滚动:items 复制两份,用 rAF 递增 scrollTop 匀速上移,过一份高度即归位,无缝循环。
+ * 悬停时暂停自动滚动,此时可用鼠标滚轮手动滚动列表(原生 overflow 滚动,隐藏滚动条)。
+ */
 function LoopList<T>({
   items,
   renderItem,
@@ -100,7 +103,33 @@ function LoopList<T>({
   renderItem: (item: T) => React.ReactNode;
   emptyText: string;
 }) {
-  const [paused, setPaused] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const pausedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || items.length === 0) return;
+    let raf = 0;
+    // scrollTop 会被浏览器取整,<1px/帧 的增量直接累加到 scrollTop 会被舍掉而卡住;
+    // 用浮点累加器保存精确位置,scrollTop 只作显示。
+    let offset = 0;
+    const SPEED = 0.5; // px/帧 ≈ 30px/s
+    const tick = () => {
+      const half = el.scrollHeight / 2; // 一份内容的高度
+      if (half > 0) {
+        if (pausedRef.current) {
+          offset = el.scrollTop; // 悬停:跟随用户滚轮手动滚动的位置
+        } else {
+          offset += SPEED;
+          if (offset >= half) offset -= half; // 过一份即归位,无缝
+          el.scrollTop = offset;
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [items.length]);
 
   if (items.length === 0) {
     return (
@@ -109,20 +138,12 @@ function LoopList<T>({
       </div>
     );
   }
-  // 匀速:每行约 1.2s,给个下限避免行数少时滚太快
-  const duration = Math.max(15, items.length * 1.2);
   return (
     <div
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      // 用 longhand 逐项设置,避免 animation 简写把 play-state 覆盖,导致悬停暂停失效
-      style={{
-        animationName: "bi-loop-scroll",
-        animationDuration: `${duration}s`,
-        animationTimingFunction: "linear",
-        animationIterationCount: "infinite",
-        animationPlayState: paused ? "paused" : "running",
-      }}
+      ref={ref}
+      onMouseEnter={() => (pausedRef.current = true)}
+      onMouseLeave={() => (pausedRef.current = false)}
+      className="h-full overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {items.map((it, i) => (
         <div key={i} className="mb-1.5">

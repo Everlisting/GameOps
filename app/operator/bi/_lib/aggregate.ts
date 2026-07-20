@@ -79,10 +79,10 @@ export async function aggregateDashboard(opts?: {
     topAnchorsRaw,
     topVideosRaw,
 
-    // 饼 1 · 稿件状态
-    submissionStatusGroups,
-    // 饼 2 · 活动状态
-    activityStatusGroups,
+    // 饼 1 · 作者分层(本月按播放总量)
+    authorTierRaw,
+    // 饼 2 · 作品分层(本月按单作品播放量)
+    workTierRaw,
     // 饼 3 · 平台分布
     platformGroups,
     // 饼 4 · 创作者分组
@@ -174,14 +174,50 @@ export async function aggregateDashboard(opts?: {
       ORDER BY "views" DESC
       LIMIT 30`,
 
-    prisma.submission.groupBy({
-      by: ["status"],
-      _count: { _all: true },
-    }),
-    prisma.activity.groupBy({
-      by: ["status"],
-      _count: { _all: true },
-    }),
+    // 作者分层:本月最新快照日,每作者累计播放分桶计数(与「优质作者」同口径)
+    prisma.$queryRaw<
+      { top: bigint; head: bigint; mid: bigint; waist: bigint; tail: bigint }[]
+    >`
+      SELECT
+        COUNT(*) FILTER (WHERE av >= 3000000)::bigint AS top,
+        COUNT(*) FILTER (WHERE av >= 1000000 AND av < 3000000)::bigint AS head,
+        COUNT(*) FILTER (WHERE av >= 300000 AND av < 1000000)::bigint AS mid,
+        COUNT(*) FILTER (WHERE av >= 100000 AND av < 300000)::bigint AS waist,
+        COUNT(*) FILTER (WHERE av >  0 AND av < 100000)::bigint AS tail
+      FROM (
+        SELECT COALESCE(v."creatorUid", d."creatorId") AS author, SUM(d."views") AS av
+        FROM "DailyVideoStat" d
+        LEFT JOIN "VideoStat" v
+          ON v."platform" = d."platform" AND v."externalId" = d."externalId"
+        WHERE d."snapshotDate" = (
+          SELECT MAX("snapshotDate") FROM "DailyVideoStat"
+          WHERE "snapshotDate" >= ${monthStart} AND "snapshotDate" < ${nextMonthStart}
+        )
+          AND COALESCE(v."hidden", false) = false
+          AND COALESCE(v."creatorUid", d."creatorId") IS NOT NULL
+        GROUP BY COALESCE(v."creatorUid", d."creatorId")
+      ) pa`,
+    // 作品分层:本月最新快照日,按单作品累计播放分桶计数
+    prisma.$queryRaw<
+      { top: bigint; head: bigint; mid: bigint; waist: bigint; tail: bigint }[]
+    >`
+      SELECT
+        COUNT(*) FILTER (WHERE av >= 1000000)::bigint AS top,
+        COUNT(*) FILTER (WHERE av >= 300000 AND av < 1000000)::bigint AS head,
+        COUNT(*) FILTER (WHERE av >= 100000 AND av < 300000)::bigint AS mid,
+        COUNT(*) FILTER (WHERE av >= 12000 AND av < 100000)::bigint AS waist,
+        COUNT(*) FILTER (WHERE av >= 0 AND av < 12000)::bigint AS tail
+      FROM (
+        SELECT d."views" AS av
+        FROM "DailyVideoStat" d
+        LEFT JOIN "VideoStat" v
+          ON v."platform" = d."platform" AND v."externalId" = d."externalId"
+        WHERE d."snapshotDate" = (
+          SELECT MAX("snapshotDate") FROM "DailyVideoStat"
+          WHERE "snapshotDate" >= ${monthStart} AND "snapshotDate" < ${nextMonthStart}
+        )
+          AND COALESCE(v."hidden", false) = false
+      ) pw`,
     prisma.submission.groupBy({
       by: ["platform"],
       _count: { _all: true },
@@ -234,16 +270,34 @@ export async function aggregateDashboard(opts?: {
   };
 
   // 饼数据 — 颜色由组件按 index 注入 var(--chart-N),这里只产生 name/value/key
-  const submissionStatusPie = submissionStatusGroups.map((g) => ({
-    name: STATUS_LABEL[g.status],
-    value: g._count._all,
-    key: g.status,
-  }));
-  const activityStatusPie = activityStatusGroups.map((g) => ({
-    name: ACTIVITY_LABEL[g.status],
-    value: g._count._all,
-    key: g.status,
-  }));
+  const t = authorTierRaw[0] ?? {
+    top: 0n,
+    head: 0n,
+    mid: 0n,
+    waist: 0n,
+    tail: 0n,
+  };
+  const authorTierPie = [
+    { name: "顶部(≥300w)", value: Number(t.top), key: "top" },
+    { name: "头部(≥100w)", value: Number(t.head), key: "head" },
+    { name: "中部(≥30w)", value: Number(t.mid), key: "mid" },
+    { name: "腰部(≥10w)", value: Number(t.waist), key: "waist" },
+    { name: "尾部(<10w)", value: Number(t.tail), key: "tail" },
+  ];
+  const tw = workTierRaw[0] ?? {
+    top: 0n,
+    head: 0n,
+    mid: 0n,
+    waist: 0n,
+    tail: 0n,
+  };
+  const workTierPie = [
+    { name: "顶部(≥100w)", value: Number(tw.top), key: "top" },
+    { name: "头部(≥30w)", value: Number(tw.head), key: "head" },
+    { name: "中部(≥10w)", value: Number(tw.mid), key: "mid" },
+    { name: "腰部(≥1.2w)", value: Number(tw.waist), key: "waist" },
+    { name: "尾部(<1.2w)", value: Number(tw.tail), key: "tail" },
+  ];
   const platformPie = platformGroups.slice(0, 5).map((g) => ({
     name: g.platform || "其他",
     value: g._count._all,
@@ -281,8 +335,8 @@ export async function aggregateDashboard(opts?: {
     topAnchors,
     topVideos,
     pies: {
-      submissionStatus: submissionStatusPie,
-      activityStatus: activityStatusPie,
+      authorTier: authorTierPie,
+      workTier: workTierPie,
       platform: platformPie,
       groupNo: groupNoPie,
     },
@@ -304,13 +358,3 @@ function buildDayRange(start: Date, end: Date): Date[] {
   return out;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "待审",
-  APPROVED: "已通过",
-  REJECTED: "未通过",
-};
-const ACTIVITY_LABEL: Record<string, string> = {
-  DRAFT: "草稿",
-  ONGOING: "进行中",
-  ENDED: "已结束",
-};
