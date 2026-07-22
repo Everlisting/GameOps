@@ -29,3 +29,12 @@ export const chatInputSchema = z.object({
   conversationId: z.string().optional(),
   messages: z.array(uiMessageSchema).min(1, "messages 不能为空"),
 });
+
+/** POST /feedback 入参 */
+export const feedbackSchema = z.object({
+  conversationId: z.string().optional(),
+  clientMessageId: z.string().optional(),
+  rating: z.enum(["up", "down"]),
+  category: z.string().max(40).optional(),
+  note: z.string().max(1000).optional(),
+});

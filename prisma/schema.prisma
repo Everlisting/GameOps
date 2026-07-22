@@ -680,6 +680,22 @@ model AiToolCall {
   @@map("ai_tool_call")
 }
 
+/// 阶段10.2 · AI 助手 · 回答反馈(点赞/点踩)。
+/// clientMessageId = 前端 useChat 的消息 id(会话内相关联,便于粗定位),不建强外键。
+model AiFeedback {
+  id              String   @id @default(cuid())
+  conversationId  String?
+  clientMessageId String?
+  userId          String
+  rating          String // up / down
+  category        String?
+  note            String?
+  createdAt       DateTime @default(now())
+
+  @@index([conversationId])
+  @@map("ai_feedback")
+}
+
 /// 阶段10 · AI 助手 · 系统提示词版本(可回溯每条回答用了哪版 prompt)。
 model AiPromptVersion {
   id        String   @id @default(cuid())

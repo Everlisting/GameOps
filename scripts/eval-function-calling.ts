@@ -21,10 +21,38 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { EVAL_CASES } from "../lib/assistant/eval-cases";
 import { TOOL_DEFS } from "../lib/assistant/tools/schemas";
 
+function todayShanghai(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+// 与 lib/assistant/agent.ts 一致:注入当前日期,否则模型对相对时间是瞎猜的。
 const SYSTEM = `你是运营数据助手。回答用户问题时,只能通过提供的工具获取数据:选择最合适的工具并填好参数。
 - 需要多步时(例如先定位活动、再解释激励),按需依次调用工具。
 - 若用户要求修改数据(如改粉丝数),你没有对应工具,不要调用任何工具,直接说明无权修改。
-- 未指定日期时,涉及统计的工具走其默认口径(本月)。`;
+- 未指定日期时,涉及统计的工具走其默认口径(本月)。
+
+当前日期:${todayShanghai()}(Asia/Shanghai)。遇到"本月""上月""最近 N 天"等相对时间时,据此计算具体日期窗口:"本月"可省略日期参数,"上月"须传上一自然月的起止日。`;
+
+/** 相对日期窗口校验:返回 true/false;非相对(或无从判断)返回 null 不计分。 */
+function checkDateWindow(kind: unknown, args: Record<string, unknown> | undefined): boolean | null {
+  const from = typeof args?.publishedFrom === "string" ? args.publishedFrom : undefined;
+  const now = new Date();
+  const ym = (y: number, m: number) => `${y}-${String(m).padStart(2, "0")}`;
+  if (kind === "本月默认") {
+    // 省略日期(走默认本月)或显式落在本月,都算对
+    return from ? from.startsWith(ym(now.getFullYear(), now.getMonth() + 1)) : true;
+  }
+  if (kind === "上月") {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return !!from && from.startsWith(ym(d.getFullYear(), d.getMonth() + 1));
+  }
+  return null;
+}
 
 interface Candidate {
   name: string;
@@ -156,6 +184,8 @@ async function evalCandidate(cand: Candidate): Promise<void> {
   let multiPass = 0;
   let paramChecked = 0;
   let paramMatched = 0;
+  let dateTotal = 0;
+  let datePass = 0;
 
   console.log(`\n=== 候选:${cand.name}(${cand.provider} · ${cand.model})===`);
   for (const c of EVAL_CASES) {
@@ -197,7 +227,13 @@ async function evalCandidate(cand: Candidate): Promise<void> {
       const { checked, matched } = checkParams(c.expectedScope, call?.args);
       paramChecked += checked;
       paramMatched += matched;
-      paramNote = checked ? `参数 ${matched}/${checked}` : "—";
+      const dateOk = checkDateWindow(c.expectedScope.dateWindow, call?.args);
+      if (dateOk !== null) {
+        dateTotal++;
+        if (dateOk) datePass++;
+      }
+      const dateTag = dateOk === null ? "" : dateOk ? " 日期✓" : " 日期✗";
+      paramNote = (checked ? `参数 ${matched}/${checked}` : "—") + dateTag;
     }
 
     const flag = toolSel ? "OK  " : "MISS";
@@ -209,6 +245,7 @@ async function evalCandidate(cand: Candidate): Promise<void> {
   console.log(`  ── 小结 ──`);
   console.log(`  工具选择正确率: ${pct(toolSelPass, total)}  (${toolSelPass}/${total})  [目标 ≥95%]`);
   console.log(`  参数正确率:     ${pct(paramMatched, paramChecked)}  (${paramMatched}/${paramChecked})  [目标 ≥90%]`);
+  console.log(`  相对日期正确率: ${pct(datePass, dateTotal)}  (${datePass}/${dateTotal})  [本月/上月计算是否正确]`);
   console.log(`  无解题拒答率:   ${pct(refusalPass, refusalTotal)}  (${refusalPass}/${refusalTotal})  [目标 ≥90%]`);
   console.log(`  多步走通率:     ${pct(multiPass, multiTotal)}  (${multiPass}/${multiTotal})`);
 }
