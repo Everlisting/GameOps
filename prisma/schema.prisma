@@ -593,3 +593,102 @@ model OpinionSettings {
 
   @@map("opinion_settings")
 }
+
+/// 阶段10 · AI 助手 · 模型配置(按用途单例:usage 唯一,如 chat / embedding)。
+/// 泛化自 OpinionSettings:apiKeyEnc = AES-256-GCM 密文,明文只在服务端解出调模型,永不回前端/入日志。
+/// baseUrl 指向国产模型的 OpenAI 兼容端点(数据不出境)。
+model AiModelProfile {
+  id         String   @id @default(cuid())
+  usage      String   @unique // "chat" | "embedding"
+  provider   String // "bailian" | "mimo" | "deepseek" ...
+  model      String // "qwen-max" 等
+  baseUrl    String // OpenAI 兼容端点
+  apiKeyEnc  String   @default("") // 密文,空 = 未配置
+  apiKeyMask String   @default("") // 打码回显串
+  updatedBy  String?
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@map("ai_model_profile")
+}
+
+/// 阶段10 · AI 助手 · 会话(运营 × 一组多轮对话)。
+model AiConversation {
+  id        String   @id @default(cuid())
+  userId    String // User.id 快照(不建外键,删用户不级联删对话历史)
+  title     String?
+  status    String   @default("active") // active / archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages AiMessage[]
+  runs     AiRun[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_conversation")
+}
+
+/// 阶段10 · AI 助手 · 消息。content 存文本 + 引用 + 工具结果摘要(已脱敏)。
+model AiMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // user / assistant / tool
+  content        Json
+  createdAt      DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_message")
+}
+
+/// 阶段10 · AI 助手 · 一次执行(模型 / token / 耗时 / 状态)。工具轨迹见 AiToolCall(阶段10.2 再加)。
+model AiRun {
+  id             String    @id @default(cuid())
+  conversationId String
+  model          String
+  promptVersion  Int?
+  status         String    @default("running") // running / succeeded / failed
+  inputTokens    Int?
+  outputTokens   Int?
+  latencyMs      Int?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  toolCalls    AiToolCall[]
+
+  @@index([conversationId, createdAt])
+  @@map("ai_run")
+}
+
+/// 阶段10.2 · AI 助手 · 一次工具调用轨迹(工具名 / 入参 / 结果摘要)。
+model AiToolCall {
+  id            String   @id @default(cuid())
+  runId         String
+  toolName      String
+  args          Json
+  resultSummary Json? // 脱敏/裁剪后的结果(工具返回已是有限行的业务聚合)
+  latencyMs     Int?
+  isError       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  run AiRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("ai_tool_call")
+}
+
+/// 阶段10 · AI 助手 · 系统提示词版本(可回溯每条回答用了哪版 prompt)。
+model AiPromptVersion {
+  id        String   @id @default(cuid())
+  name      String // "operator_assistant"
+  version   Int
+  content   String
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([name, version])
+  @@map("ai_prompt_version")
+}

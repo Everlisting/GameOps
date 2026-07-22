@@ -75,6 +75,10 @@ export const parseAnchorRoster: Parser = async (csv, ctx) => {
   );
   const hasFans = colOf.fans !== undefined;
 
+  // 平台标签:运营导入时由弹窗下拉选定(paramValues.platform),对全表生效、覆盖 CSV「主播平台」列;
+  // 爬虫上报不传时回退读 CSV 列(向后兼容)。
+  const forcedPlatform = platformFromParam(ctx.paramValues?.["platform"]);
+
   const dataRows: RosterRow[] = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
@@ -93,7 +97,7 @@ export const parseAnchorRoster: Parser = async (csv, ctx) => {
     if (!uid) continue; // 无 UID 的行(表底汇总 / 占位)跳过
 
     dataRows.push({
-      platform: normalizePlatform(cell("platform")),
+      platform: forcedPlatform ?? normalizePlatform(cell("platform")),
       uid,
       nickname: nonEmpty(cell("nickname")),
       account: nonEmpty(cell("account")),
@@ -150,6 +154,12 @@ function buildUpsert(
 }
 
 // ── 工具 ─────────────────────────────────────────
+
+/** 弹窗下拉选定的平台参数 → 归一化平台码;空/非字符串 → null(回退读 CSV 列)。 */
+function platformFromParam(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  return normalizePlatform(raw);
+}
 
 function normalizePlatform(s: string): string {
   const v = s.trim().toLowerCase();

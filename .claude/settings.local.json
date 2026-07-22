@@ -54,7 +54,10 @@
       "Bash(npx vitest *)",
       "Bash(npx eslint *)",
       "Bash(pnpm lint *)",
-      "Bash(npx tsx *)"
+      "Bash(npx tsx *)",
+      "Skill(claude-api)",
+      "PowerShell(pnpm add *)",
+      "PowerShell(Select-String *)"
     ]
   }
 }

@@ -7,6 +7,7 @@
 import * as React from "react";
 import {
   BarChart3,
+  Bot,
   CalendarRange,
   ClipboardCheck,
   Database,
@@ -112,6 +113,19 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/** 阶段10 AI 助手:对话 OPERATOR 可用,模型设置仅 ADMIN。 */
+function buildAssistantItem(isAdmin: boolean): NavItem {
+  return {
+    title: "AI 助手",
+    url: "/operator/assistant",
+    icon: Bot,
+    items: [
+      { title: "对话", url: "/operator/assistant" },
+      ...(isAdmin ? [{ title: "模型设置", url: "/operator/assistant/settings" }] : []),
+    ],
+  };
+}
+
 /** 阶段9 舆情监控:三个二级页 OPERATOR 可看,模型设置仅 ADMIN。 */
 function buildOpinionItem(isAdmin: boolean): NavItem {
   return {
@@ -131,8 +145,15 @@ function buildOpinionItem(isAdmin: boolean): NavItem {
 function buildNavItems(isAdmin: boolean): NavItem[] {
   const idx = NAV_ITEMS.findIndex((i) => i.title === "稿件管理");
   const opinion = buildOpinionItem(isAdmin);
-  if (idx < 0) return [...NAV_ITEMS, opinion];
-  return [...NAV_ITEMS.slice(0, idx), opinion, ...NAV_ITEMS.slice(idx)];
+  const base =
+    idx < 0
+      ? [...NAV_ITEMS, opinion]
+      : [...NAV_ITEMS.slice(0, idx), opinion, ...NAV_ITEMS.slice(idx)];
+  // AI 助手 放在「BI 大屏」之后
+  const biIdx = base.findIndex((i) => i.title === "BI 大屏");
+  const assistant = buildAssistantItem(isAdmin);
+  if (biIdx < 0) return [assistant, ...base];
+  return [...base.slice(0, biIdx + 1), assistant, ...base.slice(biIdx + 1)];
 }
 
 /** 仅 ADMIN 可见的菜单组 */

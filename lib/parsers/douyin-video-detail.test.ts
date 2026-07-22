@@ -1,8 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { _testing } from "./douyin-video-detail";
 
-const { parseVideoId, normalizeUid, parseChineseDate, parseDateOnly, parseIntSafe } =
-  _testing;
+const {
+  parseVideoId,
+  normalizeUid,
+  parseChineseDate,
+  parseDateOnly,
+  parseIntSafe,
+  parseKeywords,
+  matchesAllKeywords,
+} = _testing;
 
 describe("parseVideoId", () => {
   it("命中标准 douyin 视频 URL", () => {
@@ -89,6 +96,32 @@ describe("parseDateOnly(发布日期窗口 起/止)", () => {
     expect(parseDateOnly("2026-06-01 13:00")).toBeNull();
     expect(parseDateOnly("")).toBeNull();
     expect(parseDateOnly("abc")).toBeNull();
+  });
+});
+
+describe("parseKeywords", () => {
+  it("逗号 / 空格 / 顿号混合分隔,统一转小写", () => {
+    expect(parseKeywords("三国志, 战棋、Game")).toEqual(["三国志", "战棋", "game"]);
+  });
+  it("多个空白折叠、首尾空白忽略", () => {
+    expect(parseKeywords("  a   b  ")).toEqual(["a", "b"]);
+  });
+  it("空串 / 非字符串 → []", () => {
+    expect(parseKeywords("")).toEqual([]);
+    expect(parseKeywords(undefined)).toEqual([]);
+    expect(parseKeywords(123)).toEqual([]);
+  });
+});
+
+describe("matchesAllKeywords", () => {
+  it("同时包含全部关键字 → true(AND)", () => {
+    expect(matchesAllKeywords("三国志战棋玩法解析", ["三国志", "战棋"])).toBe(true);
+  });
+  it("缺任一关键字 → false", () => {
+    expect(matchesAllKeywords("三国志玩法解析", ["三国志", "战棋"])).toBe(false);
+  });
+  it("不区分大小写(keywords 已小写)", () => {
+    expect(matchesAllKeywords("New GAME Trailer", ["game"])).toBe(true);
   });
 });
 

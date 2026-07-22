@@ -72,6 +72,11 @@ export const POST = route(async (req) => {
   // 数据所属日期(快照落到这一天);常是 T-1。缺省 → snapshotter 用北京时间今天兜底。
   const dataDate = parseDataDate(form.get("dataDate"));
 
+  // 标题关键字(可选):非空时仅「标题同时包含全部关键字」的稿件入库(见 parser)。
+  const titleKeywordsRaw = form.get("titleKeywords");
+  const titleKeywords =
+    typeof titleKeywordsRaw === "string" ? titleKeywordsRaw.trim() : "";
+
   const original = typeof file.name === "string" && file.name ? file.name : "import.csv";
   const lower = original.toLowerCase();
   const isExcel = lower.endsWith(".xlsx") || lower.endsWith(".xls");
@@ -122,7 +127,7 @@ export const POST = route(async (req) => {
     try {
       const result = await parser(csvText, {
         datasetId,
-        paramValues: {},
+        paramValues: titleKeywords ? { titleKeywords } : {},
         filterRoot: null,
       });
       rowCount = result.rowCount;
@@ -168,6 +173,7 @@ export const POST = route(async (req) => {
       fileSize: raw.byteLength,
       rowCount,
       hiddenCount,
+      titleKeywords: titleKeywords || null,
       dataDate: dataDate ? dataDate.toISOString().slice(0, 10) : null,
       parseError,
     },

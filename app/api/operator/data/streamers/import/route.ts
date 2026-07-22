@@ -24,6 +24,8 @@ export const runtime = "nodejs";
 const CSV_TYPE = "anchor_roster";
 const MAX_BYTES = 200 * 1024 * 1024;
 const MAX_STEM_LEN = 120;
+// 弹窗下拉可选平台(归一化平台码);与 parser normalizePlatform 输出一致
+const ALLOWED_PLATFORMS = ["douyin", "kuaishou", "bilibili"];
 
 function sanitizeStem(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "";
@@ -50,6 +52,13 @@ export const POST = route(async (req) => {
   if (!(file instanceof File)) throw badRequest("缺少上传文件 file");
   if (file.size === 0) throw badRequest("文件为空");
   if (file.size > MAX_BYTES) throw badRequest("文件超过 200 MB");
+
+  // 平台标签:由导入弹窗下拉选定,对整份名单生效(覆盖 CSV「主播平台」列)。
+  const platformRaw = form.get("platform");
+  const platform = typeof platformRaw === "string" ? platformRaw.trim() : "";
+  if (!ALLOWED_PLATFORMS.includes(platform)) {
+    throw badRequest("请选择平台(Douyin / KuaiShou / BiliBili)");
+  }
 
   const original = typeof file.name === "string" && file.name ? file.name : "import.csv";
   const lower = original.toLowerCase();
@@ -97,7 +106,7 @@ export const POST = route(async (req) => {
     try {
       const result = await parser(csvText, {
         datasetId,
-        paramValues: {},
+        paramValues: { platform },
         filterRoot: null,
       });
       rowCount = result.rowCount;
@@ -126,6 +135,7 @@ export const POST = route(async (req) => {
       csvType: CSV_TYPE,
       fileName: original,
       fileSize: raw.byteLength,
+      platform,
       rowCount,
       parseError,
     },

@@ -68,6 +68,10 @@ export const parseDouyinVideoDetail: Parser = async (csv, ctx) => {
   const rows = parseCsv(csv);
   if (rows.length === 0) return { rowCount: 0 };
 
+  // 标题关键字过滤(手动导入表单传入,爬虫上报一般不传)。
+  // 非空时:视频标题必须「同时包含」所有关键字(AND,不区分大小写)才入库。
+  const titleKeywords = parseKeywords(ctx.paramValues?.["titleKeywords"]);
+
   // 列头校验:按"必需列名是否都在"判断,不要求顺序。
   // 重复列名取最后一次出现的索引(Excel 偶尔会同名列,后面那个一般是真值)。
   const headers = rows[0].map((h) => h.trim());
@@ -106,6 +110,10 @@ export const parseDouyinVideoDetail: Parser = async (csv, ctx) => {
 
     const parsed = mapRow(row, headerIndex, r + 1);
     if (!parsed) continue;
+    // 标题关键字过滤:不含全部关键字的稿件不入库(空关键字时不过滤)
+    if (titleKeywords.length > 0 && !matchesAllKeywords(parsed.title, titleKeywords)) {
+      continue;
+    }
     dataRows.push(parsed);
 
     // 声明窗口(可选列,缺失则后面用 publishedAt 的 min/max 兜底)
@@ -341,6 +349,21 @@ function localDayStart(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/** 把「标题关键字」参数拆成小写关键字数组:逗号 / 顿号 / 空白均可分隔;空 → []。 */
+function parseKeywords(raw: unknown): string[] {
+  if (typeof raw !== "string") return [];
+  return raw
+    .split(/[,，、\s]+/)
+    .map((k) => k.trim().toLowerCase())
+    .filter((k) => k !== "");
+}
+
+/** 标题是否「同时包含」全部关键字(AND,不区分大小写)。keywords 需已小写。 */
+function matchesAllKeywords(title: string, keywords: string[]): boolean {
+  const t = title.toLowerCase();
+  return keywords.every((k) => t.includes(k));
+}
+
 function parseIntSafe(s: string | undefined): number {
   if (!s) return 0;
   // 容忍千分位逗号 / 空白
@@ -363,4 +386,6 @@ export const _testing = {
   parseChineseDate,
   parseDateOnly,
   parseIntSafe,
+  parseKeywords,
+  matchesAllKeywords,
 };

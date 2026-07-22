@@ -14,13 +14,17 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "eval:fc": "tsx scripts/eval-function-calling.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.14",
+    "@ai-sdk/react": "^4.0.37",
     "@base-ui/react": "^1.5.0",
     "@prisma/client": "^5.22.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@tanstack/react-table": "^8.21.3",
+    "ai": "^7.0.34",
     "argon2": "^0.41.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

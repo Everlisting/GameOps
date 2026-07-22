@@ -22,16 +22,31 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ImportResult = {
   rowCount: number;
   fileName: string;
 };
 
+// 平台下拉:value = 归一化平台码(与后端 ALLOWED_PLATFORMS 一致),label = 展示名
+const PLATFORM_OPTIONS = [
+  { value: "douyin", label: "Douyin" },
+  { value: "kuaishou", label: "KuaiShou" },
+  { value: "bilibili", label: "BiliBili" },
+] as const;
+
 export default function ImportStreamersButton() {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [file, setFile] = React.useState<File | null>(null);
+  const [platform, setPlatform] = React.useState<string>("douyin");
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<ImportResult | null>(null);
@@ -41,6 +56,7 @@ export default function ImportStreamersButton() {
     setOpen(next);
     if (!next) {
       setFile(null);
+      setPlatform("douyin");
       setError(null);
       setResult(null);
       setSubmitting(false);
@@ -56,6 +72,7 @@ export default function ImportStreamersButton() {
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("platform", platform);
       const res = await fetch("/api/operator/data/streamers/import", {
         method: "POST",
         body: fd,
@@ -89,8 +106,8 @@ export default function ImportStreamersButton() {
         <DialogHeader>
           <DialogTitle>导入主播名单</DialogTitle>
           <DialogDescription>
-            上传主播名单(.csv / .xlsx),按 平台 + UID upsert。
-            识别列:主播平台 / UID(必需)/ 主播昵称 / 抖音号 / 入会时间 / 团号 / 运营经纪人 / 招募经纪人 /(可选)粉丝量。
+            上传主播名单(.csv / .xlsx),按 平台 + UID upsert。平台由下方下拉选定,对整份名单生效。
+            识别列:UID(必需)/ 主播昵称 / 抖音号 / 入会时间 / 团号 / 运营经纪人 / 招募经纪人 /(可选)粉丝量。
             作品数、播放量等指标由页面按 UID 聚合明细,无需在名单里提供。
           </DialogDescription>
         </DialogHeader>
@@ -112,6 +129,26 @@ export default function ImportStreamersButton() {
           </div>
         ) : (
           <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label htmlFor="import-platform" className="text-sm font-medium">
+                平台
+              </label>
+              <Select value={platform} onValueChange={setPlatform}>
+                <SelectTrigger id="import-platform" className="w-full">
+                  <SelectValue placeholder="选择平台" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PLATFORM_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                整份名单按此平台入库,覆盖表内「主播平台」列。
+              </p>
+            </div>
             <input
               ref={inputRef}
               type="file"

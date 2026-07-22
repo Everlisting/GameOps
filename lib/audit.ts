@@ -36,7 +36,13 @@ export type AuditAction =
   | "opinion.trigger"       // ADMIN 触发生成一份报告
   | "opinion.rerun"         // ADMIN 用相同输入重跑
   | "opinion.delete"        // ADMIN 删除报告 + 产物
-  | "opinion.settings.update"; // ADMIN 改 LLM 配置
+  | "opinion.settings.update" // ADMIN 改 LLM 配置
+  // 阶段10 · AI 助手
+  | "assistant.chat"            // 一次对话
+  | "assistant.tool_call"       // 一次工具调用(10.2)
+  | "assistant.settings.update" // 改模型配置
+  | "kb.upload"                 // 知识库上传(10.3)
+  | "kb.delete";                // 知识库删除(10.3)
 
 export type AuditTargetType =
   | "task"
@@ -47,7 +53,11 @@ export type AuditTargetType =
   | "activity"   // 阶段5 · compute 落到 activity
   | "incentive"  // 阶段5 · adjust 落到 incentive
   | "opinion_task"       // 阶段9 · 舆情监控:一份报告 task
-  | "opinion_settings";  // 阶段9 · LLM 配置
+  | "opinion_settings"   // 阶段9 · LLM 配置
+  // 阶段10 · AI 助手
+  | "ai_conversation"    // 一次会话
+  | "ai_model_profile"   // 模型配置
+  | "knowledge_document"; // 知识库文档(10.3)
 
 export interface AuditOpts {
   /** 操作人 user.id;null = 系统(cron 自动触发) */
