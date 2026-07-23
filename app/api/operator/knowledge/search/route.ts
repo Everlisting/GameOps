@@ -11,6 +11,6 @@ export const runtime = "nodejs";
 export const POST = route(async (req) => {
   const session = await requireRole("OPERATOR");
   const { query, k } = await parseJson(req, knowledgeSearchApiSchema);
-  const hits = await searchKnowledge(query, k ?? 8, { isAdmin: session.role === "ADMIN" });
+  const hits = await searchKnowledge(query, k ?? 8, { role: session.role });
   return Response.json({ hits });
 });

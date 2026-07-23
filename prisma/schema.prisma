@@ -619,6 +619,7 @@ model AiConversation {
   title     String?
   status    String   @default("active") // active / archived
   pinned    Boolean  @default(false) // 置顶:列表按 pinned desc, updatedAt desc 排序
+  audience  String   @default("operator") // operator / creator(创作者对话仅保留 1 月)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -670,13 +671,14 @@ model AiRun {
 
 /// 阶段10.3 · 知识库(RAG)· 一个知识库 = 一组文档。
 model KnowledgeBase {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  visibleToAll Boolean  @default(true) // true=全体运营可见;false=仅管理员(per-KB 权限)
-  createdById  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  visibleToOperator Boolean  @default(true) // 运营(OPERATOR)可见
+  visibleToCreator  Boolean  @default(false) // 创作者(CREATOR)可见;ADMIN 恒可见
+  createdById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   documents KnowledgeDocument[]
 
@@ -748,12 +750,13 @@ model AiFeedback {
   conversationId  String?
   clientMessageId String?
   userId          String
-  rating          String // up / down
+  rating          String? // up / down;纯文本反馈可为空
   category        String?
   note            String?
   createdAt       DateTime @default(now())
 
   @@index([conversationId])
+  @@index([createdAt])
   @@map("ai_feedback")
 }
 

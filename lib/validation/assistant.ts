@@ -43,10 +43,15 @@ export const kbCreateSchema = z.object({
   description: z.string().trim().max(500).optional(),
 });
 
-/** PATCH /knowledge/bases/[id] 入参(权限切换) */
-export const kbPatchSchema = z.object({
-  visibleToAll: z.boolean(),
-});
+/** PATCH /knowledge/bases/[id] 入参(权限切换:运营 / 创作者,至少一项) */
+export const kbPatchSchema = z
+  .object({
+    visibleToOperator: z.boolean().optional(),
+    visibleToCreator: z.boolean().optional(),
+  })
+  .refine((v) => v.visibleToOperator !== undefined || v.visibleToCreator !== undefined, {
+    message: "无更新字段",
+  });
 
 /** POST /knowledge/search 入参 */
 export const knowledgeSearchApiSchema = z.object({
@@ -70,3 +75,14 @@ export const feedbackSchema = z.object({
   category: z.string().max(40).optional(),
   note: z.string().max(1000).optional(),
 });
+
+/** POST /creator/assistant/feedback 入参(评分或文本,至少一项) */
+export const creatorFeedbackSchema = z
+  .object({
+    conversationId: z.string().optional(),
+    rating: z.enum(["up", "down"]).optional(),
+    note: z.string().trim().max(1000).optional(),
+  })
+  .refine((v) => (v.note && v.note.length > 0) || v.rating !== undefined, {
+    message: "反馈内容不能为空",
+  });

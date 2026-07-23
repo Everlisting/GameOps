@@ -31,6 +31,7 @@ export async function startTurn(args: {
   conversationId?: string;
   userText: string;
   regenerateParentId?: string;
+  audience?: string; // operator(默认) / creator
 }): Promise<StartedTurn> {
   // 解析会话(不属本人 / 不存在 → 新建)
   let conversationId = args.conversationId;
@@ -43,7 +44,11 @@ export async function startTurn(args: {
   }
   if (!conversationId) {
     const conv = await prisma.aiConversation.create({
-      data: { userId: args.userId, title: args.userText.slice(0, 40) || "新对话" },
+      data: {
+        userId: args.userId,
+        title: args.userText.slice(0, 40) || "新对话",
+        audience: args.audience ?? "operator",
+      },
       select: { id: true },
     });
     conversationId = conv.id;

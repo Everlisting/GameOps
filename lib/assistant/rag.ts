@@ -5,7 +5,7 @@
  * MVP:所有 published 文档对全体 OPERATOR 可见(暂无 per-KB ACL,后续可加)。
  */
 import { randomUUID } from "node:crypto";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Role } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
 import { embedBatch, embedOne, toVectorLiteral } from "@/lib/assistant/embed";
@@ -90,14 +90,19 @@ export interface KnowledgeHit {
   score: number;
 }
 
-/** 向量检索 top-k(仅 published 文档);非 ADMIN 只看 visibleToAll 的知识库。 */
+/** 向量检索 top-k(仅 published 文档);按角色过滤知识库:ADMIN 全见,OPERATOR 看 visibleToOperator,CREATOR 看 visibleToCreator。 */
 export async function searchKnowledge(
   query: string,
   k = 5,
-  opts: { isAdmin?: boolean } = {},
+  opts: { role?: Role } = {},
 ): Promise<KnowledgeHit[]> {
   const vec = toVectorLiteral(await embedOne(query));
-  const aclCond = opts.isAdmin ? Prisma.empty : Prisma.sql`AND b."visibleToAll" = true`;
+  const aclCond =
+    opts.role === "ADMIN"
+      ? Prisma.empty
+      : opts.role === "CREATOR"
+        ? Prisma.sql`AND b."visibleToCreator" = true`
+        : Prisma.sql`AND b."visibleToOperator" = true`;
   return prisma.$queryRaw<KnowledgeHit[]>(Prisma.sql`
     SELECT c.id AS "chunkId", c.content, c."documentId", d.title, b.name AS "kbName",
            round((1 - (c.embedding <=> ${vec}::vector))::numeric, 4)::float8 AS score

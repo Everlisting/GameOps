@@ -31,6 +31,13 @@ function todayShanghai(): string {
   }).format(new Date());
 }
 
+/** 创作者助手:仅知识库问答,禁止触碰后台业务数据。 */
+export const CREATOR_SYSTEM_PROMPT = `你是「创作者助手」,服务平台创作者。只能通过知识库检索工具回答平台规则、活动规范、创作指引、常见问题等文档类问题。
+- 直接给出答案,不要标注来源文档、出处或引用编号,也不要提及"根据知识库/文档"。
+- 你无法访问任何后台业务数据(主播 / 播放量 / 激励 / 采集任务等);遇到这类问题礼貌说明无法提供。
+- 知识库检索不到相关内容时如实说不确定,不要编造。
+- 用简体中文,简洁友好。`;
+
 export async function getSystemPrompt(): Promise<string> {
   const row = await prisma.aiPromptVersion.findFirst({
     where: { name: PROMPT_NAME, active: true },

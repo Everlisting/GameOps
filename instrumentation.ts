@@ -16,7 +16,7 @@ export async function register() {
     console.error("[instrumentation] cron-scheduler 启动失败", err);
   }
 
-  // 90 天日志清理(每天 03:00 北京时间)
+  // 90 天日志清理(每天 03:00 北京时间);创作者对话保留 1 月清理(03:30)
   try {
     const { default: cron } = await import("node-cron");
     const { cleanupOldLogs } = await import("@/lib/log-cleanup");
@@ -25,6 +25,16 @@ export async function register() {
       () => {
         void cleanupOldLogs().catch((err) =>
           console.error("[log-cleanup] 失败", err),
+        );
+      },
+      { scheduled: true, timezone: "Asia/Shanghai" },
+    );
+    const { cleanupOldCreatorChats } = await import("@/lib/assistant/retention");
+    cron.schedule(
+      "30 3 * * *",
+      () => {
+        void cleanupOldCreatorChats().catch((err) =>
+          console.error("[creator-chat-retention] 失败", err),
         );
       },
       { scheduled: true, timezone: "Asia/Shanghai" },

@@ -25,7 +25,8 @@ interface Base {
   id: string;
   name: string;
   description: string | null;
-  visibleToAll: boolean;
+  visibleToOperator: boolean;
+  visibleToCreator: boolean;
   createdAt: string;
   documents: Doc[];
 }
@@ -127,11 +128,14 @@ export function KnowledgePanel() {
     await load();
   }
 
-  async function toggleVisibility(id: string, visibleToAll: boolean) {
+  async function patchVisibility(
+    id: string,
+    patch: { visibleToOperator?: boolean; visibleToCreator?: boolean },
+  ) {
     await fetch(`/api/operator/knowledge/bases/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ visibleToAll }),
+      body: JSON.stringify(patch),
     });
     await load();
   }
@@ -181,13 +185,22 @@ export function KnowledgePanel() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">可见:</span>
                 <Button
-                  variant="outline"
+                  variant={b.visibleToOperator ? "default" : "outline"}
                   size="sm"
-                  title="切换可见范围"
-                  onClick={() => void toggleVisibility(b.id, !b.visibleToAll)}
+                  title="运营是否可见"
+                  onClick={() => void patchVisibility(b.id, { visibleToOperator: !b.visibleToOperator })}
                 >
-                  {b.visibleToAll ? "全体可见" : "仅管理员"}
+                  运营
+                </Button>
+                <Button
+                  variant={b.visibleToCreator ? "default" : "outline"}
+                  size="sm"
+                  title="创作者是否可见"
+                  onClick={() => void patchVisibility(b.id, { visibleToCreator: !b.visibleToCreator })}
+                >
+                  创作者
                 </Button>
                 <label>
                   <input

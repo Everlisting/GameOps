@@ -17,7 +17,11 @@ interface Hit {
   score: number;
 }
 
-export function KnowledgeSearch() {
+export function KnowledgeSearch({
+  endpoint = "/api/operator/knowledge/search",
+}: {
+  endpoint?: string;
+}) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [busy, setBusy] = useState(false);
@@ -30,7 +34,7 @@ export function KnowledgeSearch() {
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch("/api/operator/knowledge/search", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),

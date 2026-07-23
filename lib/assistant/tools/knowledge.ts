@@ -12,7 +12,7 @@ export function knowledgeSearchTool(session: SessionPayload) {
     description: TOOL_DEFS.knowledgeSearch.description,
     inputSchema: TOOL_DEFS.knowledgeSearch.input,
     execute: async ({ query, k }) => {
-      const hits = await searchKnowledge(query, k ?? 5, { isAdmin: session.role === "ADMIN" });
+      const hits = await searchKnowledge(query, k ?? 5, { role: session.role });
       return {
         data: hits.map((h) => ({
           title: h.title,

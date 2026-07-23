@@ -10,15 +10,18 @@ import { kbPatchSchema } from "@/lib/validation/assistant";
 
 export const runtime = "nodejs";
 
-/** 切换 per-KB 权限(全体运营可见 / 仅管理员)。ADMIN。 */
+/** 切换 per-KB 权限(运营可见 / 创作者可见;ADMIN 恒可见)。ADMIN。 */
 export const PATCH = route(async (req, { params }) => {
   await requireRole("ADMIN");
   const id = params?.id;
   if (!id) throw badRequest("缺少 id");
-  const { visibleToAll } = await parseJson(req, kbPatchSchema);
+  const input = await parseJson(req, kbPatchSchema);
   const kb = await prisma.knowledgeBase.findUnique({ where: { id }, select: { id: true } });
   if (!kb) throw new AppError("NOT_FOUND", "知识库不存在");
-  await prisma.knowledgeBase.update({ where: { id }, data: { visibleToAll } });
+  const data: { visibleToOperator?: boolean; visibleToCreator?: boolean } = {};
+  if (input.visibleToOperator !== undefined) data.visibleToOperator = input.visibleToOperator;
+  if (input.visibleToCreator !== undefined) data.visibleToCreator = input.visibleToCreator;
+  await prisma.knowledgeBase.update({ where: { id }, data });
   return Response.json({ ok: true });
 });
 

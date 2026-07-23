@@ -122,6 +122,7 @@ function buildAssistantItem(isAdmin: boolean): NavItem {
     items: [
       { title: "对话", url: "/operator/assistant" },
       { title: "知识检索", url: "/operator/assistant/search" },
+      { title: "反馈", url: "/operator/assistant/feedback" },
       ...(isAdmin
         ? [
             { title: "知识库", url: "/operator/assistant/knowledge" },

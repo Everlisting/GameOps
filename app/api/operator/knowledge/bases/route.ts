@@ -17,7 +17,8 @@ export const GET = route(async () => {
       id: true,
       name: true,
       description: true,
-      visibleToAll: true,
+      visibleToOperator: true,
+      visibleToCreator: true,
       createdAt: true,
       documents: {
         orderBy: { createdAt: "desc" },

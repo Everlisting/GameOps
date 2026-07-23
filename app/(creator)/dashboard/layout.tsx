@@ -5,8 +5,10 @@
  */
 import { prisma } from "@/lib/db";
 import { requireCreator } from "@/lib/creator";
+import { readPublicProfile } from "@/lib/assistant/settings";
 import DashboardAside from "./_components/DashboardAside";
 import DashboardShell from "./_components/DashboardShell";
+import { CreatorAssistantWidget } from "./_components/CreatorAssistantWidget";
 
 function toISODateLocal(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -20,6 +22,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { creator } = await requireCreator();
+  const chatCfg = await readPublicProfile("chat");
 
   const [enrollmentCount, submissionStats, calendarEnrollments] =
     await Promise.all([
@@ -51,15 +54,18 @@ export default async function DashboardLayout({
   );
 
   return (
-    <DashboardShell
-      sidebar={
-        <DashboardAside
-          stats={{ enrolled: enrollmentCount, submissions, approved, pending }}
-          calendarDates={calendarDates}
-        />
-      }
-    >
-      {children}
-    </DashboardShell>
+    <>
+      <DashboardShell
+        sidebar={
+          <DashboardAside
+            stats={{ enrolled: enrollmentCount, submissions, approved, pending }}
+            calendarDates={calendarDates}
+          />
+        }
+      >
+        {children}
+      </DashboardShell>
+      <CreatorAssistantWidget configured={chatCfg.configured} />
+    </>
   );
 }
