@@ -40,4 +40,12 @@ export async function register() {
   } catch (err) {
     console.error("[instrumentation] opinion.downloader 启动失败", err);
   }
+
+  // 阶段10.3 · 知识库:后台异步索引 worker(解析/OCR/嵌入)
+  try {
+    const { startIndexer } = await import("@/lib/assistant/indexer");
+    startIndexer();
+  } catch (err) {
+    console.error("[instrumentation] kb-indexer 启动失败", err);
+  }
 }

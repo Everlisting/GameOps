@@ -37,6 +37,23 @@ export const activateSchema = z.object({
   messageId: z.string().min(1),
 });
 
+/** POST /knowledge/bases 入参 */
+export const kbCreateSchema = z.object({
+  name: z.string().trim().min(1, "名称不能为空").max(60),
+  description: z.string().trim().max(500).optional(),
+});
+
+/** PATCH /knowledge/bases/[id] 入参(权限切换) */
+export const kbPatchSchema = z.object({
+  visibleToAll: z.boolean(),
+});
+
+/** POST /knowledge/search 入参 */
+export const knowledgeSearchApiSchema = z.object({
+  query: z.string().trim().min(1, "请输入检索词"),
+  k: z.number().int().min(1).max(20).optional(),
+});
+
 /** PATCH /conversations/[id] 入参(置顶 / 重命名,至少一项) */
 export const conversationPatchSchema = z
   .object({

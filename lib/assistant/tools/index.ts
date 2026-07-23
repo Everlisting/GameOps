@@ -13,14 +13,16 @@ import {
   crawlerTaskStatusTool,
 } from "@/lib/assistant/tools/data";
 import { activitySummaryTool, incentiveExplainTool } from "@/lib/assistant/tools/activity";
+import { knowledgeSearchTool } from "@/lib/assistant/tools/knowledge";
 
-// session 暂未用于收窄(全部 OPERATOR 只读);保留形参以便后续加 ADMIN/写工具时按角色过滤。
-export function makeTools(_session: SessionPayload) {
+// 数据工具全 OPERATOR 只读;knowledge_search 按 session.role 收窄可见知识库(per-KB 权限)。
+export function makeTools(session: SessionPayload) {
   return {
     [TOOL_DEFS.streamerProfile.name]: streamerProfileTool(),
     [TOOL_DEFS.videoSummary.name]: videoSummaryTool(),
     [TOOL_DEFS.activitySummary.name]: activitySummaryTool(),
     [TOOL_DEFS.incentiveExplain.name]: incentiveExplainTool(),
     [TOOL_DEFS.crawlerTaskStatus.name]: crawlerTaskStatusTool(),
+    [TOOL_DEFS.knowledgeSearch.name]: knowledgeSearchTool(session),
   };
 }

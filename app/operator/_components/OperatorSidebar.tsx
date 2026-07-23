@@ -121,8 +121,10 @@ function buildAssistantItem(isAdmin: boolean): NavItem {
     icon: Bot,
     items: [
       { title: "对话", url: "/operator/assistant" },
+      { title: "知识检索", url: "/operator/assistant/search" },
       ...(isAdmin
         ? [
+            { title: "知识库", url: "/operator/assistant/knowledge" },
             { title: "用量统计", url: "/operator/assistant/usage" },
             { title: "模型设置", url: "/operator/assistant/settings" },
           ]

@@ -55,6 +55,11 @@ export const crawlerTaskStatusInput = z.object({
   limit: z.number().int().min(1).max(50).optional().describe("返回条数,默认 20"),
 });
 
+export const knowledgeSearchInput = z.object({
+  query: z.string().min(1).describe("要检索的问题或关键词"),
+  k: z.number().int().min(1).max(10).optional().describe("返回条数,默认 5"),
+});
+
 /** 工具定义(名称 + 描述 + 入参),压测与真实工具共用。描述写清「何时调用」以帮助较弱模型选对工具。 */
 export const TOOL_DEFS = {
   streamerProfile: {
@@ -86,6 +91,12 @@ export const TOOL_DEFS = {
     description:
       "查询爬虫采集任务的状态、失败原因和日志摘要。当用户问任务是否失败/卡住/最近执行情况时调用。只读。",
     input: crawlerTaskStatusInput,
+  },
+  knowledgeSearch: {
+    name: "knowledge_search",
+    description:
+      "检索企业知识库(运营手册 / 活动规则 / SOP / 平台政策 / 历史复盘等文档)。当用户问制度、规则、流程、政策、复盘结论等文档类问题时调用;返回相关片段与来源文档,回答时须标注来源文档标题。",
+    input: knowledgeSearchInput,
   },
 } as const;
 

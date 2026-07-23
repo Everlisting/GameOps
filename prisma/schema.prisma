@@ -668,6 +668,62 @@ model AiRun {
   @@map("ai_run")
 }
 
+/// 阶段10.3 · 知识库(RAG)· 一个知识库 = 一组文档。
+model KnowledgeBase {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  visibleToAll Boolean  @default(true) // true=全体运营可见;false=仅管理员(per-KB 权限)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  documents KnowledgeDocument[]
+
+  @@map("knowledge_base")
+}
+
+/// 阶段10.3 · 知识库文档。原文件留底可选;解析后切块入 KnowledgeChunk。
+model KnowledgeDocument {
+  id          String   @id @default(cuid())
+  kbId        String
+  title       String
+  source      String // upload / manual ...
+  mimeType    String
+  storagePath String? // 原文件留底路径(MVP 可空)
+  status      String   @default("pending") // pending / indexing / published / failed
+  error       String?
+  chunkCount  Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  kb     KnowledgeBase    @relation(fields: [kbId], references: [id], onDelete: Cascade)
+  chunks KnowledgeChunk[]
+
+  @@index([kbId, status])
+  @@map("knowledge_document")
+}
+
+/// 阶段10.3 · 切块 + 向量。embedding 为 pgvector 列(维度随嵌入模型,默认 1024:百炼 text-embedding-v3 / bge-m3)。
+/// HNSW 余弦索引在迁移里手写(Prisma Unsupported 不建索引)。
+model KnowledgeChunk {
+  id         String                       @id @default(cuid())
+  documentId String
+  kbId       String // 冗余,检索按 kb 过滤用
+  ordinal    Int
+  content    String
+  embedding  Unsupported("vector(1024)")?
+  tokenCount Int?
+  createdAt  DateTime                     @default(now())
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, ordinal])
+  @@index([kbId])
+  @@map("knowledge_chunk")
+}
+
 /// 阶段10.2 · AI 助手 · 一次工具调用轨迹(工具名 / 入参 / 结果摘要)。
 model AiToolCall {
   id            String   @id @default(cuid())

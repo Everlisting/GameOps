@@ -23,7 +23,13 @@ export interface CurrentProfile {
   configured: boolean;
 }
 
-export function ModelSettingsForm({ current }: { current: CurrentProfile }) {
+export function ModelSettingsForm({
+  current,
+  usage,
+}: {
+  current: CurrentProfile;
+  usage: "chat" | "embedding";
+}) {
   const [provider, setProvider] = useState(current.provider);
   const [model, setModel] = useState(current.model);
   const [baseUrl, setBaseUrl] = useState(current.baseUrl);
@@ -37,7 +43,7 @@ export function ModelSettingsForm({ current }: { current: CurrentProfile }) {
     setErr(null);
     setOk(false);
     try {
-      const res = await fetch("/api/operator/assistant/settings?usage=chat", {
+      const res = await fetch(`/api/operator/assistant/settings?usage=${usage}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -71,11 +77,11 @@ export function ModelSettingsForm({ current }: { current: CurrentProfile }) {
   return (
     <Card className="max-w-2xl space-y-5 p-6">
       <div>
-        <Label htmlFor="ai-set-provider" className="mb-1.5 block text-xs">
+        <Label htmlFor={`ai-${usage}-provider`} className="mb-1.5 block text-xs">
           Provider *
         </Label>
         <Input
-          id="ai-set-provider"
+          id={`ai-${usage}-provider`}
           value={provider}
           onChange={(e) => setProvider(e.target.value)}
           maxLength={32}
@@ -87,36 +93,40 @@ export function ModelSettingsForm({ current }: { current: CurrentProfile }) {
       </div>
 
       <div>
-        <Label htmlFor="ai-set-model" className="mb-1.5 block text-xs">
+        <Label htmlFor={`ai-${usage}-model`} className="mb-1.5 block text-xs">
           Model *
         </Label>
         <Input
-          id="ai-set-model"
+          id={`ai-${usage}-model`}
           value={model}
           onChange={(e) => setModel(e.target.value)}
           maxLength={64}
-          placeholder="如 qwen-max / qwen-plus"
+          placeholder={usage === "embedding" ? "如 text-embedding-v3 / bge-m3" : "如 qwen-max / qwen-plus"}
         />
       </div>
 
       <div>
-        <Label htmlFor="ai-set-base" className="mb-1.5 block text-xs">
+        <Label htmlFor={`ai-${usage}-base`} className="mb-1.5 block text-xs">
           Base URL *(OpenAI 兼容端点)
         </Label>
         <Input
-          id="ai-set-base"
+          id={`ai-${usage}-base`}
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder="如 https://dashscope.aliyuncs.com/compatible-mode/v1"
+          placeholder={
+            usage === "embedding"
+              ? "如 https://dashscope.aliyuncs.com/compatible-mode/v1(维度须 1024)"
+              : "如 https://dashscope.aliyuncs.com/compatible-mode/v1"
+          }
         />
       </div>
 
       <div>
-        <Label htmlFor="ai-set-key" className="mb-1.5 block text-xs">
+        <Label htmlFor={`ai-${usage}-key`} className="mb-1.5 block text-xs">
           API Key *
         </Label>
         <Input
-          id="ai-set-key"
+          id={`ai-${usage}-key`}
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}

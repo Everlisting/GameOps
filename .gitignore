@@ -15,3 +15,9 @@ data/raw/**/*
 # 阶段9 · 舆情监控 报告产物(HTML + JSON),中台从分析服务拉回后落这里
 storage/opinion-reports/**/*
 !storage/opinion-reports/.gitkeep
+
+# 阶段10.3 · 知识库上传原文件留底
+storage/knowledge/**/*
+
+# tesseract OCR 运行时下载的语言包(落 CWD)
+*.traineddata
