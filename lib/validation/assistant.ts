@@ -28,7 +28,22 @@ const uiMessageSchema = z
 export const chatInputSchema = z.object({
   conversationId: z.string().optional(),
   messages: z.array(uiMessageSchema).min(1, "messages 不能为空"),
+  /** 重试时传入被重试的用户消息 id(其 parent):则新增一个助手版本而非新开一轮 */
+  regenerateParentId: z.string().optional(),
 });
+
+/** POST /messages/activate 入参 */
+export const activateSchema = z.object({
+  messageId: z.string().min(1),
+});
+
+/** PATCH /conversations/[id] 入参(置顶 / 重命名,至少一项) */
+export const conversationPatchSchema = z
+  .object({
+    pinned: z.boolean().optional(),
+    title: z.string().trim().min(1, "标题不能为空").max(100, "标题过长").optional(),
+  })
+  .refine((v) => v.pinned !== undefined || v.title !== undefined, { message: "无更新字段" });
 
 /** POST /feedback 入参 */
 export const feedbackSchema = z.object({

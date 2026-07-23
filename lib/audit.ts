@@ -41,6 +41,7 @@ export type AuditAction =
   | "assistant.chat"            // 一次对话
   | "assistant.tool_call"       // 一次工具调用(10.2)
   | "assistant.settings.update" // 改模型配置
+  | "assistant.conversation.delete" // 删除会话
   | "kb.upload"                 // 知识库上传(10.3)
   | "kb.delete";                // 知识库删除(10.3)
 

@@ -11,9 +11,9 @@ export const GET = route(async () => {
   const session = await requireRole("OPERATOR");
   const conversations = await prisma.aiConversation.findMany({
     where: { userId: session.sub, status: "active" },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
     take: 50,
-    select: { id: true, title: true, updatedAt: true },
+    select: { id: true, title: true, updatedAt: true, pinned: true },
   });
   return Response.json({ conversations });
 });

@@ -57,7 +57,8 @@
       "Bash(npx tsx *)",
       "Skill(claude-api)",
       "PowerShell(pnpm add *)",
-      "PowerShell(Select-String *)"
+      "PowerShell(Select-String *)",
+      "Bash(pnpm exec *)"
     ]
   }
 }
