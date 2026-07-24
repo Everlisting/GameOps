@@ -38,6 +38,29 @@ export const videoSummaryInput = z.object({
   publishedTo: dateStr.optional().describe("统计窗口止"),
 });
 
+export const videoRankInput = z.object({
+  dateFrom: dateStr
+    .optional()
+    .describe("统计窗口起(YYYY-MM-DD;缺省=本月)。播放/点赞等按视频发布日期;增长类按数据观察日期(每日快照)"),
+  dateTo: dateStr.optional().describe("统计窗口止(YYYY-MM-DD)"),
+  sortBy: z
+    .enum([
+      "views",
+      "recommendedViews",
+      "likes",
+      "comments",
+      "shares",
+      "fansGained",
+      "viewsGrowth",
+      "viewsGrowthRate",
+    ])
+    .optional()
+    .describe("排序指标,默认 views。viewsGrowth=观察期播放量净增;viewsGrowthRate=净增率"),
+  order: z.enum(["asc", "desc"]).optional().describe("排序方向,默认 desc"),
+  limit: z.number().int().min(1).max(50).optional().describe("返回条数,默认 10,最大 50"),
+  q: z.string().optional().describe("作品标题 / 创作者昵称 模糊搜索"),
+});
+
 export const activitySummaryInput = z.object({
   activityId: z.string().optional().describe("活动 id;不填=列出近期活动概览"),
 });
@@ -77,6 +100,12 @@ export const TOOL_DEFS = {
     description:
       "统计视频总量指标(总播放量、稿件数等)。当用户问某时间段视频的整体播放量/稿件数/趋势时调用。只读。",
     input: videoSummaryInput,
+  },
+  videoRank: {
+    name: "data_video_rank",
+    description:
+      "查询/排名单条作品(视频)。当用户问 TOP N 作品、某作品的播放/点赞排名、或作品播放量增长(率)时调用——这是作品级(单条视频)接口,区别于 data_streamer_profile(主播级汇总)、data_video_summary(总量)。支持按 播放/推荐播放/点赞/评论/分享/涨粉 排序,以及 viewsGrowth / viewsGrowthRate(基于每日快照的观察期净增/净增率,需窗口内有多天快照数据)。只读。",
+    input: videoRankInput,
   },
   activitySummary: {
     name: "activity_summary",

@@ -138,6 +138,109 @@ export function videoSummaryTool() {
   });
 }
 
+export function videoRankTool() {
+  return tool({
+    description: TOOL_DEFS.videoRank.description,
+    inputSchema: TOOL_DEFS.videoRank.input,
+    execute: async (input) => {
+      const { start, end, month } = resolveWindow(input.dateFrom, input.dateTo);
+      const limit = input.limit ?? 10;
+      const order = input.order === "asc" ? "asc" : "desc";
+      const sortBy = input.sortBy ?? "views";
+      const asOf = new Date().toISOString();
+      const scope = { dateFrom: input.dateFrom ?? month, dateTo: input.dateTo ?? null, sortBy, order };
+
+      // 增长类:基于 DailyVideoStat 观察期(快照日期窗口)播放量净增 = 期末 − 期初(按 externalId)
+      if (sortBy === "viewsGrowth" || sortBy === "viewsGrowthRate") {
+        const dir = order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+        const orderCol = sortBy === "viewsGrowthRate" ? Prisma.sql`growth_rate` : Prisma.sql`growth`;
+        const snapConds: Prisma.Sql[] = [];
+        if (start) snapConds.push(Prisma.sql`d."snapshotDate" >= ${start}`);
+        if (end) snapConds.push(Prisma.sql`d."snapshotDate" < ${end}`);
+        const snapWhere = snapConds.length ? Prisma.sql`WHERE ${Prisma.join(snapConds, " AND ")}` : Prisma.empty;
+        const qCond = input.q
+          ? Prisma.sql`AND (v."title" ILIKE ${"%" + input.q + "%"} OR v."creatorName" ILIKE ${"%" + input.q + "%"})`
+          : Prisma.empty;
+        // 净增率排序时排除期初为 0 的(避免 0→N 的无穷大率)
+        const rateFilter = sortBy === "viewsGrowthRate" ? Prisma.sql`AND w.first_v > 0` : Prisma.empty;
+
+        const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+          WITH w AS (
+            SELECT d."platform", d."externalId",
+                   (array_agg(d."views" ORDER BY d."snapshotDate" DESC))[1] AS last_v,
+                   (array_agg(d."views" ORDER BY d."snapshotDate" ASC))[1]  AS first_v,
+                   COUNT(*)::int AS snaps
+            FROM "DailyVideoStat" d
+            ${snapWhere}
+            GROUP BY d."platform", d."externalId"
+          )
+          SELECT v."title", v."creatorName" AS creator, v."externalId", v."url",
+                 v."views"::int              AS views,
+                 (w.last_v - w.first_v)::int AS growth,
+                 CASE WHEN w.first_v > 0
+                      THEN round((w.last_v - w.first_v)::numeric / w.first_v, 4)::float8
+                      ELSE NULL END          AS "growthRate",
+                 w.snaps                     AS snaps
+          FROM w
+          JOIN "VideoStat" v
+            ON v."platform" = w."platform" AND v."externalId" = w."externalId" AND v."hidden" = false
+          WHERE 1=1 ${qCond} ${rateFilter}
+          ORDER BY ${orderCol} ${dir} NULLS LAST
+          LIMIT ${limit}`);
+
+        return {
+          data: rows,
+          asOf,
+          scope: { ...scope, note: "增长=观察期内(按每日快照)播放量净增,需窗口内有多天快照;单快照则为 0" },
+          source: "DailyVideoStat(每日快照) + VideoStat(hidden=false)",
+          links: ["/operator/data/videos"],
+        };
+      }
+
+      // 标准指标:VideoStat 按发布日期窗口直接排名
+      const where: Prisma.VideoStatWhereInput = {
+        hidden: false,
+        ...(start || end
+          ? { publishedAt: { ...(start ? { gte: start } : {}), ...(end ? { lt: end } : {}) } }
+          : {}),
+        ...(input.q
+          ? {
+              OR: [
+                { title: { contains: input.q, mode: "insensitive" } },
+                { creatorName: { contains: input.q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
+      const rows = await prisma.videoStat.findMany({
+        where,
+        orderBy: { [sortBy]: order } as Prisma.VideoStatOrderByWithRelationInput,
+        take: limit,
+        select: {
+          title: true,
+          creatorName: true,
+          externalId: true,
+          url: true,
+          views: true,
+          recommendedViews: true,
+          likes: true,
+          comments: true,
+          shares: true,
+          fansGained: true,
+          publishedAt: true,
+        },
+      });
+      return {
+        data: rows.map((r) => ({ ...r, creator: r.creatorName })),
+        asOf,
+        scope,
+        source: "VideoStat(hidden=false)",
+        links: ["/operator/data/videos"],
+      };
+    },
+  });
+}
+
 export function crawlerTaskStatusTool() {
   return tool({
     description: TOOL_DEFS.crawlerTaskStatus.description,

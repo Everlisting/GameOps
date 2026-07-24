@@ -12,6 +12,7 @@ import { TOOL_DEFS } from "@/lib/assistant/tools/schemas";
 import {
   streamerProfileTool,
   videoSummaryTool,
+  videoRankTool,
   crawlerTaskStatusTool,
 } from "@/lib/assistant/tools/data";
 import { activitySummaryTool, incentiveExplainTool } from "@/lib/assistant/tools/activity";
@@ -50,6 +51,7 @@ export function makeTools(session: SessionPayload, ctx: ToolContext = {}) {
   return wrapJsonSafe({
     [TOOL_DEFS.streamerProfile.name]: streamerProfileTool(),
     [TOOL_DEFS.videoSummary.name]: videoSummaryTool(),
+    [TOOL_DEFS.videoRank.name]: videoRankTool(),
     [TOOL_DEFS.activitySummary.name]: activitySummaryTool(),
     [TOOL_DEFS.incentiveExplain.name]: incentiveExplainTool(),
     [TOOL_DEFS.crawlerTaskStatus.name]: crawlerTaskStatusTool(),

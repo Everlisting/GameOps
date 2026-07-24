@@ -112,6 +112,18 @@ function makeMockTools(record: RecordFn): ToolSet {
         };
       },
     }),
+    [TOOL_DEFS.videoRank.name]: tool({
+      description: TOOL_DEFS.videoRank.description,
+      inputSchema: TOOL_DEFS.videoRank.input,
+      execute: async (args) => {
+        const a = args as Record<string, unknown>;
+        record(TOOL_DEFS.videoRank.name, a);
+        return {
+          data: [{ title: "示例作品A", creator: "示例主播", views: 999999, growth: 12345, growthRate: 0.42 }],
+          asOf,
+        };
+      },
+    }),
     [TOOL_DEFS.crawlerTaskStatus.name]: tool({
       description: TOOL_DEFS.crawlerTaskStatus.description,
       inputSchema: TOOL_DEFS.crawlerTaskStatus.input,

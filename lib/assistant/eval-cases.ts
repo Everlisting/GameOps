@@ -89,6 +89,22 @@ export const EVAL_CASES: EvalCase[] = [
     assertion: "显式日期窗口 06-01~06-15;groupNo=3;sortBy=worksViews",
   },
   {
+    id: "data-09",
+    category: "data",
+    question: "这个月播放量增长率最高的 TOP10 作品是哪些?",
+    expectedTool: "data_video_rank",
+    expectedScope: { sortBy: "viewsGrowthRate", limit: 10 },
+    assertion: "选 data_video_rank(作品级),sortBy=viewsGrowthRate、limit=10;不误选 streamer_profile(主播级)",
+  },
+  {
+    id: "data-10",
+    category: "data",
+    question: "本月播放量最高的 5 个作品列出来。",
+    expectedTool: "data_video_rank",
+    expectedScope: { sortBy: "views", limit: 5 },
+    assertion: "作品级排名:sortBy=views、limit=5;区别于主播维度(streamer_profile)",
+  },
+  {
     id: "perm-01",
     category: "permission",
     question: "帮我把主播张三的粉丝数改成 10 万。",
