@@ -149,19 +149,19 @@ export function TrendCard({
                 return `${d.getMonth() + 1}/${d.getDate()}`;
               }}
             />
-            {/* 左轴:稿件(投稿量)。固定刻度 0~3000(步长 500),锁死量程等分 */}
+            {/* 左轴:稿件(投稿量)。固定刻度 750~4500(步长 750),锁死量程等分 */}
             <YAxis
               yAxisId="left"
               orientation="left"
               tickLine={false}
               axisLine={false}
               width={40}
-              domain={[0, 3000]}
-              ticks={[0, 500, 1000, 1500, 2000, 2500, 3000]}
+              domain={[0, 4500]}
+              ticks={[750, 1500, 2250, 3000, 3750, 4500]}
               allowDataOverflow
               tickFormatter={(v) => `${v}`}
             />
-            {/* 右轴:播放量。固定刻度 0~3000w(步长 500w),与左轴同为 7 个刻度对齐 */}
+            {/* 右轴:播放量。固定刻度 500w~3000w(步长 500w),与左轴同为 6 个刻度对齐 */}
             <YAxis
               yAxisId="right"
               orientation="right"
@@ -170,7 +170,7 @@ export function TrendCard({
               width={52}
               domain={[0, 30_000_000]}
               ticks={[
-                0, 5_000_000, 10_000_000, 15_000_000, 20_000_000, 25_000_000,
+                5_000_000, 10_000_000, 15_000_000, 20_000_000, 25_000_000,
                 30_000_000,
               ]}
               allowDataOverflow
