@@ -60,6 +60,10 @@ export const knowledgeSearchInput = z.object({
   k: z.number().int().min(1).max(10).optional().describe("返回条数,默认 5"),
 });
 
+export const incentiveComputeInput = z.object({
+  activityId: z.string().describe("要重算激励的活动 id(可先用 activity_summary 定位)"),
+});
+
 /** 工具定义(名称 + 描述 + 入参),压测与真实工具共用。描述写清「何时调用」以帮助较弱模型选对工具。 */
 export const TOOL_DEFS = {
   streamerProfile: {
@@ -97,6 +101,12 @@ export const TOOL_DEFS = {
     description:
       "检索企业知识库(运营手册 / 活动规则 / SOP / 平台政策 / 历史复盘等文档)。当用户问制度、规则、流程、政策、复盘结论等文档类问题时调用;返回相关片段与来源文档,回答时须标注来源文档标题。",
     input: knowledgeSearchInput,
+  },
+  incentiveCompute: {
+    name: "incentive_compute",
+    description:
+      "【写操作·需人工审批】发起「全活动重算预估激励」。当用户要求重新计算/刷新某活动的激励预估时调用。**每次这类请求都必须实际调用本工具生成一条新的待审批**——严禁凭记忆复述、复用历史审批单号或直接编造审批结果。此工具不会立即执行,只生成待审批,须运营点击「批准」后才真正重算。需要 activityId(可先用 activity_summary 定位)。",
+    input: incentiveComputeInput,
   },
 } as const;
 

@@ -76,6 +76,11 @@ export const feedbackSchema = z.object({
   note: z.string().max(1000).optional(),
 });
 
+/** POST /assistant/approvals/[id]/decision 入参(批准 / 拒绝) */
+export const approvalDecisionSchema = z.object({
+  decision: z.enum(["approve", "reject"]),
+});
+
 /** POST /creator/assistant/feedback 入参(评分或文本,至少一项) */
 export const creatorFeedbackSchema = z
   .object({

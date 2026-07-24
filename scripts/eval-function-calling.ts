@@ -34,6 +34,7 @@ function todayShanghai(): string {
 const SYSTEM = `你是运营数据助手。回答用户问题时,只能通过提供的工具获取数据:选择最合适的工具并填好参数。
 - 需要多步时(例如先定位活动、再解释激励),按需依次调用工具。
 - 若用户要求修改数据(如改粉丝数),你没有对应工具,不要调用任何工具,直接说明无权修改。
+- 涉及"重算激励"等有对应写工具的操作,调用该写工具(它只生成待审批提案、不会立即执行);调用后如实告知用户"已提交待审批,需在中台批准",不要谎称已完成。
 - 未指定日期时,涉及统计的工具走其默认口径(本月)。
 
 当前日期:${todayShanghai()}(Asia/Shanghai)。遇到"本月""上月""最近 N 天"等相对时间时,据此计算具体日期窗口:"本月"可省略日期参数,"上月"须传上一自然月的起止日。`;
@@ -118,6 +119,21 @@ function makeMockTools(record: RecordFn): ToolSet {
         const a = args as Record<string, unknown>;
         record(TOOL_DEFS.crawlerTaskStatus.name, a);
         return { data: [{ id: "task_1", status: a.status ?? "FAILED", error: "命令非零退出" }], asOf };
+      },
+    }),
+    // 写工具(10.4):mock 只回「已生成待审批」,不执行——验模型是否选对写工具且不谎称已完成。
+    [TOOL_DEFS.incentiveCompute.name]: tool({
+      description: TOOL_DEFS.incentiveCompute.description,
+      inputSchema: TOOL_DEFS.incentiveCompute.input,
+      execute: async (args) => {
+        const a = args as Record<string, unknown>;
+        record(TOOL_DEFS.incentiveCompute.name, a);
+        return {
+          ok: true,
+          approvalId: "ap_demo",
+          status: "pending",
+          message: "已生成待审批操作,尚未执行,需运营在中台批准。",
+        };
       },
     }),
   };

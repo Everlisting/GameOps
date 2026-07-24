@@ -25,6 +25,15 @@ function textOf(content: Prisma.JsonValue): string {
   return "";
 }
 
+/** 助手消息若关联了一条待审批(写工具),content 里存 approvalId,供刷新后重建审批卡片。 */
+function approvalIdOf(content: Prisma.JsonValue): string | null {
+  if (content && typeof content === "object" && !Array.isArray(content) && "approvalId" in content) {
+    const a = (content as { approvalId?: unknown }).approvalId;
+    return typeof a === "string" ? a : null;
+  }
+  return null;
+}
+
 /** 开一轮(新问答或重试的新版本),预建助手空消息以拿到 id。 */
 export async function startTurn(args: {
   userId: string;
@@ -106,12 +115,16 @@ export async function startTurn(args: {
   };
 }
 
-/** 填入助手最终文本。永不阻塞主流程。 */
-export async function finishAssistant(assistantMessageId: string, text: string): Promise<void> {
+/** 填入助手最终文本;approvalId 存在则一并记下(供刷新后重建审批卡片)。永不阻塞主流程。 */
+export async function finishAssistant(
+  assistantMessageId: string,
+  text: string,
+  approvalId?: string | null,
+): Promise<void> {
   try {
     await prisma.aiMessage.update({
       where: { id: assistantMessageId },
-      data: { content: { text } as Prisma.InputJsonValue },
+      data: { content: { text, ...(approvalId ? { approvalId } : {}) } as Prisma.InputJsonValue },
     });
   } catch (err) {
     console.error("[assistant] finishAssistant failed", err);
@@ -132,7 +145,7 @@ export async function activateVariant(userId: string, messageId: string): Promis
 
 export interface TurnDTO {
   user: { id: string; text: string };
-  variants: Array<{ id: string; text: string }>;
+  variants: Array<{ id: string; text: string; approvalId: string | null }>;
   activeIndex: number;
 }
 
@@ -158,7 +171,11 @@ export async function getConversationTurns(conversationId: string): Promise<Turn
       const ai = kids.findIndex((k) => k.active);
       return {
         user: { id: u.id, text: textOf(u.content) },
-        variants: kids.map((k) => ({ id: k.id, text: textOf(k.content) })),
+        variants: kids.map((k) => ({
+          id: k.id,
+          text: textOf(k.content),
+          approvalId: approvalIdOf(k.content),
+        })),
         activeIndex: ai < 0 ? Math.max(0, kids.length - 1) : ai,
       };
     });

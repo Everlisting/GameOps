@@ -5,7 +5,7 @@
  * 响应头回传 DB id + 版本信息,供前端做 ‹ › 切换与反馈定位。
  */
 import type { Prisma } from "@prisma/client";
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from "ai";
+import { streamText, convertToModelMessages, stepCountIs, hasToolCall, type UIMessage } from "ai";
 
 import { route, parseJson } from "@/lib/api";
 import { requireRole } from "@/lib/rbac";
@@ -23,6 +23,32 @@ import {
 } from "@/lib/assistant/persistence";
 
 export const runtime = "nodejs"; // 必须:Edge 不能用 prisma / crypto / argon2
+
+/**
+ * 剥掉历史里的写工具(incentive_compute)交互再发给模型。
+ * 否则模型会看到上一轮那条"待审批"结果,凭记忆复述/复用旧审批单号,而不重新发起工具调用。
+ * 数据类工具(activity_summary 等)结果保留,供多轮上下文;当前轮的工具调用发生在流内,不受影响。
+ */
+function stripWriteToolHistory(
+  messages: Array<{ role: string; parts?: unknown[]; content?: unknown }>,
+): Array<{ role: string; parts?: unknown[]; content?: unknown }> {
+  return messages
+    .map((m) => {
+      if (!Array.isArray(m.parts)) return m;
+      const parts = m.parts.filter(
+        (p) =>
+          !(
+            p &&
+            typeof p === "object" &&
+            "type" in p &&
+            (p as { type: unknown }).type === "tool-incentive_compute"
+          ),
+      );
+      return { ...m, parts };
+    })
+    // 剥空的助手消息丢掉(user 恒保留)
+    .filter((m) => m.role === "user" || !Array.isArray(m.parts) || m.parts.length > 0);
+}
 
 /** 从最后一条 user 消息提取纯文本。 */
 function lastUserText(
@@ -65,15 +91,21 @@ export const POST = route(async (req) => {
 
   const [systemPrompt, modelMessages] = await Promise.all([
     getSystemPrompt(),
-    convertToModelMessages(body.messages as unknown as UIMessage[]),
+    convertToModelMessages(stripWriteToolHistory(body.messages) as unknown as UIMessage[]),
   ]);
+
+  // 写工具因 stopWhen 停在审批卡片、模型不再吐文字;记下 approvalId 存进助手消息,
+  // 刷新后能据此重建审批卡片(卡片自拉当前状态),历史不再缺信息。
+  let approvalId: string | null = null;
 
   const result = streamText({
     model,
     system: systemPrompt,
     messages: modelMessages,
-    tools: makeTools(session),
-    stopWhen: stepCountIs(8),
+    tools: makeTools(session, { conversationId: turn.conversationId, runId }),
+    // 写工具(需审批)一被调用就停止本轮:回合干净停在审批卡片上,不再生成"已提交待审批…"之类
+    // 的后续文字(那会让人误以为流程没等批准就走完了)。真正的执行在用户点「批准」后由卡片触发。
+    stopWhen: [stepCountIs(8), hasToolCall("incentive_compute")],
     onStepFinish: async ({ toolCalls, toolResults }) => {
       const outputById = new Map(toolResults.map((r) => [r.toolCallId, r.output]));
       for (const call of toolCalls) {
@@ -86,15 +118,25 @@ export const POST = route(async (req) => {
           targetId: turn.conversationId,
           details: { runId, toolCallId: call.toolCallId, tool: call.toolName, args } as Prisma.InputJsonValue,
         });
+        const out = outputById.get(call.toolCallId);
         await recordToolCall(runId, {
           toolName: call.toolName,
           args,
-          resultSummary: outputById.get(call.toolCallId) as Prisma.InputJsonValue | undefined,
+          resultSummary: out as Prisma.InputJsonValue | undefined,
         });
+        if (
+          call.toolName === "incentive_compute" &&
+          out &&
+          typeof out === "object" &&
+          (out as { ok?: unknown }).ok === true
+        ) {
+          const aid = (out as { approvalId?: unknown }).approvalId;
+          if (typeof aid === "string") approvalId = aid;
+        }
       }
     },
     onFinish: async ({ text, usage }) => {
-      await finishAssistant(turn.assistantMessageId, text);
+      await finishAssistant(turn.assistantMessageId, text.trim(), approvalId);
       await finishRun(runId, {
         status: "succeeded",
         inputTokens: usage.inputTokens ?? null,
@@ -103,6 +145,7 @@ export const POST = route(async (req) => {
       });
     },
     onError: async ({ error }) => {
+      console.error("[assistant] streamText error", error);
       await finishRun(runId, {
         status: "failed",
         errorMessage: error instanceof Error ? error.message : String(error),

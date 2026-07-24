@@ -772,3 +772,31 @@ model AiPromptVersion {
   @@unique([name, version])
   @@map("ai_prompt_version")
 }
+
+/// 阶段10.4 · AI 助手 · 需审批的写操作(暂停-审批-恢复)。
+/// 写工具只生成 pending 提案(不执行);运营在中台批准后由执行器幂等调用现有业务逻辑。
+/// 不建 conversation 外键:审批是操作留痕,删会话不应连带删审批。
+model AiApproval {
+  id             String    @id @default(cuid())
+  conversationId String? // 发起对话(快照,无外键)
+  runId          String? // 发起 run(快照)
+  action         String // "incentive.compute" ...
+  title          String // 人类可读一句话("重算活动《X》的预估激励")
+  params         Json // 执行入参(如 { activityId })
+  preview        Json // 展示用摘要(已脱敏)
+  status         String    @default("pending") // pending / approved / rejected / executed / failed
+  result         Json? // 执行结果摘要
+  errorMessage   String? // 执行失败原因
+  createdById    String // 发起人 user.id 快照
+  createdByName  String
+  decidedById    String? // 审批人 user.id 快照
+  decidedByName  String?
+  decidedAt      DateTime?
+  executedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([conversationId])
+  @@map("ai_approval")
+}

@@ -43,7 +43,11 @@ export type AuditAction =
   | "assistant.settings.update" // 改模型配置
   | "assistant.conversation.delete" // 删除会话
   | "kb.upload"                 // 知识库上传(10.3)
-  | "kb.delete";                // 知识库删除(10.3)
+  | "kb.delete"                 // 知识库删除(10.3)
+  // 阶段10.4 · 需审批的写操作
+  | "approval.create"           // 写工具生成一条待审批提案
+  | "approval.approve"          // 运营批准(触发执行)
+  | "approval.reject";          // 运营拒绝
 
 export type AuditTargetType =
   | "task"
@@ -58,7 +62,8 @@ export type AuditTargetType =
   // 阶段10 · AI 助手
   | "ai_conversation"    // 一次会话
   | "ai_model_profile"   // 模型配置
-  | "knowledge_document"; // 知识库文档(10.3)
+  | "knowledge_document" // 知识库文档(10.3)
+  | "ai_approval";       // 需审批的写操作(10.4)
 
 export interface AuditOpts {
   /** 操作人 user.id;null = 系统(cron 自动触发) */

@@ -58,6 +58,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Markdown } from "./Markdown";
+import { InlineApproval } from "./InlineApproval";
 
 const EXAMPLES = [
   "本月视频总播放量和稿件数各是多少?",
@@ -99,6 +100,22 @@ function isEvidence(x: unknown): x is Evidence {
     !!x &&
     typeof x === "object" &&
     ("source" in x || "asOf" in x || "links" in x || "scope" in x)
+  );
+}
+
+/** 写工具生成的待审批提案输出:{ ok, approvalId, title?, preview? }(刷新重建时只带 approvalId,
+ *  title/preview 由卡片按 approvalId 拉取)。 */
+interface ApprovalOutput {
+  approvalId: string;
+  title?: string;
+  preview?: unknown;
+}
+function isApprovalOutput(x: unknown): x is ApprovalOutput {
+  return (
+    !!x &&
+    typeof x === "object" &&
+    (x as { ok?: unknown }).ok === true &&
+    typeof (x as { approvalId?: unknown }).approvalId === "string"
   );
 }
 
@@ -408,7 +425,7 @@ export function AssistantChat({
       const data = (await res.json()) as {
         turns?: Array<{
           user: { id: string; text: string };
-          variants: Array<{ id: string; text: string }>;
+          variants: Array<{ id: string; text: string; approvalId?: string | null }>;
           activeIndex: number;
         }>;
       };
@@ -419,11 +436,17 @@ export function AssistantChat({
         loaded.push({ id: t.user.id, role: "user", parts: [{ type: "text", text: t.user.text }] } as UIMessage);
         const active = t.variants[t.activeIndex];
         if (active) {
-          loaded.push({
-            id: active.id,
-            role: "assistant",
-            parts: [{ type: "text", text: active.text }],
-          } as UIMessage);
+          // 文本(可空)+ 若关联审批则重建合成工具 part → 渲染审批卡片(卡片自拉当前状态)
+          const parts: unknown[] = [];
+          if (active.text) parts.push({ type: "text", text: active.text });
+          if (active.approvalId) {
+            parts.push({
+              type: "tool-incentive_compute",
+              state: "output-available",
+              output: { ok: true, approvalId: active.approvalId },
+            });
+          }
+          loaded.push({ id: active.id, role: "assistant", parts } as unknown as UIMessage);
         }
         if (t.variants.length > 0) {
           vmap[t.user.id] = {
@@ -768,6 +791,11 @@ export function AssistantChat({
                         const state = (p as { state?: string }).state ?? "";
                         const output = (p as { output?: unknown }).output;
                         const ev = state === "output-available" && isEvidence(output) ? output : null;
+                        // 写工具(需审批):输出携带 approvalId + status=pending → 内联审批卡片
+                        const appr =
+                          state === "output-available" && name === "incentive_compute" && isApprovalOutput(output)
+                            ? output
+                            : null;
                         const hint =
                           state === "output-available"
                             ? "已返回"
@@ -780,6 +808,13 @@ export function AssistantChat({
                               🔧 调用工具 <code className="font-mono">{name}</code> · {hint}
                             </div>
                             {ev && <EvidenceCard ev={ev} />}
+                            {appr && (
+                              <InlineApproval
+                                approvalId={appr.approvalId}
+                                title={appr.title}
+                                preview={appr.preview}
+                              />
+                            )}
                           </div>
                         );
                       }
