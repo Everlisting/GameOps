@@ -3,33 +3,16 @@
  * 允许转移:DRAFT → ONGOING;ONGOING → ENDED;ENDED 终态,不可再变。
  * DRAFT → ENDED 已下线 —— 想丢弃草稿走 DELETE /api/operator/activities/[id]。
  */
-import type { ActivityStatus } from "@prisma/client";
 import { route, parseJson } from "@/lib/api";
-import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
-import { badRequest, notFound } from "@/lib/errors";
 import { activityStatusSchema } from "@/lib/validation/activity";
-
-const ALLOWED: Record<ActivityStatus, ActivityStatus[]> = {
-  DRAFT: ["ONGOING"],
-  ONGOING: ["ENDED"],
-  ENDED: [],
-};
+import { changeActivityStatus } from "@/lib/activity/status";
 
 export const PATCH = route(async (req, { params }) => {
-  await requireRole("OPERATOR");
+  const session = await requireRole("OPERATOR");
   const id = params?.id ?? "";
   const { status } = await parseJson(req, activityStatusSchema);
 
-  const a = await prisma.activity.findUnique({
-    where: { id },
-    select: { status: true },
-  });
-  if (!a) throw notFound("活动不存在");
-  if (a.status === status) return Response.json({ ok: true });
-  if (!ALLOWED[a.status].includes(status))
-    throw badRequest(`不允许从 ${a.status} 转到 ${status}`);
-
-  await prisma.activity.update({ where: { id }, data: { status } });
+  await changeActivityStatus(id, status, { id: session.sub, username: session.username });
   return Response.json({ ok: true });
 });

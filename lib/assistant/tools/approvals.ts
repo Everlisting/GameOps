@@ -82,3 +82,39 @@ export function incentiveComputeTool(session: SessionPayload, ctx: ToolContext) 
     execute: async (input) => propose("incentive.compute", input, session, ctx),
   });
 }
+
+/** crawler_task_rerun:重跑采集任务(需审批)。 */
+export function crawlerTaskRerunTool(session: SessionPayload, ctx: ToolContext) {
+  return tool({
+    description: TOOL_DEFS.crawlerTaskRerun.description,
+    inputSchema: TOOL_DEFS.crawlerTaskRerun.input,
+    execute: async (input) => propose("crawler.task_rerun", input, session, ctx),
+  });
+}
+
+/** crawler_task_cancel:取消采集任务(需审批)。 */
+export function crawlerTaskCancelTool(session: SessionPayload, ctx: ToolContext) {
+  return tool({
+    description: TOOL_DEFS.crawlerTaskCancel.description,
+    inputSchema: TOOL_DEFS.crawlerTaskCancel.input,
+    execute: async (input) => propose("crawler.task_cancel", input, session, ctx),
+  });
+}
+
+/** activity_status:切换活动状态(上线/结束,需审批)。 */
+export function activityStatusTool(session: SessionPayload, ctx: ToolContext) {
+  return tool({
+    description: TOOL_DEFS.activityStatus.description,
+    inputSchema: TOOL_DEFS.activityStatus.input,
+    execute: async (input) => propose("activity.status", input, session, ctx),
+  });
+}
+
+/** activity_update:改活动基础信息(需 ADMIN 审批)。 */
+export function activityUpdateTool(session: SessionPayload, ctx: ToolContext) {
+  return tool({
+    description: TOOL_DEFS.activityUpdate.description,
+    inputSchema: TOOL_DEFS.activityUpdate.input,
+    execute: async (input) => propose("activity.update", input, session, ctx),
+  });
+}

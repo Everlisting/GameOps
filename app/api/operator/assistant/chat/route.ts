@@ -13,7 +13,7 @@ import { recordAudit } from "@/lib/audit";
 import { chatInputSchema } from "@/lib/validation/assistant";
 import { getChatModel } from "@/lib/assistant/model";
 import { getSystemPrompt } from "@/lib/assistant/agent";
-import { makeTools } from "@/lib/assistant/tools";
+import { makeTools, WRITE_TOOL_NAMES } from "@/lib/assistant/tools";
 import {
   startTurn,
   beginRun,
@@ -24,8 +24,14 @@ import {
 
 export const runtime = "nodejs"; // 必须:Edge 不能用 prisma / crypto / argon2
 
+// 写工具在 UI 消息里的 part type(tool-<name>)+ 刷新重建的 data-approval part,都要从发给模型的历史里剥掉。
+const WRITE_TOOL_PART_TYPES = new Set([
+  ...WRITE_TOOL_NAMES.map((n) => `tool-${n}`),
+  "data-approval",
+]);
+
 /**
- * 剥掉历史里的写工具(incentive_compute)交互再发给模型。
+ * 剥掉历史里的写工具交互(及刷新重建的审批 part)再发给模型。
  * 否则模型会看到上一轮那条"待审批"结果,凭记忆复述/复用旧审批单号,而不重新发起工具调用。
  * 数据类工具(activity_summary 等)结果保留,供多轮上下文;当前轮的工具调用发生在流内,不受影响。
  */
@@ -41,7 +47,7 @@ function stripWriteToolHistory(
             p &&
             typeof p === "object" &&
             "type" in p &&
-            (p as { type: unknown }).type === "tool-incentive_compute"
+            WRITE_TOOL_PART_TYPES.has(String((p as { type: unknown }).type))
           ),
       );
       return { ...m, parts };
@@ -103,9 +109,9 @@ export const POST = route(async (req) => {
     system: systemPrompt,
     messages: modelMessages,
     tools: makeTools(session, { conversationId: turn.conversationId, runId }),
-    // 写工具(需审批)一被调用就停止本轮:回合干净停在审批卡片上,不再生成"已提交待审批…"之类
+    // 任一写工具(需审批)被调用就停止本轮:回合干净停在审批卡片上,不再生成"已提交待审批…"之类
     // 的后续文字(那会让人误以为流程没等批准就走完了)。真正的执行在用户点「批准」后由卡片触发。
-    stopWhen: [stepCountIs(8), hasToolCall("incentive_compute")],
+    stopWhen: [stepCountIs(8), ...WRITE_TOOL_NAMES.map((n) => hasToolCall(n))],
     onStepFinish: async ({ toolCalls, toolResults }) => {
       const outputById = new Map(toolResults.map((r) => [r.toolCallId, r.output]));
       for (const call of toolCalls) {
@@ -124,12 +130,8 @@ export const POST = route(async (req) => {
           args,
           resultSummary: out as Prisma.InputJsonValue | undefined,
         });
-        if (
-          call.toolName === "incentive_compute" &&
-          out &&
-          typeof out === "object" &&
-          (out as { ok?: unknown }).ok === true
-        ) {
+        // 任一写工具返回 pending 提案 → 记下 approvalId(存进助手消息,供刷新后重建卡片)
+        if (out && typeof out === "object" && (out as { ok?: unknown }).ok === true) {
           const aid = (out as { approvalId?: unknown }).approvalId;
           if (typeof aid === "string") approvalId = aid;
         }

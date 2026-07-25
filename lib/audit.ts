@@ -32,6 +32,8 @@ export type AuditAction =
   // 阶段5 · 激励引擎
   | "incentive.compute"   // 全活动重算预估
   | "incentive.adjust"    // 单条人工调整
+  | "activity.status"     // 活动状态变更(上线/结束)
+  | "activity.update"     // 活动基础信息修改(带字段 diff)
   // 阶段9 · 舆情监控
   | "opinion.trigger"       // ADMIN 触发生成一份报告
   | "opinion.rerun"         // ADMIN 用相同输入重跑

@@ -87,6 +87,27 @@ export const incentiveComputeInput = z.object({
   activityId: z.string().describe("要重算激励的活动 id(可先用 activity_summary 定位)"),
 });
 
+export const crawlerTaskRerunInput = z.object({
+  taskId: z.string().describe("要重跑的采集任务 id(可先用 crawler_task_status 定位)"),
+});
+
+export const crawlerTaskCancelInput = z.object({
+  taskId: z.string().describe("要取消的采集任务 id(可先用 crawler_task_status 定位)"),
+});
+
+export const activityStatusInput = z.object({
+  activityId: z.string().describe("活动 id(可先用 activity_summary 定位)"),
+  status: z.enum(["ONGOING", "ENDED"]).describe("目标状态:ONGOING=上线/开始;ENDED=结束/下线"),
+});
+
+export const activityUpdateInput = z.object({
+  activityId: z.string().describe("活动 id(可先用 activity_summary 定位)"),
+  name: z.string().optional().describe("新活动名称"),
+  description: z.string().optional().describe("新活动简介"),
+  startAt: z.string().optional().describe("新开始时间(YYYY-MM-DD 或 ISO 日期时间)"),
+  endAt: z.string().optional().describe("新结束时间(YYYY-MM-DD 或 ISO 日期时间)"),
+});
+
 /** 工具定义(名称 + 描述 + 入参),压测与真实工具共用。描述写清「何时调用」以帮助较弱模型选对工具。 */
 export const TOOL_DEFS = {
   streamerProfile: {
@@ -136,6 +157,30 @@ export const TOOL_DEFS = {
     description:
       "【写操作·需人工审批】发起「全活动重算预估激励」。当用户要求重新计算/刷新某活动的激励预估时调用。**每次这类请求都必须实际调用本工具生成一条新的待审批**——严禁凭记忆复述、复用历史审批单号或直接编造审批结果。此工具不会立即执行,只生成待审批,须运营点击「批准」后才真正重算。需要 activityId(可先用 activity_summary 定位)。",
     input: incentiveComputeInput,
+  },
+  crawlerTaskRerun: {
+    name: "crawler_task_rerun",
+    description:
+      "【写操作·需人工审批】重跑一条采集任务(基于原任务的 Job+参数克隆一条新任务,原任务不动)。当用户要求重跑/重新执行某个采集任务时调用。**每次都必须实际调用本工具生成新的待审批**,不得凭记忆复述。只生成待审批,须运营批准后才执行。需要 taskId(可先用 crawler_task_status 定位)。",
+    input: crawlerTaskRerunInput,
+  },
+  crawlerTaskCancel: {
+    name: "crawler_task_cancel",
+    description:
+      "【写操作·需人工审批】取消一条采集任务(PENDING/RUNNING/FAILED 可取消,RUNNING 会通知 Agent kill 子进程;已完成不可取消)。当用户要求取消/停止某个采集任务时调用。**每次都必须实际调用本工具生成新的待审批**。只生成待审批,须运营批准后才执行。需要 taskId(可先用 crawler_task_status 定位)。",
+    input: crawlerTaskCancelInput,
+  },
+  activityStatus: {
+    name: "activity_status",
+    description:
+      "【写操作·需人工审批】切换活动状态:上线(DRAFT→ONGOING)或结束(ONGOING→ENDED)。当用户要求上线/开始/发布 或 结束/下线某活动时调用。**每次都必须实际调用本工具生成新的待审批**。只生成待审批,须运营批准后才执行。需要 activityId(可先用 activity_summary 定位)。",
+    input: activityStatusInput,
+  },
+  activityUpdate: {
+    name: "activity_update",
+    description:
+      "【写操作·需人工审批(管理员)】修改活动基础信息:名称 / 简介 / 开始时间 / 结束时间。当用户要求修改/编辑某活动的这些字段时调用。不改激励规则(那需在中台规则编辑器操作)。**每次都必须实际调用本工具生成新的待审批**,并只带用户明确要改的字段。只生成待审批,须管理员批准后才生效。需要 activityId + 至少一个要改的字段(可先用 activity_summary 定位活动)。",
+    input: activityUpdateInput,
   },
 } as const;
 

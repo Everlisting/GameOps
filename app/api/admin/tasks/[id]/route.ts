@@ -12,30 +12,13 @@
  *   - CANCELED:仅 PENDING / RUNNING / FAILED 可改成 CANCELED;SUCCEEDED 不动
  *   - PENDING(重新排队):仅 FAILED / CANCELED 可改成 PENDING;同时清掉 startedAt/finishedAt/exitCode/errorMessage
  */
-import { promises as fs } from "node:fs";
-import path from "node:path";
-
 import { route, parseJson } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { conflict, notFound } from "@/lib/errors";
 import { taskUpdateSchema } from "@/lib/validation/crawler";
 import { recordAudit } from "@/lib/audit";
-
-/** 在 task 日志文件末尾追加一行 server 侧 marker(取消 / 重排队等)。
- * 文件不存在 / 写入失败都安静吞掉(管理员只是想看个提示,不要因为 IO 失败把 PATCH 也带挂)。 */
-async function appendLogMarker(logPath: string | null, line: string): Promise<void> {
-  if (!logPath) return;
-  try {
-    const abs = path.join(process.cwd(), logPath);
-    // 防越权:logPath 必须仍在 data/logs/ 下
-    const allowed = path.resolve(process.cwd(), "data", "logs");
-    if (!path.resolve(abs).startsWith(allowed + path.sep)) return;
-    await fs.appendFile(abs, line.endsWith("\n") ? line : line + "\n", "utf8");
-  } catch {
-    // 静默忽略
-  }
-}
+import { appendTaskLogMarker, cancelCrawlerTask } from "@/lib/crawler/task-ops";
 
 export const GET = route(async (_req, { params }) => {
   await requireRole("OPERATOR");
@@ -91,7 +74,6 @@ export const PATCH = route(async (req, { params }) => {
   if (!t) throw notFound("任务不存在");
 
   const data: Record<string, unknown> = {};
-  let cancelMarker: string | null = null;
   let requeueMarker: string | null = null;
   const audits: Promise<void>[] = [];
 
@@ -110,27 +92,11 @@ export const PATCH = route(async (req, { params }) => {
   }
 
   if (input.status === "CANCELED") {
-    if (t.status === "SUCCEEDED") throw conflict("已完成任务不能取消");
-    if (t.status === "CANCELED") {
-      return Response.json({ ok: true });
-    }
-    data.status = "CANCELED";
-    data.finishedAt = new Date();
-    const wasRunning = t.status === "RUNNING";
-    cancelMarker =
-      `\n[server] ${new Date().toISOString()} 任务被 ${session.username} 取消` +
-      (wasRunning ? ",Agent 将在数秒内 kill 子进程" : "") +
-      "\n";
-    audits.push(
-      recordAudit({
-        actorId: session.sub,
-        actorUsername: session.username,
-        action: "task.cancel",
-        targetType: "task",
-        targetId: t.id,
-        details: { fromStatus: t.status },
-      }),
-    );
+    // 先落 priority(若有),再走共享取消逻辑(状态机 + marker + 审计)
+    if (Object.keys(data).length > 0) await prisma.crawlerTask.update({ where: { id }, data });
+    await cancelCrawlerTask(id, { id: session.sub, username: session.username });
+    await Promise.all(audits);
+    return Response.json({ ok: true });
   }
 
   if (input.status === "PENDING") {
@@ -158,9 +124,8 @@ export const PATCH = route(async (req, { params }) => {
 
   await prisma.crawlerTask.update({ where: { id }, data });
 
-  // 转 CANCELED / PENDING 时往原日志文件追加 marker,日志页能看到收尾
-  if (cancelMarker) await appendLogMarker(t.logPath, cancelMarker);
-  if (requeueMarker) await appendLogMarker(t.logPath, requeueMarker);
+  // 转 PENDING(重排队)时往原日志文件追加 marker,日志页能看到收尾
+  if (requeueMarker) await appendTaskLogMarker(t.logPath, requeueMarker);
 
   await Promise.all(audits);
 

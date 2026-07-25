@@ -25,9 +25,64 @@ interface ApprovalView {
 function pick(obj: unknown, key: string): unknown {
   return obj && typeof obj === "object" ? (obj as Record<string, unknown>)[key] : undefined;
 }
-function str(obj: unknown, key: string): string {
-  const v = pick(obj, key);
-  return v == null || v === "" ? "—" : String(v);
+
+/** 从响应体取错误文案:兼容 { error: "..." } 与 AppError 的 { error: { message } }。 */
+function errMessage(data: unknown): string | null {
+  const e = pick(data, "error");
+  if (typeof e === "string") return e;
+  const m = pick(e, "message");
+  return typeof m === "string" ? m : null;
+}
+
+// 通用字段渲染:preview / result 里的键 → 中文标签 + 单位(未收录的键回退原样)。
+const LABELS: Record<string, string> = {
+  activityName: "活动名称",
+  activityId: "活动ID",
+  rulesCount: "规则数",
+  submissionsCount: "稿件数",
+  candidateCount: "参与人数",
+  creatorsCount: "参与人数",
+  totalEstimated: "预估合计",
+  durationMs: "用时",
+  scope: "计算范围",
+  jobName: "Job",
+  jobId: "Job ID",
+  sequenceNumber: "序号",
+  sourceStatus: "原状态",
+  currentStatus: "当前状态",
+  fromStatus: "原状态",
+  toStatus: "新状态",
+  targetStatus: "目标状态",
+  taskId: "任务ID",
+  newTaskId: "新任务ID",
+};
+const UNITS: Record<string, (v: unknown) => string> = {
+  rulesCount: (v) => `${v}条`,
+  submissionsCount: (v) => `${v}条`,
+  candidateCount: (v) => `${v}人`,
+  creatorsCount: (v) => `${v}人`,
+  totalEstimated: (v) => `¥${v}`,
+  durationMs: (v) => `${v}ms`,
+};
+// effect(用于"下一步")、message(用于标题行)不作为字段行展示
+const HIDDEN_KEYS = new Set(["effect", "message"]);
+
+interface FieldRow {
+  k: string;
+  label: string;
+  value: string;
+  mono: boolean;
+}
+function fieldRows(obj: unknown): FieldRow[] {
+  if (!obj || typeof obj !== "object") return [];
+  return Object.entries(obj as Record<string, unknown>)
+    .filter(([k, v]) => !HIDDEN_KEYS.has(k) && v != null && v !== "")
+    .map(([k, v]) => ({
+      k,
+      label: LABELS[k] ?? k,
+      value: UNITS[k] ? UNITS[k](v) : String(v),
+      mono: /id$/i.test(k),
+    }));
 }
 
 /** 一行「标签:值」。值用等宽以对齐 ID。 */
@@ -87,18 +142,23 @@ export function InlineApproval({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ decision }),
         });
-        const data = (await res.json().catch(() => null)) as
-          | { ok: boolean; error?: string; approval?: ApprovalView | null }
-          | null;
-        if (data?.approval) {
-          setStatus(data.approval.status);
-          setResult(data.approval.result);
-          setErrorMsg(data.approval.errorMessage ?? data.error ?? null);
+        const data = await res.json().catch(() => null);
+        const view = (data as { approval?: ApprovalView | null } | null)?.approval;
+        if (view) {
+          setStatus(view.status);
+          setResult(view.result);
+          setErrorMsg(view.errorMessage);
         } else if (res.status === 409) {
-          void refresh();
+          void refresh(); // 已被处理 → 拉最新状态
+        } else if (res.status === 403) {
+          // 角色不足(如 activity.update 需管理员):保持待审批,提示需更高权限,允许他人处理
+          setErrorMsg(errMessage(data) ?? "此操作需要更高权限(管理员)审批");
+          decidedRef.current = false;
+          setBusy(false);
+          return;
         } else {
           setStatus("failed");
-          setErrorMsg(data?.error ?? "操作失败");
+          setErrorMsg(errMessage(data) ?? "操作失败");
         }
       } catch {
         setStatus("failed");
@@ -135,23 +195,22 @@ export function InlineApproval({
     );
   }
 
-  const activityName = str(previewState,"activityName");
+  const effect = typeof pick(previewState, "effect") === "string" ? String(pick(previewState, "effect")) : null;
+  const resultMsg = typeof pick(result, "message") === "string" ? String(pick(result, "message")) : null;
 
   // ── 已完成 ──
   if (status === "executed") {
     return (
       <div className={`${box} border-emerald-500/40 bg-emerald-500/10`}>
         <div className="mb-2 flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-200">
-          <Check className="size-4" /> 重算已完成
+          <Check className="size-4" /> {resultMsg ?? "操作已完成"}
         </div>
         <div className="space-y-0.5">
           <Row label="审批ID" value={approvalId} mono />
           <Row label="状态" value="已完成（executed）" />
-          <Row label="活动名称" value={str(result, "activityName")} />
-          <Row label="规则数" value={`${str(result, "rulesCount")}条`} />
-          <Row label="参与人数" value={`${str(result, "creatorsCount")}人`} />
-          <Row label="预估合计" value={`¥${str(result, "totalEstimated")}`} />
-          <Row label="用时" value={`${str(result, "durationMs")}ms`} />
+          {fieldRows(result).map((r) => (
+            <Row key={r.k} label={r.label} value={r.value} mono={r.mono} />
+          ))}
         </div>
       </div>
     );
@@ -167,7 +226,7 @@ export function InlineApproval({
         <div className="space-y-0.5">
           <Row label="审批ID" value={approvalId} mono />
           <Row label="状态" value={timedOut ? "已拒绝（超时未审批,自动拒绝）" : "已拒绝（rejected）"} />
-          <Row label="活动名称" value={activityName} />
+          {titleState && <Row label="事项" value={titleState} />}
         </div>
       </div>
     );
@@ -193,23 +252,25 @@ export function InlineApproval({
   return (
     <div className={`${box} border-amber-500/50 bg-amber-500/5`}>
       <div className="mb-2 flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-200">
-        <ShieldAlert className="size-4" /> 已为您提交「{titleState || "重算预估激励"}」的操作
+        <ShieldAlert className="size-4" /> 已为您提交「{titleState || "待审批操作"}」
       </div>
       <div className="mb-1 font-medium">当前状态</div>
       <div className="space-y-0.5">
         <Row label="审批ID" value={approvalId} mono />
         <Row label="状态" value="待审批（pending）" />
-        <Row label="活动名称" value={activityName} />
-        <Row label="活动ID" value={str(previewState,"activityId")} mono />
-        <Row label="规则数" value={`${str(previewState,"rulesCount")}条`} />
-        <Row label="稿件数" value={`${str(previewState,"submissionsCount")}条`} />
-        <Row label="参与人数" value={`${str(previewState,"candidateCount")}人`} />
-        <Row label="计算范围" value={str(previewState,"scope")} />
+        {fieldRows(previewState).map((r) => (
+          <Row key={r.k} label={r.label} value={r.value} mono={r.mono} />
+        ))}
       </div>
       <div className="mb-1 mt-2.5 font-medium">下一步</div>
       <p className="text-muted-foreground">
-        点击下方「批准」后,系统才会真正执行重算;批准后将{str(previewState,"effect")}。
+        点击下方「批准」后,系统才会真正执行{effect ? `;批准后将${effect}` : ""}。
       </p>
+      {errorMsg && (
+        <p className="mt-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-200">
+          ⚠ {errorMsg}
+        </p>
+      )}
       <div className="mt-2.5 flex items-center gap-2">
         <Button size="sm" onClick={() => decide("approve")} disabled={busy}>
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}

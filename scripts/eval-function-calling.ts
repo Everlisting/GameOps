@@ -148,6 +148,42 @@ function makeMockTools(record: RecordFn): ToolSet {
         };
       },
     }),
+    [TOOL_DEFS.crawlerTaskRerun.name]: tool({
+      description: TOOL_DEFS.crawlerTaskRerun.description,
+      inputSchema: TOOL_DEFS.crawlerTaskRerun.input,
+      execute: async (args) => {
+        const a = args as Record<string, unknown>;
+        record(TOOL_DEFS.crawlerTaskRerun.name, a);
+        return { ok: true, approvalId: "ap_demo", status: "pending", message: "已生成待审批操作。" };
+      },
+    }),
+    [TOOL_DEFS.crawlerTaskCancel.name]: tool({
+      description: TOOL_DEFS.crawlerTaskCancel.description,
+      inputSchema: TOOL_DEFS.crawlerTaskCancel.input,
+      execute: async (args) => {
+        const a = args as Record<string, unknown>;
+        record(TOOL_DEFS.crawlerTaskCancel.name, a);
+        return { ok: true, approvalId: "ap_demo", status: "pending", message: "已生成待审批操作。" };
+      },
+    }),
+    [TOOL_DEFS.activityStatus.name]: tool({
+      description: TOOL_DEFS.activityStatus.description,
+      inputSchema: TOOL_DEFS.activityStatus.input,
+      execute: async (args) => {
+        const a = args as Record<string, unknown>;
+        record(TOOL_DEFS.activityStatus.name, a);
+        return { ok: true, approvalId: "ap_demo", status: "pending", message: "已生成待审批操作。" };
+      },
+    }),
+    [TOOL_DEFS.activityUpdate.name]: tool({
+      description: TOOL_DEFS.activityUpdate.description,
+      inputSchema: TOOL_DEFS.activityUpdate.input,
+      execute: async (args) => {
+        const a = args as Record<string, unknown>;
+        record(TOOL_DEFS.activityUpdate.name, a);
+        return { ok: true, approvalId: "ap_demo", status: "pending", message: "已生成待审批操作。" };
+      },
+    }),
   };
 }
 

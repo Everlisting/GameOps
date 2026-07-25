@@ -17,7 +17,23 @@ import {
 } from "@/lib/assistant/tools/data";
 import { activitySummaryTool, incentiveExplainTool } from "@/lib/assistant/tools/activity";
 import { knowledgeSearchTool } from "@/lib/assistant/tools/knowledge";
-import { incentiveComputeTool, type ToolContext } from "@/lib/assistant/tools/approvals";
+import {
+  incentiveComputeTool,
+  crawlerTaskRerunTool,
+  crawlerTaskCancelTool,
+  activityStatusTool,
+  activityUpdateTool,
+  type ToolContext,
+} from "@/lib/assistant/tools/approvals";
+
+/** 写工具(需审批)名单:chat 路由据此做 stopWhen(调用即停)+ 剥离历史写工具交互。 */
+export const WRITE_TOOL_NAMES: string[] = [
+  TOOL_DEFS.incentiveCompute.name,
+  TOOL_DEFS.crawlerTaskRerun.name,
+  TOOL_DEFS.crawlerTaskCancel.name,
+  TOOL_DEFS.activityStatus.name,
+  TOOL_DEFS.activityUpdate.name,
+];
 
 /**
  * ai@7 的 `ModelMessage` 要求工具输出是纯 `JSONValue`;而 Prisma 返回的 `Date` / `Decimal`
@@ -57,5 +73,9 @@ export function makeTools(session: SessionPayload, ctx: ToolContext = {}) {
     [TOOL_DEFS.crawlerTaskStatus.name]: crawlerTaskStatusTool(),
     [TOOL_DEFS.knowledgeSearch.name]: knowledgeSearchTool(session),
     [TOOL_DEFS.incentiveCompute.name]: incentiveComputeTool(session, ctx),
+    [TOOL_DEFS.crawlerTaskRerun.name]: crawlerTaskRerunTool(session, ctx),
+    [TOOL_DEFS.crawlerTaskCancel.name]: crawlerTaskCancelTool(session, ctx),
+    [TOOL_DEFS.activityStatus.name]: activityStatusTool(session, ctx),
+    [TOOL_DEFS.activityUpdate.name]: activityUpdateTool(session, ctx),
   });
 }

@@ -442,16 +442,11 @@ export function AssistantChat({
         loaded.push({ id: t.user.id, role: "user", parts: [{ type: "text", text: t.user.text }] } as UIMessage);
         const active = t.variants[t.activeIndex];
         if (active) {
-          // 文本(可空)+ 若关联审批则重建合成工具 part → 渲染审批卡片(卡片自拉当前状态)
+          // 文本(可空)+ 若关联审批则加 data-approval part → 渲染审批卡片(卡片自拉当前状态)。
+          // 用 data-* 而非 tool-*:UI-only,convertToModelMessages 忽略,不污染模型上下文。
           const parts: unknown[] = [];
           if (active.text) parts.push({ type: "text", text: active.text });
-          if (active.approvalId) {
-            parts.push({
-              type: "tool-incentive_compute",
-              state: "output-available",
-              output: { ok: true, approvalId: active.approvalId },
-            });
-          }
+          if (active.approvalId) parts.push({ type: "data-approval", approvalId: active.approvalId });
           loaded.push({ id: active.id, role: "assistant", parts } as unknown as UIMessage);
         }
         if (t.variants.length > 0) {
@@ -776,6 +771,13 @@ export function AssistantChat({
                 >
                   <div className="flex max-w-[80%] flex-col gap-1.5">
                     {m.parts.map((p, i) => {
+                      // 刷新重建的审批卡片(UI-only part,不进模型上下文)
+                      if (p.type === "data-approval") {
+                        const aid = (p as { approvalId?: unknown }).approvalId;
+                        return typeof aid === "string" ? (
+                          <InlineApproval key={i} approvalId={aid} />
+                        ) : null;
+                      }
                       if (p.type === "text") {
                         return m.role === "user" ? (
                           <div
@@ -798,11 +800,9 @@ export function AssistantChat({
                         const state = (p as { state?: string }).state ?? "";
                         const output = (p as { output?: unknown }).output;
                         const ev = state === "output-available" && isEvidence(output) ? output : null;
-                        // 写工具(需审批):输出携带 approvalId + status=pending → 内联审批卡片
+                        // 任一写工具(需审批):输出携带 approvalId → 内联审批卡片
                         const appr =
-                          state === "output-available" && name === "incentive_compute" && isApprovalOutput(output)
-                            ? output
-                            : null;
+                          state === "output-available" && isApprovalOutput(output) ? output : null;
                         const hint =
                           state === "output-available"
                             ? "已返回"
