@@ -269,6 +269,7 @@ export function AssistantChat({
   const captureRef = useRef<CaptureInfo | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const forceBottomRef = useRef(false); // 加载会话后强制贴底(即使不在底部附近)
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -367,10 +368,15 @@ export function AssistantChat({
     });
   }, [status, messages]);
 
-  // 贴底(仅当已在底部附近)
+  // 贴底:加载会话后强制到底;否则仅当已在底部附近才跟随
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    if (forceBottomRef.current) {
+      forceBottomRef.current = false;
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     if (nearBottom) el.scrollTop = el.scrollHeight;
   }, [messages, showThinking]);
@@ -457,6 +463,7 @@ export function AssistantChat({
           };
         }
       }
+      forceBottomRef.current = true; // 进入会话后落到最新消息(底部)
       setMessages(loaded);
       setVariants(vmap);
       convIdRef.current = id;
