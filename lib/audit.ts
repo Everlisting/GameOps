@@ -55,7 +55,10 @@ export type AuditAction =
   | "feishu.test"               // 测试连通性发送
   | "feishu.webhook.create"     // 新增 webhook
   | "feishu.webhook.update"     // 改 webhook
-  | "feishu.webhook.delete";    // 删 webhook
+  | "feishu.webhook.delete"     // 删 webhook
+  | "feishu.app.update"         // 改自建应用配置(双向对话)
+  | "feishu.chat.allow"         // 会话白名单开关
+  | "feishu.chat.delete";       // 移除会话(白名单 + 绑定对话)
 
 export type AuditTargetType =
   | "task"
@@ -72,7 +75,9 @@ export type AuditTargetType =
   | "ai_model_profile"   // 模型配置
   | "knowledge_document" // 知识库文档(10.3)
   | "ai_approval"        // 需审批的写操作(10.4)
-  | "feishu_webhook";    // 飞书 webhook(阶段6)
+  | "feishu_webhook"     // 飞书 webhook(阶段6)
+  | "feishu_app"         // 飞书自建应用(双向对话)
+  | "feishu_chat";       // 飞书会话白名单
 
 export interface AuditOpts {
   /** 操作人 user.id;null = 系统(cron 自动触发) */

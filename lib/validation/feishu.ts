@@ -26,3 +26,25 @@ export const feishuUpdateSchema = z
     dailyReport: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "无更新字段" });
+
+/** 双向对话 · 自建应用配置(密钥字段仅在非空时覆盖)。 */
+export const feishuAppSchema = z
+  .object({
+    appId: z
+      .string()
+      .trim()
+      .max(64)
+      .refine(
+        (value) => value === "" || /^cli_[0-9a-fA-F]{16}$/.test(value),
+        "App ID 格式不正确",
+      )
+      .optional(),
+    appSecret: z.string().trim().max(128).optional(),
+    verificationToken: z.string().trim().max(128).optional(),
+    encryptKey: z.string().trim().max(128).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "无更新字段" });
+
+/** PATCH 会话白名单:allowed 开关 */
+export const feishuChatPatchSchema = z.object({ allowed: z.boolean() });

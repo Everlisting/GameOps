@@ -61,10 +61,9 @@ function wrapJsonSafe(tools: ToolSet): ToolSet {
   return out;
 }
 
-// 数据工具全 OPERATOR 只读;knowledge_search 按 session.role 收窄可见知识库(per-KB 权限)。
-// 写工具(10.4)只生成待审批提案,不执行;仅运营端对话挂载(创作者端自建工具集,不含写工具)。
-export function makeTools(session: SessionPayload, ctx: ToolContext = {}) {
-  return wrapJsonSafe({
+/** 只读工具集:数据工具 + knowledge_search(按 session.role 收窄可见知识库)。 */
+function readTools(session: SessionPayload) {
+  return {
     [TOOL_DEFS.streamerProfile.name]: streamerProfileTool(),
     [TOOL_DEFS.videoSummary.name]: videoSummaryTool(),
     [TOOL_DEFS.videoRank.name]: videoRankTool(),
@@ -72,10 +71,22 @@ export function makeTools(session: SessionPayload, ctx: ToolContext = {}) {
     [TOOL_DEFS.incentiveExplain.name]: incentiveExplainTool(),
     [TOOL_DEFS.crawlerTaskStatus.name]: crawlerTaskStatusTool(),
     [TOOL_DEFS.knowledgeSearch.name]: knowledgeSearchTool(session),
+  };
+}
+
+// 只读数据工具 + 写工具(10.4,只生成待审批提案)。运营端对话用。
+export function makeTools(session: SessionPayload, ctx: ToolContext = {}) {
+  return wrapJsonSafe({
+    ...readTools(session),
     [TOOL_DEFS.incentiveCompute.name]: incentiveComputeTool(session, ctx),
     [TOOL_DEFS.crawlerTaskRerun.name]: crawlerTaskRerunTool(session, ctx),
     [TOOL_DEFS.crawlerTaskCancel.name]: crawlerTaskCancelTool(session, ctx),
     [TOOL_DEFS.activityStatus.name]: activityStatusTool(session, ctx),
     [TOOL_DEFS.activityUpdate.name]: activityUpdateTool(session, ctx),
   });
+}
+
+/** 只读工具集(飞书双向对话等外部场景:无写工具/审批)。 */
+export function makeReadonlyTools(session: SessionPayload) {
+  return wrapJsonSafe(readTools(session));
 }

@@ -611,6 +611,36 @@ model FeishuWebhook {
   @@map("feishu_webhook")
 }
 
+/// 阶段6 · 飞书双向对话 · 自建应用凭证(单例)。AppSecret/校验令牌/加密密钥 AES 加密存库。
+model FeishuApp {
+  id                   Int      @id @default(1) // 单例锁:业务只写 id=1
+  appId                String   @default("")
+  appSecretEnc         String   @default("") // App Secret 密文
+  appSecretMask        String   @default("")
+  verificationTokenEnc String   @default("") // 事件订阅 Verification Token 密文
+  encryptKeyEnc        String   @default("") // 事件订阅 Encrypt Key 密文(空=事件不加密)
+  enabled              Boolean  @default(false)
+  updatedBy            String?
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  @@map("feishu_app")
+}
+
+/// 阶段6 · 飞书双向对话 · 会话白名单(收到消息自动登记,管理员勾选 allowed 才应答)。
+model FeishuChat {
+  id             String   @id @default(cuid())
+  chatId         String   @unique // 飞书 chat_id
+  name           String   @default("")
+  chatType       String   @default("group") // group / p2p
+  allowed        Boolean  @default(false)
+  conversationId String? // 绑定的 AiConversation(audience=feishu),多轮记忆
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@map("feishu_chat")
+}
+
 /// 阶段10 · AI 助手 · 模型配置(按用途单例:usage 唯一,如 chat / embedding)。
 /// 泛化自 OpinionSettings:apiKeyEnc = AES-256-GCM 密文,明文只在服务端解出调模型,永不回前端/入日志。
 /// baseUrl 指向国产模型的 OpenAI 兼容端点(数据不出境)。

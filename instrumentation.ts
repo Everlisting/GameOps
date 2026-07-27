@@ -70,4 +70,12 @@ export async function register() {
   } catch (err) {
     console.error("[instrumentation] kb-indexer 启动失败", err);
   }
+
+  // 阶段6 · 飞书双向对话:长连接(WebSocket)接收消息事件 → 只读 Agent → 回发
+  try {
+    const { startFeishuWS } = await import("@/lib/feishu/ws");
+    startFeishuWS();
+  } catch (err) {
+    console.error("[instrumentation] feishu-ws 启动失败", err);
+  }
 }
