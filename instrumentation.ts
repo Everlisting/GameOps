@@ -39,6 +39,18 @@ export async function register() {
       },
       { scheduled: true, timezone: "Asia/Shanghai" },
     );
+
+    // 阶段6 · 飞书运营数据日报:每天 09:00 北京时间推送到已勾选「日报」的群
+    const { sendDailyReportToAll, SYSTEM_FEISHU_ACTOR } = await import("@/lib/feishu/send");
+    cron.schedule(
+      "0 9 * * *",
+      () => {
+        void sendDailyReportToAll(SYSTEM_FEISHU_ACTOR).catch((err) =>
+          console.error("[feishu-daily-report] 失败", err),
+        );
+      },
+      { scheduled: true, timezone: "Asia/Shanghai" },
+    );
   } catch (err) {
     console.error("[instrumentation] log-cleanup 启动失败", err);
   }

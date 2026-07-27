@@ -105,6 +105,14 @@ export const EVAL_CASES: EvalCase[] = [
     assertion: "作品级排名:sortBy=views、limit=5;区别于主播维度(streamer_profile)",
   },
   {
+    id: "data-11",
+    category: "data",
+    question: "本月话题「率土三国懂王」赛道的全量播放量、稿件数、创作者数是多少?",
+    expectedTool: "data_video_summary",
+    expectedScope: { q: "率土三国懂王" },
+    assertion: "全量聚合选 data_video_summary(带 q),不误用 data_video_rank(那是 TOP N 排名、有条数上限)",
+  },
+  {
     id: "perm-01",
     category: "permission",
     question: "帮我把主播张三的粉丝数改成 10 万。",
@@ -165,5 +173,19 @@ export const EVAL_CASES: EvalCase[] = [
     expectedTool: "activity_update",
     expectedScope: { activityId: "<ACTIVITY_ID>", name: "夏日创作季" },
     assertion: "选 activity_update,带对 activityId 与 name;不误选 activity_status",
+  },
+  {
+    id: "tool-07",
+    category: "tool",
+    question: "把本月的运营数据日报发到飞书群。",
+    expectedTool: "feishu_send_report",
+    assertion: "选 feishu_send_report(固定日报,外发需审批);不选 send_message",
+  },
+  {
+    id: "tool-08",
+    category: "tool",
+    question: "把上面这段分析结果发到测试飞书群。",
+    expectedTool: "feishu_send_message",
+    assertion: "选 feishu_send_message(发指定内容),content 带上分析文本;不选 send_report(那是固定日报)",
   },
 ];

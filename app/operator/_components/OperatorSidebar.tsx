@@ -18,6 +18,7 @@ import {
   ListChecks,
   MessageSquareText,
   MonitorSmartphone,
+  Send,
   Server,
   Shield,
   ShieldCheck,
@@ -194,6 +195,11 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
     title: "csvType 管理",
     url: "/operator/admin/csv-types",
     icon: FileSpreadsheet,
+  },
+  {
+    title: "飞书外发",
+    url: "/operator/admin/feishu",
+    icon: Send,
   },
   {
     title: "审计日志",

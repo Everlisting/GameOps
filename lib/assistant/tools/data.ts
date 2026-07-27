@@ -104,8 +104,16 @@ export function videoSummaryTool() {
         ...(start || end
           ? { publishedAt: { ...(start ? { gte: start } : {}), ...(end ? { lt: end } : {}) } }
           : {}),
+        ...(input.q
+          ? {
+              OR: [
+                { title: { contains: input.q, mode: "insensitive" } },
+                { creatorName: { contains: input.q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
       };
-      const [agg, worksCount] = await Promise.all([
+      const [agg, worksCount, creators] = await Promise.all([
         prisma.videoStat.aggregate({
           where,
           _sum: {
@@ -118,10 +126,14 @@ export function videoSummaryTool() {
           },
         }),
         prisma.videoStat.count({ where }),
+        // 去重创作者(按昵称)——全量统计,不受排名条数限制
+        prisma.videoStat.findMany({ where, select: { creatorName: true }, distinct: ["creatorName"] }),
       ]);
+      const creatorCount = creators.filter((c) => c.creatorName).length;
       return {
         data: {
           worksCount,
+          creatorCount,
           views: agg._sum.views ?? 0,
           recommendedViews: agg._sum.recommendedViews ?? 0,
           likes: agg._sum.likes ?? 0,
@@ -130,8 +142,8 @@ export function videoSummaryTool() {
           fansGained: agg._sum.fansGained ?? 0,
         },
         asOf: new Date().toISOString(),
-        scope: { dateFrom: input.publishedFrom ?? month, dateTo: input.publishedTo ?? null },
-        source: "VideoStat(hidden=false)",
+        scope: { dateFrom: input.publishedFrom ?? month, dateTo: input.publishedTo ?? null, q: input.q ?? null },
+        source: "VideoStat(hidden=false)· 全量聚合",
         links: ["/operator/data/videos"],
       };
     },

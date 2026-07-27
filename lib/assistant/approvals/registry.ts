@@ -12,7 +12,7 @@ import type { Role } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db";
-import { conflict, notFound } from "@/lib/errors";
+import { badRequest, conflict, notFound } from "@/lib/errors";
 import {
   previewActivityCompute,
   computeActivityIncentives,
@@ -20,6 +20,8 @@ import {
 import { cancelCrawlerTask, rerunCrawlerTask } from "@/lib/crawler/task-ops";
 import { changeActivityStatus, previewActivityStatus } from "@/lib/activity/status";
 import { previewActivityUpdate, updateActivity } from "@/lib/activity/update";
+import { listWebhooks, getWebhookTarget } from "@/lib/feishu/config";
+import { sendDailyReport, sendCustomMessage } from "@/lib/feishu/send";
 
 export interface ApprovalActor {
   id: string;
@@ -229,12 +231,106 @@ const activityUpdateHandler: ApprovalHandler = {
   },
 };
 
+// ── feishu.send_report:把运营数据日报推送到飞书群 ──────────────────────
+const feishuSendReportInput = z.object({
+  group: z.string().optional(), // 飞书群名称(模糊);缺省=唯一启用的群
+});
+
+/** 解析目标群:按名称模糊匹配启用中的群;不给名称且仅一个启用群时用它;否则报错。 */
+async function resolveFeishuTarget(group?: string): Promise<{ id: string; name: string }> {
+  const enabled = (await listWebhooks()).filter((w) => w.enabled);
+  if (enabled.length === 0) throw badRequest("尚未配置启用中的飞书群(请先在中台配置)");
+  if (group) {
+    const hit = enabled.find((w) => w.name.includes(group)) ?? enabled.find((w) => group.includes(w.name));
+    if (!hit) throw badRequest(`没有找到名为「${group}」的飞书群`);
+    return { id: hit.id, name: hit.name };
+  }
+  if (enabled.length > 1) {
+    throw badRequest(`有多个飞书群(${enabled.map((w) => w.name).join("、")}),请指明发到哪个`);
+  }
+  return { id: enabled[0].id, name: enabled[0].name };
+}
+
+const feishuSendReportHandler: ApprovalHandler = {
+  action: "feishu.send_report",
+  requiredRole: "OPERATOR",
+  async buildProposal(raw) {
+    const { group } = feishuSendReportInput.parse(raw);
+    const target = await resolveFeishuTarget(group);
+    return {
+      title: `向飞书群「${target.name}」发送运营数据日报`,
+      preview: {
+        群: target.name,
+        内容: "运营数据日报(本月视频总量 / Top5 作品 / 进行中活动)",
+        effect: "批准后立即推送到该飞书群",
+      },
+      params: { webhookId: target.id, webhookName: target.name },
+    };
+  },
+  async execute(params, actor) {
+    const p = z.object({ webhookId: z.string(), webhookName: z.string() }).parse(params);
+    const target = await getWebhookTarget(p.webhookId);
+    if (!target) throw badRequest("飞书群不存在或已删除");
+    const r = await sendDailyReport(target, { id: actor.id, username: actor.username });
+    if (!r.ok) throw badRequest(`飞书发送失败:${r.msg}`);
+    return { message: "日报已发送", 群: p.webhookName };
+  },
+};
+
+// ── feishu.send_message:把指定内容(如助手生成的分析)推送到飞书群 ────────
+const feishuSendMessageInput = z.object({
+  group: z.string().optional(),
+  title: z.string().optional(),
+  content: z.string().min(1, "内容不能为空"),
+});
+
+const feishuSendMessageHandler: ApprovalHandler = {
+  action: "feishu.send_message",
+  requiredRole: "OPERATOR",
+  async buildProposal(raw) {
+    const p = feishuSendMessageInput.parse(raw);
+    const target = await resolveFeishuTarget(p.group);
+    const snippet = p.content.length > 120 ? `${p.content.slice(0, 120)}…` : p.content;
+    return {
+      title: `向飞书群「${target.name}」发送消息`,
+      preview: {
+        群: target.name,
+        标题: p.title ?? "(默认)",
+        内容预览: snippet,
+        effect: "批准后立即推送到该飞书群",
+      },
+      params: { webhookId: target.id, webhookName: target.name, title: p.title, content: p.content },
+    };
+  },
+  async execute(params, actor) {
+    const p = z
+      .object({
+        webhookId: z.string(),
+        webhookName: z.string(),
+        title: z.string().optional(),
+        content: z.string(),
+      })
+      .parse(params);
+    const target = await getWebhookTarget(p.webhookId);
+    if (!target) throw badRequest("飞书群不存在或已删除");
+    const r = await sendCustomMessage(
+      target,
+      { title: p.title, content: p.content },
+      { id: actor.id, username: actor.username },
+    );
+    if (!r.ok) throw badRequest(`飞书发送失败:${r.msg}`);
+    return { message: "消息已发送", 群: p.webhookName };
+  },
+};
+
 export const APPROVAL_HANDLERS: Record<string, ApprovalHandler> = {
   [incentiveComputeHandler.action]: incentiveComputeHandler,
   [crawlerRerunHandler.action]: crawlerRerunHandler,
   [crawlerCancelHandler.action]: crawlerCancelHandler,
   [activityStatusHandler.action]: activityStatusHandler,
   [activityUpdateHandler.action]: activityUpdateHandler,
+  [feishuSendReportHandler.action]: feishuSendReportHandler,
+  [feishuSendMessageHandler.action]: feishuSendMessageHandler,
 };
 
 export function getApprovalHandler(action: string): ApprovalHandler | undefined {

@@ -594,6 +594,23 @@ model OpinionSettings {
   @@map("opinion_settings")
 }
 
+/// 阶段6 · 飞书外发 · 群自定义机器人 webhook(多群)。URL/加签密钥 AES 加密存库。
+model FeishuWebhook {
+  id          String   @id @default(cuid())
+  name        String // 群名称 / 用途标签
+  urlEnc      String // webhook URL 密文(AES-256-GCM base64)
+  urlMask     String   @default("") // 打码展示串
+  secretEnc   String   @default("") // 加签密钥密文;空=不加签
+  hasSecret   Boolean  @default(false) // 是否配了加签(免解密即可展示)
+  enabled     Boolean  @default(true)
+  dailyReport Boolean  @default(false) // 纳入每日 cron 日报推送
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("feishu_webhook")
+}
+
 /// 阶段10 · AI 助手 · 模型配置(按用途单例:usage 唯一,如 chat / embedding)。
 /// 泛化自 OpinionSettings:apiKeyEnc = AES-256-GCM 密文,明文只在服务端解出调模型,永不回前端/入日志。
 /// baseUrl 指向国产模型的 OpenAI 兼容端点(数据不出境)。

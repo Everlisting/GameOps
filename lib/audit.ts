@@ -49,7 +49,13 @@ export type AuditAction =
   // 阶段10.4 · 需审批的写操作
   | "approval.create"           // 写工具生成一条待审批提案
   | "approval.approve"          // 运营批准(触发执行)
-  | "approval.reject";          // 运营拒绝
+  | "approval.reject"           // 运营拒绝
+  // 阶段6 · 飞书外发
+  | "feishu.send"               // 发送日报/报告到飞书群
+  | "feishu.test"               // 测试连通性发送
+  | "feishu.webhook.create"     // 新增 webhook
+  | "feishu.webhook.update"     // 改 webhook
+  | "feishu.webhook.delete";    // 删 webhook
 
 export type AuditTargetType =
   | "task"
@@ -65,7 +71,8 @@ export type AuditTargetType =
   | "ai_conversation"    // 一次会话
   | "ai_model_profile"   // 模型配置
   | "knowledge_document" // 知识库文档(10.3)
-  | "ai_approval";       // 需审批的写操作(10.4)
+  | "ai_approval"        // 需审批的写操作(10.4)
+  | "feishu_webhook";    // 飞书 webhook(阶段6)
 
 export interface AuditOpts {
   /** 操作人 user.id;null = 系统(cron 自动触发) */
