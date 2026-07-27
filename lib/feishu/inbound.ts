@@ -15,7 +15,7 @@ import {
   loadRecentMessages,
   appendMessages,
 } from "@/lib/feishu/chat";
-import { replyToChat } from "@/lib/feishu/reply";
+import { sendCard, deliverMarkdown } from "@/lib/feishu/reply";
 
 export interface ParsedFeishuMessage {
   chatId: string;
@@ -41,6 +41,9 @@ export async function processFeishuMessage(msg: ParsedFeishuMessage): Promise<vo
   const conversationId = await ensureConversation(chat);
   const history = await loadRecentMessages(conversationId, 12);
 
+  // 先秒回「思考中」占位卡片,拿到 message_id;生成完后原地更新为答案(避免用户以为没发出去)
+  const thinking = await sendCard(msg.chatId, "🤔 正在思考,请稍候…");
+
   const { model } = await getChatModel();
   const system = await getSystemPrompt();
   // 飞书用户非登录中台账号:统一按只读 OPERATOR 处理(知识库 ACL 取运营可见)
@@ -63,5 +66,17 @@ export async function processFeishuMessage(msg: ParsedFeishuMessage): Promise<vo
   if (!answer) answer = "(未生成内容)";
 
   await appendMessages(conversationId, text, answer);
-  await replyToChat(msg.chatId, answer);
+
+  if (!thinking.ok) {
+    console.error("[feishu] 「思考中」卡片发送失败:", thinking.msg);
+  }
+  // 投递答案:超飞书卡片上限时自动拆成多张卡片(首块更新「思考中」卡片,其余追加)
+  const sent = await deliverMarkdown(
+    msg.chatId,
+    answer,
+    thinking.ok && thinking.messageId ? thinking.messageId : undefined,
+  );
+  if (!sent.ok) {
+    console.error(`[feishu] 回发消息失败(chat=${msg.chatId}):${sent.msg}`);
+  }
 }
