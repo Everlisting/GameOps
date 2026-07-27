@@ -14,6 +14,7 @@ import { chatInputSchema } from "@/lib/validation/assistant";
 import { getChatModel } from "@/lib/assistant/model";
 import { getSystemPrompt } from "@/lib/assistant/agent";
 import { makeTools, WRITE_TOOL_NAMES } from "@/lib/assistant/tools";
+import { deliverToGroups } from "@/lib/feishu/send";
 import {
   startTurn,
   beginRun,
@@ -139,6 +140,13 @@ export const POST = route(async (req) => {
     },
     onFinish: async ({ text, usage }) => {
       await finishAssistant(turn.assistantMessageId, text.trim(), approvalId);
+      // 用户在输入框选了飞书群 → 把本轮回复同时投递一份到这些群(页面照常输出)
+      if (body.feishuGroupIds && body.feishuGroupIds.length > 0 && text.trim()) {
+        void deliverToGroups(body.feishuGroupIds, text.trim(), {
+          id: session.sub,
+          username: session.username,
+        });
+      }
       await finishRun(runId, {
         status: "succeeded",
         inputTokens: usage.inputTokens ?? null,

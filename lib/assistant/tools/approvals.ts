@@ -119,20 +119,3 @@ export function activityUpdateTool(session: SessionPayload, ctx: ToolContext) {
   });
 }
 
-/** feishu_send_report:把运营数据日报推送到飞书群(需审批)。 */
-export function feishuSendReportTool(session: SessionPayload, ctx: ToolContext) {
-  return tool({
-    description: TOOL_DEFS.feishuSendReport.description,
-    inputSchema: TOOL_DEFS.feishuSendReport.input,
-    execute: async (input) => propose("feishu.send_report", input, session, ctx),
-  });
-}
-
-/** feishu_send_message:把指定内容(如助手生成的分析)推送到飞书群(需审批)。 */
-export function feishuSendMessageTool(session: SessionPayload, ctx: ToolContext) {
-  return tool({
-    description: TOOL_DEFS.feishuSendMessage.description,
-    inputSchema: TOOL_DEFS.feishuSendMessage.input,
-    execute: async (input) => propose("feishu.send_message", input, session, ctx),
-  });
-}

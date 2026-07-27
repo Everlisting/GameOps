@@ -114,19 +114,6 @@ export const activityUpdateInput = z.object({
   endAt: z.string().optional().describe("新结束时间(YYYY-MM-DD 或 ISO 日期时间)"),
 });
 
-export const feishuSendReportInput = z.object({
-  group: z.string().optional().describe("飞书群名称(模糊匹配);只有一个启用群时可不填"),
-});
-
-export const feishuSendMessageInput = z.object({
-  group: z.string().optional().describe("飞书群名称(模糊匹配);只有一个启用群时可不填"),
-  title: z.string().optional().describe("卡片标题(可选)"),
-  content: z
-    .string()
-    .describe(
-      "要发送的完整内容(markdown:**加粗** / 列表 / **表格**(会渲染成飞书原生表格)/ [文本](url) 链接。数据对比请用 markdown 表格;列举具体作品用 [《标题》](url) 链接,url 取自数据工具返回的 url 字段)",
-    ),
-});
 
 /** 工具定义(名称 + 描述 + 入参),压测与真实工具共用。描述写清「何时调用」以帮助较弱模型选对工具。 */
 export const TOOL_DEFS = {
@@ -201,18 +188,6 @@ export const TOOL_DEFS = {
     description:
       "【写操作·需人工审批(管理员)】修改活动基础信息:名称 / 简介 / 开始时间 / 结束时间。当用户要求修改/编辑某活动的这些字段时调用。不改激励规则(那需在中台规则编辑器操作)。**每次都必须实际调用本工具生成新的待审批**,并只带用户明确要改的字段。只生成待审批,须管理员批准后才生效。需要 activityId + 至少一个要改的字段(可先用 activity_summary 定位活动)。",
     input: activityUpdateInput,
-  },
-  feishuSendReport: {
-    name: "feishu_send_report",
-    description:
-      "【写操作·需人工审批】发送**系统自动组装的固定运营数据日报**(本月视频总量 / Top5 作品 / 进行中活动)到飞书群。仅当用户要求发送「日报 / 每日数据」这类**固定报表**时调用;若用户要发的是你刚生成的分析/总结/某段具体内容,请改用 feishu_send_message。**每次都必须实际调用本工具生成新的待审批**,须运营批准后才外发。可给 group;只有一个启用群时可不填。",
-    input: feishuSendReportInput,
-  },
-  feishuSendMessage: {
-    name: "feishu_send_message",
-    description:
-      "【写操作·需人工审批】把**指定的一段内容**发送到飞书群。当用户要求把「上面的/这段/刚才的分析、总结、结论、某条消息」发到飞书、推送到群里时调用——把要发送的完整内容放进 content。**内容用 markdown**:数据对比用**表格**(会渲染成飞书原生表格,别退化成纯文本列表)、列举具体作品用 [《标题》](url) 可点击链接(url 取自数据工具返回值)。**每次都必须实际调用本工具生成新的待审批**,须运营批准后才外发。可给 group;只有一个启用群时可不填。",
-    input: feishuSendMessageInput,
   },
 } as const;
 

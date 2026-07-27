@@ -174,18 +174,4 @@ export const EVAL_CASES: EvalCase[] = [
     expectedScope: { activityId: "<ACTIVITY_ID>", name: "夏日创作季" },
     assertion: "选 activity_update,带对 activityId 与 name;不误选 activity_status",
   },
-  {
-    id: "tool-07",
-    category: "tool",
-    question: "把本月的运营数据日报发到飞书群。",
-    expectedTool: "feishu_send_report",
-    assertion: "选 feishu_send_report(固定日报,外发需审批);不选 send_message",
-  },
-  {
-    id: "tool-08",
-    category: "tool",
-    question: "把上面这段分析结果发到测试飞书群。",
-    expectedTool: "feishu_send_message",
-    assertion: "选 feishu_send_message(发指定内容),content 带上分析文本;不选 send_report(那是固定日报)",
-  },
 ];

@@ -23,8 +23,6 @@ import {
   crawlerTaskCancelTool,
   activityStatusTool,
   activityUpdateTool,
-  feishuSendReportTool,
-  feishuSendMessageTool,
   type ToolContext,
 } from "@/lib/assistant/tools/approvals";
 
@@ -35,8 +33,6 @@ export const WRITE_TOOL_NAMES: string[] = [
   TOOL_DEFS.crawlerTaskCancel.name,
   TOOL_DEFS.activityStatus.name,
   TOOL_DEFS.activityUpdate.name,
-  TOOL_DEFS.feishuSendReport.name,
-  TOOL_DEFS.feishuSendMessage.name,
 ];
 
 /**
@@ -81,7 +77,5 @@ export function makeTools(session: SessionPayload, ctx: ToolContext = {}) {
     [TOOL_DEFS.crawlerTaskCancel.name]: crawlerTaskCancelTool(session, ctx),
     [TOOL_DEFS.activityStatus.name]: activityStatusTool(session, ctx),
     [TOOL_DEFS.activityUpdate.name]: activityUpdateTool(session, ctx),
-    [TOOL_DEFS.feishuSendReport.name]: feishuSendReportTool(session, ctx),
-    [TOOL_DEFS.feishuSendMessage.name]: feishuSendMessageTool(session, ctx),
   });
 }

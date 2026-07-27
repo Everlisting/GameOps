@@ -184,24 +184,6 @@ function makeMockTools(record: RecordFn): ToolSet {
         return { ok: true, approvalId: "ap_demo", status: "pending", message: "已生成待审批操作。" };
       },
     }),
-    [TOOL_DEFS.feishuSendReport.name]: tool({
-      description: TOOL_DEFS.feishuSendReport.description,
-      inputSchema: TOOL_DEFS.feishuSendReport.input,
-      execute: async (args) => {
-        const a = args as Record<string, unknown>;
-        record(TOOL_DEFS.feishuSendReport.name, a);
-        return { ok: true, approvalId: "ap_demo", status: "pending", message: "已生成待审批操作。" };
-      },
-    }),
-    [TOOL_DEFS.feishuSendMessage.name]: tool({
-      description: TOOL_DEFS.feishuSendMessage.description,
-      inputSchema: TOOL_DEFS.feishuSendMessage.input,
-      execute: async (args) => {
-        const a = args as Record<string, unknown>;
-        record(TOOL_DEFS.feishuSendMessage.name, a);
-        return { ok: true, approvalId: "ap_demo", status: "pending", message: "已生成待审批操作。" };
-      },
-    }),
   };
 }
 

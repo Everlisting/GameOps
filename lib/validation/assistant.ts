@@ -30,6 +30,8 @@ export const chatInputSchema = z.object({
   messages: z.array(uiMessageSchema).min(1, "messages 不能为空"),
   /** 重试时传入被重试的用户消息 id(其 parent):则新增一个助手版本而非新开一轮 */
   regenerateParentId: z.string().optional(),
+  /** 同时把本轮回复投递到这些飞书群(webhook id);空/缺省=仅页面输出 */
+  feishuGroupIds: z.array(z.string()).max(20).optional(),
 });
 
 /** POST /messages/activate 入参 */

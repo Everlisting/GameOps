@@ -21,6 +21,7 @@ import {
   Pin,
   PinOff,
   RefreshCw,
+  Send,
   Share2,
   Square,
   ThumbsDown,
@@ -56,6 +57,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Markdown } from "./Markdown";
 import { InlineApproval } from "./InlineApproval";
@@ -271,6 +274,11 @@ export function AssistantChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const forceBottomRef = useRef(false); // 加载会话后强制贴底(即使不在底部附近)
 
+  // 「同时发送到飞书群」多选(显式,非 AI 自主):选中的群会收到本轮回复的一份副本
+  const [feishuGroups, setFeishuGroups] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedFeishu, setSelectedFeishu] = useState<string[]>([]);
+  const selectedFeishuRef = useRef<string[]>([]);
+
   const refreshConversations = useCallback(async () => {
     try {
       const res = await fetch("/api/operator/assistant/conversations");
@@ -289,7 +297,15 @@ export function AssistantChat({
         prepareSendMessagesRequest: ({ messages }) => {
           const rp = regenParentRef.current;
           regenParentRef.current = undefined;
-          return { body: { messages, conversationId: convIdRef.current, regenerateParentId: rp } };
+          const fg = selectedFeishuRef.current;
+          return {
+            body: {
+              messages,
+              conversationId: convIdRef.current,
+              regenerateParentId: rp,
+              ...(fg.length > 0 ? { feishuGroupIds: fg } : {}),
+            },
+          };
         },
         fetch: async (url, init) => {
           const res = await fetch(url, init);
@@ -384,6 +400,24 @@ export function AssistantChat({
   useEffect(() => {
     if (configured) void refreshConversations();
   }, [configured, refreshConversations]);
+  // 拉取启用中的飞书群(供「同时发送到飞书群」下拉)
+  useEffect(() => {
+    if (!configured) return;
+    void fetch("/api/operator/assistant/feishu-groups", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { groups?: Array<{ id: string; name: string }> } | null) => {
+        if (d?.groups) setFeishuGroups(d.groups);
+      })
+      .catch(() => {});
+  }, [configured]);
+
+  const toggleFeishu = useCallback((id: string) => {
+    setSelectedFeishu((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      selectedFeishuRef.current = next;
+      return next;
+    });
+  }, []);
   useEffect(() => {
     if (status === "ready") void refreshConversations();
   }, [status, refreshConversations]);
@@ -921,6 +955,20 @@ export function AssistantChat({
             </div>
           )}
 
+          {selectedFeishu.length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-1 px-1 text-[11px] text-muted-foreground">
+              <Send className="h-3 w-3 text-primary" />
+              本轮回复将同时发送到飞书群:
+              {feishuGroups
+                .filter((g) => selectedFeishu.includes(g.id))
+                .map((g) => (
+                  <span key={g.id} className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
+                    {g.name}
+                  </span>
+                ))}
+            </div>
+          )}
+
           <form
             className="flex items-end gap-1.5"
             onSubmit={(e) => {
@@ -950,6 +998,62 @@ export function AssistantChat({
             >
               <Paperclip className="h-4 w-4" />
             </Button>
+
+            {feishuGroups.length > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "relative shrink-0 rounded-full",
+                      selectedFeishu.length > 0 ? "text-primary" : "text-muted-foreground",
+                    )}
+                    title="同时发送到飞书群"
+                    disabled={busy}
+                  >
+                    <Send className="h-4 w-4" />
+                    {selectedFeishu.length > 0 && (
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none text-primary-foreground">
+                        {selectedFeishu.length}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-56 p-2">
+                  <div className="mb-1 px-1 text-xs font-medium text-muted-foreground">
+                    同时发送到飞书群(可多选)
+                  </div>
+                  <div className="max-h-56 space-y-0.5 overflow-y-auto">
+                    {feishuGroups.map((g) => (
+                      <label
+                        key={g.id}
+                        className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-accent"
+                      >
+                        <Checkbox
+                          checked={selectedFeishu.includes(g.id)}
+                          onCheckedChange={() => toggleFeishu(g.id)}
+                        />
+                        <span className="truncate">{g.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedFeishu.length > 0 && (
+                    <button
+                      type="button"
+                      className="mt-1 w-full rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-accent"
+                      onClick={() => {
+                        setSelectedFeishu([]);
+                        selectedFeishuRef.current = [];
+                      }}
+                    >
+                      清除选择
+                    </button>
+                  )}
+                </PopoverContent>
+              </Popover>
+            )}
 
             <Textarea
               value={input}

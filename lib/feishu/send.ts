@@ -5,7 +5,7 @@ import { recordAudit, SYSTEM_ACTOR_USERNAME } from "@/lib/audit";
 import { sendFeishu } from "@/lib/feishu/client";
 import { textMessage, richCardMessage } from "@/lib/feishu/message";
 import { buildDailyReportPayload } from "@/lib/feishu/report";
-import { getDailyReportTargets, type WebhookTarget } from "@/lib/feishu/config";
+import { getDailyReportTargets, getWebhookTarget, type WebhookTarget } from "@/lib/feishu/config";
 
 export interface FeishuActor {
   id: string | null; // null = 系统(cron)
@@ -60,6 +60,27 @@ export async function sendCustomMessage(
     details: { name: target.name, kind: "message", title: msg.title ?? null, ok: r.ok, code: r.code, msg: r.msg },
   });
   return { ok: r.ok, msg: r.msg };
+}
+
+/**
+ * 把一段内容(如助手回复)投递到多个飞书群(用户在输入框显式选择的群)。
+ * 逐群解密目标 + 发富卡片 + 审计;单群失败不影响其他群。永不抛(在 onFinish 后台调用)。
+ */
+export async function deliverToGroups(
+  webhookIds: string[],
+  content: string,
+  actor: FeishuActor,
+  title = "AI 助手回复",
+): Promise<void> {
+  for (const id of webhookIds) {
+    try {
+      const target = await getWebhookTarget(id);
+      if (!target) continue;
+      await sendCustomMessage(target, { title, content }, actor);
+    } catch (err) {
+      console.error("[feishu] deliverToGroups 失败", { id, err });
+    }
+  }
 }
 
 /** 发送连通性测试(纯文本)+ 审计 feishu.test。 */
