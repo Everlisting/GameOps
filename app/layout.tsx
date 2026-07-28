@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 import FilterResetOnEntry from "./_components/FilterResetOnEntry";
+import ClientErrorReporter from "./_components/ClientErrorReporter";
 
 export const metadata: Metadata = {
   title: "游戏运营中台",
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <FilterResetOnEntry />
+        <ClientErrorReporter />
         {children}
       </body>
     </html>
