@@ -3,7 +3,7 @@
  */
 import { z } from "zod";
 import { AppError, badRequest } from "@/lib/errors";
-import { createLogger, runWithLogContext } from "@/lib/logger";
+import { createLogger, runWithLogContext, getLogContext } from "@/lib/logger";
 import { normalizeRoute } from "@/lib/logger/normalize";
 
 type Handler = (req: Request, ctx: { params?: Record<string, string> }) => Promise<Response> | Response;
@@ -48,15 +48,18 @@ export function route(handler: Handler): Handler {
 }
 
 export function handleApiError(err: unknown): Response {
+  // 在 route() 的 ALS 上下文内 → 由 route() 的完成日志统一记(此处跳过避免重复);
+  // 裸调用(未过 route(),如 datasets/download)才在此记录未处理错误。
+  const loggedByRoute = !!getLogContext();
   if (err instanceof AppError) {
-    if (!err.expected) console.error("[AppError:INTERNAL]", err);
+    if (!err.expected && !loggedByRoute) httpLog.error("未处理的服务器错误", { event: "http.error", err });
     return Response.json(err.toResponseBody(), { status: err.status });
   }
   if (err instanceof z.ZodError) {
     const e = badRequest("请求参数校验失败", err.flatten().fieldErrors);
     return Response.json(e.toResponseBody(), { status: e.status });
   }
-  console.error("[UnhandledError]", err);
+  if (!loggedByRoute) httpLog.error("未处理的服务器错误", { event: "http.error", err });
   return Response.json({ error: { code: "INTERNAL", message: "服务器内部错误" } }, { status: 500 });
 }
 

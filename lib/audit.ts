@@ -2,13 +2,16 @@
  * 操作审计日志:trigger / cancel / rerun / 模板修改 等关键动作写一条。
  *
  * 设计原则:
- *   - 失败不阻塞主路径:网络 / DB 瞬错只 console.error,不抛
+ *   - 失败不阻塞主路径:网络 / DB 瞬错只记日志,不抛
  *   - 写入用 actorUsername 快照,User 被删后审计仍可读
  *   - cron 自动触发用 SYSTEM_ACTOR(actorId=null, actorUsername="<system>")
  */
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("audit");
 
 export const SYSTEM_ACTOR_USERNAME = "<system>";
 
@@ -105,6 +108,13 @@ export async function recordAudit(opts: AuditOpts): Promise<void> {
       },
     });
   } catch (err) {
-    console.error("[audit] record failed", { opts, err });
+    // 不记 details 整对象(可能大/含敏感);只留定位所需的动作维度
+    log.error("审计写入失败", {
+      event: "audit.write_failed",
+      action: opts.action,
+      targetType: opts.targetType,
+      targetId: opts.targetId,
+      err,
+    });
   }
 }

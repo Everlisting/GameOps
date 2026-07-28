@@ -5,6 +5,9 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("log-cleanup");
 const LOG_DIR_REL = "data/logs";
 const RETAIN_DAYS = 90;
 
@@ -36,6 +39,6 @@ export async function cleanupOldLogs(): Promise<{ scanned: number; deleted: numb
     }
   }
 
-  if (deleted > 0) console.info(`[log-cleanup] scanned=${scanned} deleted=${deleted}`);
+  if (deleted > 0) log.info("清理过期任务日志", { event: "log_cleanup.done", scanned, deleted });
   return { scanned, deleted };
 }

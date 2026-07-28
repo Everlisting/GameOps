@@ -8,9 +8,12 @@
 import path from "node:path";
 
 import { prisma } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
 import { readKbFile } from "@/lib/assistant/kb-storage";
 import { extractText } from "@/lib/assistant/parse";
 import { ingestDocument } from "@/lib/assistant/rag";
+
+const log = createLogger("kb.indexer");
 
 const POLL_MS = 5_000;
 const BATCH = 2; // 每轮最多处理 2 个文档
@@ -59,7 +62,7 @@ async function tick(): Promise<void> {
       }
     }
   } catch (err) {
-    console.error("[kb-indexer] tick error", err);
+    log.error("索引轮询失败", { event: "kb.indexer.tick_failed", err });
   } finally {
     running = false;
   }
@@ -70,5 +73,5 @@ export function startIndexer(): void {
   started = true;
   timer = setInterval(() => void tick(), POLL_MS);
   if (timer.unref) timer.unref();
-  console.log("[kb-indexer] started");
+  log.info("索引 worker 已启动", { event: "kb.indexer.started" });
 }

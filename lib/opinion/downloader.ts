@@ -12,6 +12,7 @@
  */
 import fs from "node:fs/promises";
 
+import { createLogger } from "@/lib/logger";
 import { fetchTaskArtifact, listTasks, type AnalysisTaskInfo } from "@/lib/opinion/client";
 import {
   ensureRoot,
@@ -24,6 +25,7 @@ import {
 import { env } from "@/lib/validation/env";
 
 const POLL_INTERVAL_MS = 10_000;
+const log = createLogger("opinion.downloader");
 
 let started = false;
 let running = false;
@@ -58,7 +60,7 @@ async function downloadOne(task: AnalysisTaskInfo): Promise<void> {
       const jsonBuf = Buffer.from(await jsonRes.arrayBuffer());
       await fs.writeFile(jsonPath(task.task_id), jsonBuf);
     } catch (err) {
-      console.warn("[opinion.downloader] json 拉取失败(html 已入库)", task.task_id, err);
+      log.warn("json 拉取失败(html 已入库)", { event: "opinion.downloader.json_failed", taskId: task.task_id, err });
     }
   }
 
@@ -76,9 +78,12 @@ async function downloadOne(task: AnalysisTaskInfo): Promise<void> {
   };
   await fs.writeFile(metaPath(task.task_id), JSON.stringify(meta, null, 2), "utf-8");
 
-  console.info(
-    `[opinion.downloader] pulled ${task.scope} ${task.task_id} html=${htmlBuf.length}B`,
-  );
+  log.info("已拉取报告", {
+    event: "opinion.downloader.pulled",
+    opinionTaskId: task.task_id,
+    scope: task.scope,
+    htmlBytes: htmlBuf.length,
+  });
 }
 
 async function pollOnce(): Promise<void> {
@@ -90,12 +95,12 @@ async function pollOnce(): Promise<void> {
       try {
         await downloadOne(t);
       } catch (err) {
-        console.warn("[opinion.downloader] 单条失败", t.task_id, err);
+        log.warn("单条报告下载失败", { event: "opinion.downloader.one_failed", opinionTaskId: t.task_id, err });
       }
     }
   } catch (err) {
     // 分析服务不可达 / 401 等:只 log,下轮再试
-    console.warn("[opinion.downloader] 轮询失败", err);
+    log.warn("轮询失败", { event: "opinion.downloader.poll_failed", err });
   } finally {
     running = false;
   }
@@ -105,9 +110,7 @@ async function pollOnce(): Promise<void> {
 export function startDownloader(): void {
   if (started) return;
   if (!env.ANALYSIS_SHARED_SECRET || !env.ANALYSIS_BASE_URL) {
-    console.warn(
-      "[opinion.downloader] 未配置 ANALYSIS_BASE_URL / ANALYSIS_SHARED_SECRET,跳过启动",
-    );
+    log.warn("未配置分析服务,跳过下载器启动", { event: "opinion.downloader.skip_start" });
     return;
   }
   started = true;
@@ -117,9 +120,7 @@ export function startDownloader(): void {
   }, POLL_INTERVAL_MS);
   // Node 里 setInterval 默认会阻止进程退出;开发热重启期间 unref 让它别拖住 exit
   if (typeof timer.unref === "function") timer.unref();
-  console.info(
-    `[opinion.downloader] started, interval=${POLL_INTERVAL_MS}ms`,
-  );
+  log.info("下载器已启动", { event: "opinion.downloader.started", intervalMs: POLL_INTERVAL_MS });
   // 启动就跑一次(不等第一轮 tick)
   void pollOnce();
 }

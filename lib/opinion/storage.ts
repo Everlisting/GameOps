@@ -14,7 +14,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { AppError } from "@/lib/errors";
+import { createLogger } from "@/lib/logger";
 
+const log = createLogger("opinion.storage");
 const ROOT = path.resolve(process.cwd(), "storage", "opinion-reports");
 const SAFE_ID = /^[A-Za-z0-9_.-]{1,80}$/;
 
@@ -63,6 +65,6 @@ export function removeTaskDir(taskId: string): void {
   try {
     fs.rmSync(taskDir(taskId), { recursive: true, force: true });
   } catch (err) {
-    console.warn("[opinion.storage] removeTaskDir 失败", taskId, err);
+    log.warn("删除任务目录失败", { event: "opinion.storage.remove_failed", taskId, err });
   }
 }

@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import * as Lark from "@larksuiteoapi/node-sdk";
 
 import { badRequest } from "@/lib/errors";
+import { createLogger } from "@/lib/logger";
 import {
   clearFeishuTokenCache,
   getFeishuAppConfig,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/feishu/app";
 import { processFeishuMessage, type ParsedFeishuMessage } from "@/lib/feishu/inbound";
 
+const log = createLogger("feishu.ws");
 const CONNECT_TIMEOUT_MS = 20_000;
 const CONFIG_POLL_INTERVAL_MS = 10_000;
 
@@ -133,7 +135,7 @@ function messageHandler(data: unknown): void {
   const parsed = parse(d);
   if (parsed) {
     void processFeishuMessage(parsed).catch((err) =>
-      console.error("[feishu-ws] inbound", err),
+      log.error("入站消息处理失败", { event: "feishu.ws.inbound_failed", err }),
     );
   }
 }
@@ -167,7 +169,7 @@ export class FeishuWSManager {
     if (this.pollTimer) return;
     this.pollTimer = setInterval(() => {
       void this.syncFromDatabase("poll").catch((err) =>
-        console.error("[feishu-ws] 配置轮询热更新失败", err),
+        log.error("配置轮询热更新失败", { event: "feishu.ws.poll_failed", err }),
       );
     }, CONFIG_POLL_INTERVAL_MS);
     this.pollTimer.unref?.();
@@ -218,7 +220,7 @@ export class FeishuWSManager {
       clearFeishuTokenCache();
       this.closeActive();
       this.setBaseState("disabled");
-      console.log(`[feishu-ws] 已停用(${reason})`);
+      log.info("长连接已停用", { event: "feishu.ws.disabled", reason });
       return;
     }
 
@@ -253,7 +255,7 @@ export class FeishuWSManager {
       this.baseState = "connected";
       this.touch();
       previous?.client.close();
-      console.log(`[feishu-ws] 长连接已热更新(${reason})`);
+      log.info("长连接已热更新", { event: "feishu.ws.reloaded", reason });
     } catch (err) {
       candidate?.client.close({ force: true });
       if (!candidateReady) {
@@ -380,7 +382,7 @@ const manager =
 export function startFeishuWS(): void {
   manager.startPolling();
   void manager.syncFromDatabase("startup").catch((err) =>
-    console.error("[feishu-ws] 启动失败", err),
+    log.error("长连接启动失败", { event: "feishu.ws.startup_failed", err }),
   );
 }
 

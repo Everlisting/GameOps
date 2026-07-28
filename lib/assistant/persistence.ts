@@ -8,6 +8,9 @@
  */
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("assistant.persistence");
 
 export interface StartedTurn {
   conversationId: string;
@@ -127,7 +130,7 @@ export async function finishAssistant(
       data: { content: { text, ...(approvalId ? { approvalId } : {}) } as Prisma.InputJsonValue },
     });
   } catch (err) {
-    console.error("[assistant] finishAssistant failed", err);
+    log.error("助手消息落库失败", { event: "assistant.persist.finish_assistant_failed", err });
   }
 }
 
@@ -212,7 +215,7 @@ export async function finishRun(
       },
     });
   } catch (err) {
-    console.error("[assistant] finishRun failed", err);
+    log.error("run 收尾落库失败", { event: "assistant.persist.finish_run_failed", err });
   }
 }
 
@@ -239,6 +242,6 @@ export async function recordToolCall(
       },
     });
   } catch (err) {
-    console.error("[assistant] recordToolCall failed", err);
+    log.error("工具调用落库失败", { event: "assistant.persist.record_tool_call_failed", err });
   }
 }

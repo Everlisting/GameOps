@@ -13,11 +13,14 @@
 import type { Prisma } from "@prisma/client";
 
 import { route, parseJson } from "@/lib/api";
+import { createLogger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { triggerJobSchema, type ParamSchemaItem } from "@/lib/validation/job";
 import { createTaskFromJob } from "@/lib/jobs";
 import { recordAudit } from "@/lib/audit";
+
+const log = createLogger("job.trigger");
 
 /**
  * 把本次触发填的参数值写回 Job.paramSchema 的 default,下次触发自动预填。
@@ -70,7 +73,7 @@ export const POST = route(async (req, { params }) => {
   try {
     await rememberParamDefaults(id, input.paramValues);
   } catch (err) {
-    console.error("[trigger] 记忆参数默认值失败", err);
+    log.warn("记忆参数默认值失败(不影响触发)", { event: "job.trigger.remember_defaults_failed", jobId: id, err });
   }
 
   await recordAudit({

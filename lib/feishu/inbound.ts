@@ -5,6 +5,7 @@
 import type { Role } from "@prisma/client";
 import { generateText, stepCountIs } from "ai";
 
+import { createLogger } from "@/lib/logger";
 import { getChatModel } from "@/lib/assistant/model";
 import { getSystemPrompt } from "@/lib/assistant/agent";
 import { makeReadonlyTools } from "@/lib/assistant/tools";
@@ -16,6 +17,8 @@ import {
   appendMessages,
 } from "@/lib/feishu/chat";
 import { sendCard, deliverMarkdown } from "@/lib/feishu/reply";
+
+const log = createLogger("feishu.inbound");
 
 export interface ParsedFeishuMessage {
   chatId: string;
@@ -60,7 +63,7 @@ export async function processFeishuMessage(msg: ParsedFeishuMessage): Promise<vo
     });
     answer = result.text?.trim() ?? "";
   } catch (err) {
-    console.error("[feishu] agent 生成失败", err);
+    log.error("Agent 生成失败", { event: "feishu.inbound.agent_failed", err });
     answer = "抱歉,处理你的问题时出错了,请稍后再试。";
   }
   if (!answer) answer = "(未生成内容)";
@@ -68,7 +71,7 @@ export async function processFeishuMessage(msg: ParsedFeishuMessage): Promise<vo
   await appendMessages(conversationId, text, answer);
 
   if (!thinking.ok) {
-    console.error("[feishu] 「思考中」卡片发送失败:", thinking.msg);
+    log.warn("「思考中」卡片发送失败", { event: "feishu.inbound.thinking_failed", detail: thinking.msg });
   }
   // 投递答案:超飞书卡片上限时自动拆成多张卡片(首块更新「思考中」卡片,其余追加)
   const sent = await deliverMarkdown(
@@ -77,6 +80,6 @@ export async function processFeishuMessage(msg: ParsedFeishuMessage): Promise<vo
     thinking.ok && thinking.messageId ? thinking.messageId : undefined,
   );
   if (!sent.ok) {
-    console.error(`[feishu] 回发消息失败(chat=${msg.chatId}):${sent.msg}`);
+    log.error("回发消息失败", { event: "feishu.inbound.reply_failed", detail: sent.msg });
   }
 }

@@ -2,10 +2,13 @@
  * 飞书发送编排:日报 / 测试 / 群发,统一走审计。供 API / cron / AI 审批执行器复用。
  */
 import { recordAudit, SYSTEM_ACTOR_USERNAME } from "@/lib/audit";
+import { createLogger } from "@/lib/logger";
 import { sendFeishu } from "@/lib/feishu/client";
 import { textMessage, richCardMessage } from "@/lib/feishu/message";
 import { buildDailyReportPayload } from "@/lib/feishu/report";
 import { getDailyReportTargets, getWebhookTarget, type WebhookTarget } from "@/lib/feishu/config";
+
+const log = createLogger("feishu.send");
 
 export interface FeishuActor {
   id: string | null; // null = 系统(cron)
@@ -78,7 +81,7 @@ export async function deliverToGroups(
       if (!target) continue;
       await sendCustomMessage(target, { title, content }, actor);
     } catch (err) {
-      console.error("[feishu] deliverToGroups 失败", { id, err });
+      log.error("投递到群失败", { event: "feishu.deliver_failed", webhookId: id, err });
     }
   }
 }

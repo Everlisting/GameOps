@@ -11,6 +11,9 @@ import {
   type AnalysisTaskInfo,
 } from "@/lib/opinion/client";
 import { readPublicSettings, type OpinionSettingsPublic } from "@/lib/opinion/settings";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("opinion.loader");
 
 export interface OpinionListPageData {
   items: AnalysisTaskInfo[];
@@ -44,7 +47,7 @@ export async function loadListPageData(
       settings,
     };
   } catch (err) {
-    console.warn(`[opinion.loader] listTasks(${scope}) 失败:`, err);
+    log.warn("初始列表拉取失败,降级空数据", { event: "opinion.loader.list_failed", scope, err });
     return {
       items: [],
       total: 0,

@@ -14,8 +14,11 @@
 import cron from "node-cron";
 
 import { prisma } from "@/lib/db";
+import { createLogger } from "@/lib/logger";
 import { createTaskFromJob } from "@/lib/jobs";
 import { isValidCronExpression } from "@/lib/validation/job";
+
+const log = createLogger("cron");
 
 type ScheduledEntry = {
   task: cron.ScheduledTask;
@@ -38,10 +41,10 @@ export async function start(): Promise<void> {
     try {
       await syncJob(j.id);
     } catch (err) {
-      console.error("[cron-scheduler] syncJob 失败", j.id, err);
+      log.error("syncJob 失败", { event: "cron.sync_failed", jobId: j.id, err });
     }
   }
-  console.info("[cron-scheduler] started, jobs=", scheduled.size);
+  log.info("cron 调度器已启动", { event: "cron.started", jobs: scheduled.size });
 }
 
 /**
@@ -62,13 +65,13 @@ export async function syncJob(jobId: string): Promise<void> {
     if (existing) {
       existing.task.stop();
       scheduled.delete(jobId);
-      console.info("[cron-scheduler] unscheduled job=", jobId);
+      log.info("已取消 Job 定时", { event: "cron.unscheduled", jobId });
     }
     return;
   }
 
   if (!isValidCronExpression(job.cronExpression)) {
-    console.warn("[cron-scheduler] cron 表达式非法,跳过 job=", jobId, job.cronExpression);
+    log.warn("cron 表达式非法,跳过", { event: "cron.invalid_expression", jobId, cronExpression: job.cronExpression });
     if (existing) {
       existing.task.stop();
       scheduled.delete(jobId);
@@ -89,14 +92,12 @@ export async function syncJob(jobId: string): Promise<void> {
     { scheduled: true, timezone: "Asia/Shanghai" },
   );
   scheduled.set(jobId, { task, cronExpression: job.cronExpression });
-  console.info(
-    "[cron-scheduler] scheduled job=",
+  log.info("已注册 Job 定时", {
+    event: "cron.scheduled",
     jobId,
-    "name=",
-    job.name,
-    "cron=",
-    job.cronExpression,
-  );
+    jobName: job.name,
+    cronExpression: job.cronExpression,
+  });
 }
 
 export async function removeJob(jobId: string): Promise<void> {
@@ -104,7 +105,7 @@ export async function removeJob(jobId: string): Promise<void> {
   if (e) {
     e.task.stop();
     scheduled.delete(jobId);
-    console.info("[cron-scheduler] removed job=", jobId);
+    log.info("已移除 Job 定时", { event: "cron.removed", jobId });
   }
 }
 
@@ -132,18 +133,15 @@ async function fireJob(jobId: string, name: string): Promise<void> {
       trigger: "AUTO",
       createdById: null,
     });
-    console.info(
-      "[cron-scheduler] fired job=",
+    log.info("cron 触发建任务", {
+      event: "cron.fired",
       jobId,
-      "name=",
-      name,
-      "task=",
-      task.id,
-      "seq=",
-      task.sequenceNumber,
-    );
+      jobName: name,
+      taskId: task.id,
+      sequenceNumber: task.sequenceNumber,
+    });
   } catch (err) {
-    console.error("[cron-scheduler] fire 失败 job=", jobId, err);
+    log.error("cron 触发失败", { event: "cron.fire_failed", jobId, err });
   }
 }
 
