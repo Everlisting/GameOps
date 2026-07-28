@@ -1,6 +1,6 @@
 # 日志系统设计方案（修订版）
 
-> 状态：**阶段1(core)+ 阶段2(接入)已实现并通过端到端测试;阶段3 部署接入见 `docs/logging-deploy.md`;阶段4/5 暂不做(§18)**。
+> 状态：**阶段1(core)/ 阶段2(接入)/ 阶段4(ErrorLog 表 + ADMIN 页)/ 阶段5(前端上报)已实现并测试;阶段3 部署接入见 `docs/logging-deploy.md`**。阶段4 需跑 migration + `generate` 并设 `LOG_ERROR_DB_ENABLED=true` 才生效。
 >
 > 适用范围：Next.js 14 App Router + Prisma + 进程内 worker + 爬虫 Agent + Python 分析服务 + 阿里云 ECS/PM2 单实例部署。
 >
@@ -725,7 +725,9 @@ PM2 轮转、Logtail 和 SLS 配置放在部署层，不放进 `lib/logger/trans
 
 ## 18. 实施前待确认
 
-**已由项目负责人确认(2026-07-28),全部按推荐默认。** 据此:阶段4(ErrorLog 表 + 管理页)与前端错误上报暂不做;`no-console` 护栏与阶段3 部署接入按 §16 推进。第 6/7 项为对现状的追认(阶段1/2 已实现)。
+**已由项目负责人确认(2026-07-28),全部按推荐默认。** 第 6/7 项为对现状的追认(阶段1/2 已实现)。
+
+> **后续更新(2026-07-28)**:项目负责人改变主意,推翻第 3/4 项——**阶段4(ErrorLog 表 + ADMIN 页)与阶段5(前端错误上报)已实现**。ErrorLog 默认仍关(`LOG_ERROR_DB_ENABLED=false`),需跑 migration + `generate` 后手动开启;前端上报已随根 layout 上线。
 
 - [x] SLS 与 ECS 使用同地域，默认保留 90 天。
 - [x] PM2 本地日志保留 7–14 天，并设置磁盘总量上限。
