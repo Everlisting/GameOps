@@ -8,6 +8,7 @@ import type { Prisma } from "@prisma/client";
 import { streamText, convertToModelMessages, stepCountIs, hasToolCall, type UIMessage } from "ai";
 
 import { route, parseJson } from "@/lib/api";
+import { createLogger, getLogContext } from "@/lib/logger";
 import { requireRole } from "@/lib/rbac";
 import { recordAudit } from "@/lib/audit";
 import { chatInputSchema } from "@/lib/validation/assistant";
@@ -24,6 +25,8 @@ import {
 } from "@/lib/assistant/persistence";
 
 export const runtime = "nodejs"; // 必须:Edge 不能用 prisma / crypto / argon2
+
+const log = createLogger("assistant");
 
 // 写工具在 UI 消息里的 part type(tool-<name>)+ 刷新重建的 data-approval part,都要从发给模型的历史里剥掉。
 const WRITE_TOOL_PART_TYPES = new Set([
@@ -86,6 +89,9 @@ export const POST = route(async (req) => {
   });
   const runId = await beginRun(turn.conversationId, modelId);
   const startedAt = Date.now();
+  // onFinish/onError 在 route() 返回后触发、ALS 已失效 → 此处同步捕获 requestId 显式带入
+  const requestId = getLogContext()?.requestId;
+  const toolNames = new Set<string>();
 
   await recordAudit({
     actorId: session.sub,
@@ -116,6 +122,7 @@ export const POST = route(async (req) => {
     onStepFinish: async ({ toolCalls, toolResults }) => {
       const outputById = new Map(toolResults.map((r) => [r.toolCallId, r.output]));
       for (const call of toolCalls) {
+        toolNames.add(call.toolName);
         const args = call.input as Prisma.InputJsonValue;
         await recordAudit({
           actorId: session.sub,
@@ -147,19 +154,42 @@ export const POST = route(async (req) => {
           username: session.username,
         });
       }
+      const latencyMs = Date.now() - startedAt;
       await finishRun(runId, {
         status: "succeeded",
         inputTokens: usage.inputTokens ?? null,
         outputTokens: usage.outputTokens ?? null,
-        latencyMs: Date.now() - startedAt,
+        latencyMs,
+      });
+      // 只记元数据(runId/model/token/耗时/工具名),不记提示词与回复内容
+      log.info("AI 流式完成", {
+        event: "assistant.stream.completed",
+        runId,
+        requestId,
+        conversationId: turn.conversationId,
+        model: modelId,
+        durationMs: latencyMs,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        tools: [...toolNames],
       });
     },
     onError: async ({ error }) => {
-      console.error("[assistant] streamText error", error);
+      const latencyMs = Date.now() - startedAt;
+      log.error("AI 流式失败", {
+        event: "assistant.stream.failed",
+        runId,
+        requestId,
+        conversationId: turn.conversationId,
+        model: modelId,
+        durationMs: latencyMs,
+        err: error,
+        persist: true,
+      });
       await finishRun(runId, {
         status: "failed",
         errorMessage: error instanceof Error ? error.message : String(error),
-        latencyMs: Date.now() - startedAt,
+        latencyMs,
       });
     },
   });
