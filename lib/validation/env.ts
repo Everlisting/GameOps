@@ -24,6 +24,10 @@ const schema = z.object({
   LOG_HASH_SECRET: z.string().optional().default(""),
   // 成功(<400)请求完成日志采样率 0..1;≥400 始终记录。非法则按 1(全记)
   LOG_HTTP_SAMPLE_RATE: z.string().optional().default("1"),
+  // 慢查询阈值(ms);超过记 warn。见 docs/logging.md §8
+  LOG_SLOW_QUERY_MS: z.string().optional().default("500"),
+  // 普通 query debug 采样率 0..1;默认 0(不记),仅临时排障时开
+  LOG_QUERY_SAMPLE_RATE: z.string().optional().default("0"),
 });
 
 const parsed = schema.safeParse(process.env);
