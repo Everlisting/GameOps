@@ -22,6 +22,8 @@ const schema = z.object({
   LOG_LEVEL_OVERRIDES: z.string().optional().default(""),
   // HMAC 去身份化密钥;缺失时省略 userIdHash/chatIdHash(不落明文)
   LOG_HASH_SECRET: z.string().optional().default(""),
+  // 成功(<400)请求完成日志采样率 0..1;≥400 始终记录。非法则按 1(全记)
+  LOG_HTTP_SAMPLE_RATE: z.string().optional().default("1"),
 });
 
 const parsed = schema.safeParse(process.env);
