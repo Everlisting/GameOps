@@ -58,6 +58,13 @@ export async function register() {
       timezone: "Asia/Shanghai",
     });
 
+    // 阶段4 · ErrorLog 保留清理(90 天;LOG_ERROR_DB_ENABLED 关闭时为空操作)
+    const { cleanupOldErrorLogs } = await import("@/lib/logger/sinks/error-db");
+    cron.schedule("15 3 * * *", scheduleTick("error-log-retention", () => cleanupOldErrorLogs(90)), {
+      scheduled: true,
+      timezone: "Asia/Shanghai",
+    });
+
     // 阶段6 · 飞书运营数据日报:每天 09:00 北京时间推送到已勾选「日报」的群
     const { sendDailyReportToAll, SYSTEM_FEISHU_ACTOR } = await import("@/lib/feishu/send");
     cron.schedule("0 9 * * *", scheduleTick("feishu-daily-report", () => sendDailyReportToAll(SYSTEM_FEISHU_ACTOR)), {

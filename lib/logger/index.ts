@@ -76,6 +76,18 @@ function effectiveLevel(module: string): LogLevel {
   return LEVEL_OVERRIDES[module] ?? GLOBAL_LEVEL;
 }
 
+// ErrorLog sink(可选):动态 import 打破与 lib/db 的循环(index→sink→error-log-db→db→index);
+// 禁用时 enqueueError 恒为 null(零开销)。启动首刻 import 未就绪前的错误会漏持久化,可接受。
+type PersistFn = (input: import("@/lib/logger/sinks/error-db").PersistInput) => void;
+let enqueueError: PersistFn | null = null;
+void import("@/lib/logger/sinks/error-db")
+  .then((m) => {
+    if (m.isErrorDbEnabled()) enqueueError = m.enqueueErrorLog;
+  })
+  .catch((err) => bootstrapLog("warn", "ErrorLog sink 加载失败", { err: err instanceof Error ? err.message : String(err) }));
+
+const asStr = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+
 function emit(module: string, level: LogLevel, msg: string, fields?: LogFields): void {
   try {
     if (LEVEL_ORDER[level] < LEVEL_ORDER[effectiveLevel(module)]) return;
@@ -83,6 +95,32 @@ function emit(module: string, level: LogLevel, msg: string, fields?: LogFields):
     const cleanMsg = clampString(scrubString(msg ?? ""), LIMITS.string).value;
     capRecordSize(emitFields, cleanMsg);
     pinoLogger[level](emitFields, cleanMsg);
+
+    // 高价值错误持久化:fatal 恒持久化,error 需显式 persist;sinkInternal 记录不入库(防递归)
+    if (
+      enqueueError &&
+      emitFields.sinkInternal !== true &&
+      (level === "fatal" || (level === "error" && fields?.persist === true))
+    ) {
+      enqueueError({
+        occurredAt: new Date().toISOString(),
+        level,
+        service: SERVICE,
+        environment: ENVIRONMENT,
+        release: RELEASE,
+        instanceId: INSTANCE_ID,
+        module,
+        event: asStr(emitFields.event),
+        msg: cleanMsg,
+        requestId: asStr(emitFields.requestId),
+        traceId: asStr(emitFields.traceId),
+        taskId: asStr(emitFields.taskId),
+        runId: asStr(emitFields.runId),
+        userIdHash: asStr(emitFields.userIdHash),
+        err: emitFields.err as { name?: string; message?: string; code?: string; stack?: string } | undefined,
+        fields: emitFields.fields as Record<string, unknown> | undefined,
+      });
+    }
   } catch (err) {
     bootstrapLog("error", "logger emit 失败", { module, err: err instanceof Error ? err.message : String(err) });
   }

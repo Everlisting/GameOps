@@ -28,6 +28,8 @@ const schema = z.object({
   LOG_SLOW_QUERY_MS: z.string().optional().default("500"),
   // 普通 query debug 采样率 0..1;默认 0(不记),仅临时排障时开
   LOG_QUERY_SAMPLE_RATE: z.string().optional().default("0"),
+  // 阶段4 · 是否把高价值 error/fatal 落 ErrorLog 表(需先跑 migration)。默认关
+  LOG_ERROR_DB_ENABLED: z.string().optional().default("false"),
 });
 
 const parsed = schema.safeParse(process.env);

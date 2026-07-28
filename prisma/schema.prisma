@@ -847,3 +847,39 @@ model AiApproval {
   @@index([conversationId])
   @@map("ai_approval")
 }
+
+/// 日志系统 · 阶段4 · 高价值运行错误留档(仅 error/fatal 且显式 persist)。
+/// 由隔离有界队列 sink 写入(docs/logging.md §9/§12);已白名单脱敏、限深限长。
+/// 与 AuditLog 分离:审计=业务追责,ErrorLog=排障。userIdHash 不存明文 userId。
+model ErrorLog {
+  id          String   @id @default(cuid())
+  occurredAt  DateTime // 日志产生时刻(ts)
+  ingestedAt  DateTime @default(now()) // 落库时刻
+  level       String // error / fatal
+  service     String
+  environment String
+  release     String?
+  instanceId  String?
+  module      String
+  event       String?
+  msg         String
+  requestId   String?
+  traceId     String?
+  taskId      String?
+  runId       String?
+  userIdHash  String?
+  errName     String?
+  errMessage  String?
+  errStack    String?
+  errCode     String?
+  fingerprint String // service+module+event+errName+errCode+topFrame+release
+  fields      Json? // 已脱敏的补充字段
+
+  @@index([occurredAt])
+  @@index([module, level, occurredAt])
+  @@index([requestId])
+  @@index([traceId])
+  @@index([taskId, occurredAt])
+  @@index([fingerprint, occurredAt])
+  @@map("error_log")
+}
