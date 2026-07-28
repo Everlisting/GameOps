@@ -79,7 +79,7 @@ export const KNOWN_TOP_LEVEL = [
   "operation",
   "model",
   "queryFingerprint",
-  "service",
+  "peer",
   // sink 内部日志标记:禁止再进 DB/告警 sink(§9.2 防递归)
   "sinkInternal",
 ] as const;

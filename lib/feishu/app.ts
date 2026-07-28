@@ -3,6 +3,7 @@
  */
 import { encryptSecret, decryptSecret, maskApiKey } from "@/lib/crypto";
 import { feishuAppDb } from "@/lib/feishu/db";
+import { logExternalResult } from "@/lib/logger/external";
 
 export const FEISHU_BASE = "https://open.feishu.cn";
 
@@ -140,8 +141,10 @@ export async function getBotOpenId(): Promise<string> {
     };
     const openId = data.code === 0 ? data.bot?.open_id ?? "" : "";
     if (openId) botOpenIdCache = openId;
+    else logExternalResult("feishu", "bot.info", { ok: false, code: data.code, detail: "取 bot open_id 失败" });
     return openId;
-  } catch {
+  } catch (err) {
+    logExternalResult("feishu", "bot.info", { ok: false, code: -1, detail: err instanceof Error ? err.message : "网络错误" });
     return "";
   }
 }
@@ -163,6 +166,7 @@ export async function getTenantAccessToken(): Promise<string> {
     expire?: number;
   };
   if (data.code !== 0 || !data.tenant_access_token) {
+    logExternalResult("feishu", "auth.tenant_token", { ok: false, code: data.code ?? res.status, detail: data.msg });
     throw new Error(`获取 tenant_access_token 失败:${data.msg ?? `HTTP ${res.status}`}`);
   }
   const ttlMs = Math.max((data.expire ?? 7200) - 300, 60) * 1000;

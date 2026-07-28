@@ -10,6 +10,7 @@
  */
 import { env } from "@/lib/validation/env";
 import { AppError } from "@/lib/errors";
+import { loggedFetch } from "@/lib/logger/external";
 import type { OpinionSettingsInternal } from "@/lib/opinion/settings";
 
 const BASE = env.ANALYSIS_BASE_URL;
@@ -93,7 +94,7 @@ export async function triggerFileTask(
   if (args.coverageSpan) form.append("coverage_span", args.coverageSpan);
   form.append("created_by", args.createdBy);
 
-  const res = await fetch(`${BASE}/tasks/${scope}`, {
+  const res = await loggedFetch("analysis", "tasks.trigger", `${BASE}/tasks/${scope}`, {
     method: "POST",
     headers: { Authorization: bearer(), ...llmHeaders(args.settings) },
     body: form,
@@ -118,7 +119,7 @@ export async function triggerCombined(args: {
     game: args.game,
     created_by: args.createdBy,
   };
-  const res = await fetch(`${BASE}/tasks/combined`, {
+  const res = await loggedFetch("analysis", "tasks.trigger_combined", `${BASE}/tasks/combined`, {
     method: "POST",
     headers: {
       Authorization: bearer(),
@@ -144,7 +145,7 @@ export interface AnalysisTaskCounts {
 /** 计数(4 态桶),用于列表页顶部卡片。 */
 export async function getTaskCounts(scope?: string): Promise<AnalysisTaskCounts> {
   const q = scope ? `?scope=${encodeURIComponent(scope)}` : "";
-  const res = await fetch(`${BASE}/tasks/counts${q}`, {
+  const res = await loggedFetch("analysis", "tasks.counts", `${BASE}/tasks/counts${q}`, {
     headers: { Authorization: bearer() },
     cache: "no-store",
   }).catch((err) => {
@@ -163,7 +164,7 @@ export async function listTasks(params: {
   if (params.status) q.set("status", params.status);
   if (params.limit) q.set("limit", String(params.limit));
   if (params.offset) q.set("offset", String(params.offset));
-  const res = await fetch(`${BASE}/tasks?${q.toString()}`, {
+  const res = await loggedFetch("analysis", "tasks.list", `${BASE}/tasks?${q.toString()}`, {
     headers: { Authorization: bearer() },
     cache: "no-store",
   }).catch((err) => {
@@ -175,7 +176,7 @@ export async function listTasks(params: {
 
 /** 详情。 */
 export async function getTask(taskId: string): Promise<AnalysisTaskInfo> {
-  const res = await fetch(`${BASE}/tasks/${encodeURIComponent(taskId)}`, {
+  const res = await loggedFetch("analysis", "tasks.get", `${BASE}/tasks/${encodeURIComponent(taskId)}`, {
     headers: { Authorization: bearer() },
     cache: "no-store",
   }).catch((err) => {
@@ -187,7 +188,7 @@ export async function getTask(taskId: string): Promise<AnalysisTaskInfo> {
 
 /** 下载 HTML / JSON:返回 Response 供中台再 stream 给浏览器。 */
 export async function fetchTaskArtifact(taskId: string, kind: "html" | "json"): Promise<Response> {
-  const res = await fetch(`${BASE}/tasks/${encodeURIComponent(taskId)}/${kind}`, {
+  const res = await loggedFetch("analysis", "tasks.artifact", `${BASE}/tasks/${encodeURIComponent(taskId)}/${kind}`, {
     headers: { Authorization: bearer() },
   }).catch((err) => {
     throw new AppError("INTERNAL", `分析服务不可达:${err instanceof Error ? err.message : String(err)}`);
@@ -202,7 +203,7 @@ export async function rerunTask(args: {
 }): Promise<TaskCreated> {
   const form = new FormData();
   form.append("created_by", args.createdBy);
-  const res = await fetch(`${BASE}/tasks/${encodeURIComponent(args.taskId)}/rerun`, {
+  const res = await loggedFetch("analysis", "tasks.rerun", `${BASE}/tasks/${encodeURIComponent(args.taskId)}/rerun`, {
     method: "POST",
     headers: { Authorization: bearer(), ...llmHeaders(args.settings) },
     body: form,
@@ -215,7 +216,7 @@ export async function rerunTask(args: {
 
 /** 删除。 */
 export async function deleteTask(taskId: string): Promise<void> {
-  const res = await fetch(`${BASE}/tasks/${encodeURIComponent(taskId)}`, {
+  const res = await loggedFetch("analysis", "tasks.delete", `${BASE}/tasks/${encodeURIComponent(taskId)}`, {
     method: "DELETE",
     headers: { Authorization: bearer() },
   }).catch((err) => {

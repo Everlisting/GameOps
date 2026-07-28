@@ -3,6 +3,7 @@
  */
 import { getTenantAccessToken, FEISHU_BASE } from "@/lib/feishu/app";
 import { mdToCardElements, chunkCardElements } from "@/lib/feishu/markdown";
+import { logExternalResult } from "@/lib/logger/external";
 
 /** 构造飞书 2.0 交互卡片(update_multi 必须 true;不用 1.0 的 wide_screen_mode)。 */
 function buildCard(elements: unknown[], title = "AI 助手") {
@@ -32,7 +33,7 @@ async function postCard(
       data?: { message_id?: string };
     };
     if (data.code !== 0) {
-      console.error(`[feishu] 发送卡片失败 code=${data.code} msg=${data.msg} (elements=${(card as { body?: { elements?: unknown[] } })?.body?.elements?.length})`);
+      logExternalResult("feishu", "im.message.send", { ok: false, code: data.code, detail: data.msg });
     }
     return {
       ok: data.code === 0,
@@ -55,7 +56,7 @@ async function patchCard(messageId: string, card: unknown): Promise<{ ok: boolea
     });
     const data = (await res.json().catch(() => ({}))) as { code?: number; msg?: string };
     if (data.code !== 0) {
-      console.error(`[feishu] 更新卡片失败 code=${data.code} msg=${data.msg}`);
+      logExternalResult("feishu", "im.message.update", { ok: false, code: data.code, detail: data.msg });
     }
     return { ok: data.code === 0, msg: `code=${data.code ?? "?"} ${data.msg ?? `HTTP ${res.status}`}` };
   } catch (err) {

@@ -6,6 +6,8 @@
  */
 import { createHmac } from "node:crypto";
 
+import { logExternalResult } from "@/lib/logger/external";
+
 export interface FeishuTarget {
   url: string;
   secret?: string; // 空/undefined = 不加签
@@ -36,6 +38,7 @@ export async function sendFeishu(target: FeishuTarget, payload: FeishuPayload): 
     body.sign = sign(target.secret, timestamp);
   }
 
+  const started = Date.now();
   try {
     const res = await fetch(target.url, {
       method: "POST",
@@ -50,8 +53,11 @@ export async function sendFeishu(target: FeishuTarget, payload: FeishuPayload): 
     };
     const code = data.code ?? data.StatusCode ?? (res.ok ? 0 : res.status);
     const msg = data.msg ?? data.StatusMessage ?? (res.ok ? "success" : `HTTP ${res.status}`);
-    return { ok: code === 0, code, msg };
+    const ok = code === 0;
+    logExternalResult("feishu", "webhook.send", { ok, code, detail: ok ? undefined : msg, durationMs: Date.now() - started });
+    return { ok, code, msg };
   } catch (err) {
+    logExternalResult("feishu", "webhook.send", { ok: false, code: -1, detail: err instanceof Error ? err.message : "网络错误", durationMs: Date.now() - started });
     return { ok: false, code: -1, msg: err instanceof Error ? err.message : "网络错误" };
   }
 }
