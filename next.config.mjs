@@ -9,6 +9,7 @@ const nextConfig = {
       "node-cron",
       "cron-parser",
       "@larksuiteoapi/node-sdk",
+      "pino",
     ],
   },
   // instrumentation.ts 走的是单独的 webpack 上下文,
@@ -25,7 +26,11 @@ const nextConfig = {
           request === "cron-parser" ||
           request.startsWith("cron-parser/") ||
           request === "@larksuiteoapi/node-sdk" ||
-          request.startsWith("@larksuiteoapi/node-sdk/")
+          request.startsWith("@larksuiteoapi/node-sdk/") ||
+          request === "pino" ||
+          request.startsWith("pino/") ||
+          request === "thread-stream" ||
+          request === "sonic-boom"
         ) {
           return callback(null, `commonjs ${request}`);
         }

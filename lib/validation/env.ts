@@ -14,6 +14,14 @@ const schema = z.object({
   ANALYSIS_BASE_URL: z.string().url().optional().default("http://127.0.0.1:8000"),
   ANALYSIS_SHARED_SECRET: z.string().min(1, "ANALYSIS_SHARED_SECRET 不能为空").optional().default(""),
   OPINION_AES_KEY: z.string().min(1, "OPINION_AES_KEY 不能为空").optional().default(""),
+  // 运行日志(docs/logging.md §13)。logger 直接读 process.env,这里仅校验/留档。
+  LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).optional().default("info"),
+  LOG_SERVICE: z.string().optional().default("gameops-web"),
+  LOG_RELEASE: z.string().optional().default(""),
+  // 按 module 覆盖级别的 JSON(如 {"feishu.ws":"debug"});格式非法只在 logger 侧告警忽略
+  LOG_LEVEL_OVERRIDES: z.string().optional().default(""),
+  // HMAC 去身份化密钥;缺失时省略 userIdHash/chatIdHash(不落明文)
+  LOG_HASH_SECRET: z.string().optional().default(""),
 });
 
 const parsed = schema.safeParse(process.env);
