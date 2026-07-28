@@ -13,6 +13,7 @@ import {
   Database,
   FileSpreadsheet,
   History,
+  TriangleAlert,
   LayoutGrid,
   Lightbulb,
   ListChecks,
@@ -205,6 +206,11 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
     title: "审计日志",
     url: "/operator/admin/audit-logs",
     icon: History,
+  },
+  {
+    title: "运行错误",
+    url: "/operator/admin/logs",
+    icon: TriangleAlert,
   },
 ];
 
