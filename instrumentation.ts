@@ -3,37 +3,40 @@
  *
  * 仅在 Node runtime 注册后台 worker(cron 调度、日志清理、日报、下载器、索引器、飞书长连接);
  * Edge runtime 不会跑这段。所有启动/失败与每次 tick 走结构化 worker 日志(见 docs/logging.md §4.5/§7)。
+ *
+ * 注意:本文件会被同时编进 Edge instrumentation 产物,故**顶层不得静态 import** 任何
+ * Node-only 模块(lib/logger 依赖 node:os/pino/async_hooks)。所有 Node 依赖一律在
+ * `register()` 的 nodejs 守卫之后动态 import,避免 Edge 加载时求值报「node:os not found」。
  */
-import { createLogger, runWithLogContext } from "@/lib/logger";
-
-const log = createLogger("worker");
-
-/** 启动一个后台 worker,统一记录 started / start_failed。 */
-async function startWorker(name: string, start: () => void | Promise<void>): Promise<void> {
-  try {
-    await start();
-    log.info(`worker 已启动:${name}`, { event: "worker.started", worker: name });
-  } catch (err) {
-    log.error(`worker 启动失败:${name}`, { event: "worker.start_failed", worker: name, err });
-  }
-}
-
-/** 把一次 cron tick 包进独立 traceId,统一记录完成 / 失败。 */
-function scheduleTick(name: string, run: () => Promise<unknown>): () => void {
-  return () => {
-    runWithLogContext({ traceId: crypto.randomUUID() }, () => {
-      void run()
-        .then(() => log.info(`定时任务完成:${name}`, { event: "worker.tick.done", worker: name }))
-        .catch((err) => log.error(`定时任务失败:${name}`, { event: "worker.tick.failed", worker: name, err }));
-    });
-  };
-}
-
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   // 跳过 build / lint / typecheck 阶段(不需要副作用)
   if (process.env.NEXT_PHASE === "phase-production-build") return;
+
+  const { createLogger, runWithLogContext } = await import("@/lib/logger");
+  const log = createLogger("worker");
+
+  /** 启动一个后台 worker,统一记录 started / start_failed。 */
+  async function startWorker(name: string, start: () => void | Promise<void>): Promise<void> {
+    try {
+      await start();
+      log.info(`worker 已启动:${name}`, { event: "worker.started", worker: name });
+    } catch (err) {
+      log.error(`worker 启动失败:${name}`, { event: "worker.start_failed", worker: name, err });
+    }
+  }
+
+  /** 把一次 cron tick 包进独立 traceId,统一记录完成 / 失败。 */
+  function scheduleTick(name: string, run: () => Promise<unknown>): () => void {
+    return () => {
+      runWithLogContext({ traceId: crypto.randomUUID() }, () => {
+        void run()
+          .then(() => log.info(`定时任务完成:${name}`, { event: "worker.tick.done", worker: name }))
+          .catch((err) => log.error(`定时任务失败:${name}`, { event: "worker.tick.failed", worker: name, err }));
+      });
+    };
+  }
 
   await startWorker("cron-scheduler", async () => {
     const { start } = await import("@/lib/cron-scheduler");
