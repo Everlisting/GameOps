@@ -1,6 +1,6 @@
 # 日志系统设计方案（修订版）
 
-> 状态：**设计稿，尚未实现**。
+> 状态：**阶段1(core)+ 阶段2(接入)已实现并通过端到端测试;阶段3 部署接入见 `docs/logging-deploy.md`;阶段4/5 暂不做(§18)**。
 >
 > 适用范围：Next.js 14 App Router + Prisma + 进程内 worker + 爬虫 Agent + Python 分析服务 + 阿里云 ECS/PM2 单实例部署。
 >
