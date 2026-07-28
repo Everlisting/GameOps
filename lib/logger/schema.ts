@@ -68,6 +68,7 @@ export const KNOWN_TOP_LEVEL = [
   "runId",
   "conversationId",
   "documentId",
+  "worker",
   "userIdHash",
   "chatIdHash",
   "role",
