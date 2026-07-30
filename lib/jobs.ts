@@ -2,9 +2,10 @@
  * Job 执行的共享 helper:被 trigger API / cron scheduler / rerun API 复用。
  *
  * createTaskFromJob:
- *   - 校验 Job 存在且 enabled
+ *   - 校验 Job 存在且允许当前触发方式
  *   - 校验 paramValues 对照 Job.paramSchema
  *   - 在事务里算出本 Job 的下一个 sequenceNumber(并发安全:用 Job 行级锁)
+ *   - 把 Job 当前 revision + 执行配置冻结进 Task,避免排队期间模板被修改后错跑
  *   - 写一条 CrawlerTask(status=PENDING、agentId 从 Job 继承)
  */
 import { prisma } from "@/lib/db";
@@ -21,6 +22,7 @@ export type CreateTaskFromJobOpts = {
   trigger: CrawlerTaskTrigger;
   createdById: string | null; // AUTO(cron)时为 null
   priority?: number;
+  rerunOfTaskId?: string;
 };
 
 export type CreatedTask = {
@@ -32,46 +34,83 @@ export type CreatedTask = {
   createdAt: Date;
 };
 
+export type JobExecutionSnapshot = {
+  id: string;
+  name: string;
+  revision: number;
+  agentId: string;
+  repoType: "GIT" | "SVN";
+  repoUrl: string;
+  repoBranch: string | null;
+  workdir: string;
+  command: string;
+  timeoutMinutes: number;
+  paramSchema: Prisma.JsonValue;
+  outputs: Prisma.JsonValue;
+};
+
 export async function createTaskFromJob(opts: CreateTaskFromJobOpts): Promise<CreatedTask> {
-  const job = await prisma.crawlerJob.findUnique({
-    where: { id: opts.jobId },
-    select: {
-      id: true,
-      enabled: true,
-      active: true,
-      agentId: true,
-      paramSchema: true,
-    },
-  });
-  if (!job) throw notFound("Job 不存在");
-  // active = 任务整体启停,停用后任何方式都不可触发(手动 / rerun / cron)。
-  if (!job.active) {
-    throw conflict("任务已停用,请先在任务列表启用后再运行");
-  }
-  // enabled 只控制 cron 自动触发(AUTO)。手动触发(MANUAL / rerun)即使 cron 关着也允许,
-  // 方便临时关掉定时但偶尔手工补数据。
-  if (!job.enabled && opts.trigger === "AUTO") {
-    throw conflict("Job 的 cron 已关闭,不再自动触发");
-  }
-
-  // paramValues 对照 Job 的 paramSchema 校验
-  const schema = (job.paramSchema as unknown as ParamSchemaItem[]) ?? [];
-  const errors = validateParamValuesAgainstSchema(schema, opts.paramValues);
-  if (errors.length > 0) {
-    throw badRequest("参数校验失败", errors);
-  }
-
-  // 串行化"算 sequenceNumber + 写 task":用事务 + Job 行锁
-  // (Postgres 默认 READ COMMITTED 下 SELECT FOR UPDATE 即可串行化同 Job 的并发 trigger)
+  // 串行化“读配置 + 校验 + 算序号 + 建 Task”。Job 更新同样取得行锁,
+  // 因而 jobSnapshot 必然对应一个完整、确定的 revision。
   const created = await prisma.$transaction(async (tx) => {
-    // 取本 Job 当前最大 sequenceNumber(只数 jobId 匹配的);锁 Job 行避免并发重复
-    await tx.$executeRaw`SELECT id FROM "CrawlerJob" WHERE id = ${job.id} FOR UPDATE`;
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "CrawlerJob" WHERE id = ${opts.jobId} FOR UPDATE
+    `;
+    if (locked.length === 0) throw notFound("Job 不存在");
+
+    const job = await tx.crawlerJob.findUnique({
+      where: { id: opts.jobId },
+      select: {
+        id: true,
+        name: true,
+        revision: true,
+        enabled: true,
+        active: true,
+        agentId: true,
+        repoType: true,
+        repoUrl: true,
+        repoBranch: true,
+        workdir: true,
+        command: true,
+        timeoutMinutes: true,
+        paramSchema: true,
+        outputs: true,
+      },
+    });
+    if (!job) throw notFound("Job 不存在");
+    if (!job.active) {
+      throw conflict("任务已停用,请先在任务列表启用后再运行");
+    }
+    if (!job.enabled && opts.trigger === "AUTO") {
+      throw conflict("Job 的 cron 已关闭,不再自动触发");
+    }
+
+    const schema = (job.paramSchema as unknown as ParamSchemaItem[]) ?? [];
+    const errors = validateParamValuesAgainstSchema(schema, opts.paramValues);
+    if (errors.length > 0) {
+      throw badRequest("参数校验失败", errors);
+    }
+
     const last = await tx.crawlerTask.findFirst({
       where: { jobId: job.id },
       orderBy: { sequenceNumber: "desc" },
       select: { sequenceNumber: true },
     });
     const nextSeq = (last?.sequenceNumber ?? 0) + 1;
+    const snapshot: JobExecutionSnapshot = {
+      id: job.id,
+      name: job.name,
+      revision: job.revision,
+      agentId: job.agentId,
+      repoType: job.repoType,
+      repoUrl: job.repoUrl,
+      repoBranch: job.repoBranch,
+      workdir: job.workdir,
+      command: job.command,
+      timeoutMinutes: job.timeoutMinutes,
+      paramSchema: job.paramSchema,
+      outputs: job.outputs,
+    };
 
     return tx.crawlerTask.create({
       data: {
@@ -79,10 +118,109 @@ export async function createTaskFromJob(opts: CreateTaskFromJobOpts): Promise<Cr
         agentId: job.agentId,
         sequenceNumber: nextSeq,
         paramValues: opts.paramValues as Prisma.InputJsonValue,
+        jobRevision: job.revision,
+        jobSnapshot: snapshot as unknown as Prisma.InputJsonValue,
         trigger: opts.trigger,
         priority: opts.priority ?? 0,
         status: "PENDING",
         createdById: opts.createdById,
+        rerunOfTaskId: opts.rerunOfTaskId,
+      },
+      select: {
+        id: true,
+        jobId: true,
+        agentId: true,
+        sequenceNumber: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+  });
+
+  return {
+    id: created.id,
+    jobId: created.jobId!,
+    agentId: created.agentId!,
+    sequenceNumber: created.sequenceNumber!,
+    status: "PENDING",
+    createdAt: created.createdAt,
+  };
+}
+
+/**
+ * 基于已有 Task 创建可复现重跑:
+ * - 现代 Task:克隆原 jobSnapshot/jobRevision/agentId/paramValues/sourceRevision
+ * - 历史 Task(无快照):兼容性回退到当前 Job,但仍记录 rerunOfTaskId
+ * - 当前 Job 的 active 总开关仍生效
+ */
+export async function createTaskFromFrozenTask(
+  sourceTaskId: string,
+  createdById: string | null,
+): Promise<CreatedTask> {
+  const source = await prisma.crawlerTask.findUnique({
+    where: { id: sourceTaskId },
+    select: {
+      id: true,
+      jobId: true,
+      agentId: true,
+      paramValues: true,
+      priority: true,
+      jobRevision: true,
+      jobSnapshot: true,
+      sourceRevision: true,
+    },
+  });
+  if (!source) throw notFound("任务不存在");
+  if (!source.jobId) {
+    throw conflict("该任务没有关联 Job(历史数据),不支持重跑");
+  }
+
+  if (!source.jobSnapshot || !source.jobRevision || !source.agentId) {
+    return createTaskFromJob({
+      jobId: source.jobId,
+      paramValues: (source.paramValues as Record<string, unknown>) ?? {},
+      trigger: "MANUAL",
+      createdById,
+      priority: source.priority,
+      rerunOfTaskId: source.id,
+    });
+  }
+
+  const created = await prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "CrawlerJob" WHERE id = ${source.jobId} FOR UPDATE
+    `;
+    if (locked.length === 0) throw notFound("Job 不存在");
+
+    const job = await tx.crawlerJob.findUnique({
+      where: { id: source.jobId! },
+      select: { id: true, active: true },
+    });
+    if (!job) throw notFound("Job 不存在");
+    if (!job.active) {
+      throw conflict("任务已停用,请先在任务列表启用后再运行");
+    }
+
+    const last = await tx.crawlerTask.findFirst({
+      where: { jobId: job.id },
+      orderBy: { sequenceNumber: "desc" },
+      select: { sequenceNumber: true },
+    });
+
+    return tx.crawlerTask.create({
+      data: {
+        jobId: job.id,
+        agentId: source.agentId,
+        sequenceNumber: (last?.sequenceNumber ?? 0) + 1,
+        paramValues: source.paramValues as Prisma.InputJsonValue,
+        jobRevision: source.jobRevision,
+        jobSnapshot: source.jobSnapshot as Prisma.InputJsonValue,
+        sourceRevision: source.sourceRevision,
+        rerunOfTaskId: source.id,
+        trigger: "MANUAL",
+        priority: source.priority,
+        status: "PENDING",
+        createdById,
       },
       select: {
         id: true,

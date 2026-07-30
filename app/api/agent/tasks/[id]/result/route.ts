@@ -117,12 +117,26 @@ export const POST = route(async (req, { params }) => {
       status: true,
       agentId: true,
       paramValues: true,
+      sourceRevision: true,
+      executionSnapshot: true,
       job: { select: { outputs: true } },
     },
   });
   if (!task) throw notFound("任务不存在");
   if (task.agentId !== agent.id) throw conflict("任务不属于当前 agent");
   if (task.status !== "RUNNING") throw conflict("任务当前状态不可上报结果");
+  if (!task.sourceRevision || !task.executionSnapshot) {
+    await prisma.crawlerTask.update({
+      where: { id: task.id },
+      data: {
+        status: "FAILED",
+        finishedAt: new Date(),
+        errorMessage:
+          "Agent 未在执行前冻结源码 revision 与环境;请升级到 Agent 0.5.0+ 后重跑",
+      },
+    });
+    throw conflict("任务缺少 P3 可复现执行快照,已标记为失败");
+  }
 
   // parser 上下文用的 paramValues:cron 自动 / 历史 task 可能是 null,统一成 {}
   const taskParamValues =

@@ -27,6 +27,7 @@ export default function JobEditPanel({
   const router = useRouter();
   const [triggerOpen, setTriggerOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   async function del() {
     if (!confirm(`确认删除 Job「${initial.name}」?未完成的任务会阻止删除。`)) return;
@@ -47,9 +48,20 @@ export default function JobEditPanel({
   return (
     <>
       <div className="mb-5 flex items-center justify-end gap-2">
-        <Button variant="outline" onClick={() => setTriggerOpen(true)}>
+        <Button
+          variant="outline"
+          onClick={() => setTriggerOpen(true)}
+          disabled={dirty || !initial.active}
+          title={
+            dirty
+              ? "请先保存修改,再运行当前版本"
+              : !initial.active
+                ? "采集任务已停用"
+                : undefined
+          }
+        >
           <Play className="size-4" />
-          手动触发一次
+          {dirty ? "先保存再运行" : "手动运行一次"}
         </Button>
         <Button variant="ghost" className="text-destructive" onClick={del} disabled={deleting}>
           <Trash2 className="size-4" />
@@ -57,7 +69,13 @@ export default function JobEditPanel({
         </Button>
       </div>
 
-      <JobForm mode="edit" initial={initial} agents={agents} csvTypes={csvTypes} />
+      <JobForm
+        mode="edit"
+        initial={initial}
+        agents={agents}
+        csvTypes={csvTypes}
+        onDirtyChange={setDirty}
+      />
 
       <TriggerDialog
         jobId={initial.id}

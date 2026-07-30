@@ -49,6 +49,12 @@ export const taskUpdateSchema = z.object({
 export const heartbeatRequestSchema = z.object({
   agentStatus: z.enum(["idle", "busy"]).optional(),
   version: z.string().max(64).optional(),
+  hostname: z.string().trim().max(128).optional(),
+  pythonVersion: z.string().trim().max(128).optional(),
+  gitVersion: z.string().trim().max(128).optional(),
+  diagnostics: z
+    .record(z.union([z.string().max(500), z.number(), z.boolean(), z.null()]))
+    .optional(),
 });
 
 /**
@@ -56,6 +62,34 @@ export const heartbeatRequestSchema = z.object({
  * 服务端按 `WHERE agentId = <self>` 取自己的队列。空 body 即可。
  */
 export const claimRequestSchema = z.object({}).default({});
+
+export const executionSnapshotSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    capturedAt: z.string().datetime(),
+    agentVersion: z.string().trim().min(1).max(64),
+    hostname: z.string().trim().min(1).max(128),
+    platform: z.string().trim().min(1).max(500),
+    pythonVersion: z.string().trim().min(1).max(128),
+    pythonExecutable: z.string().trim().min(1).max(500),
+    gitVersion: z.string().trim().min(1).max(128),
+    dependencyFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    dependencies: z.array(z.string().trim().min(1).max(500)).max(1000),
+    commandHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+export const taskPrepareSchema = z
+  .object({
+    sourceRevision: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .regex(/^[A-Za-z0-9._-]+$/, "sourceRevision 格式无效"),
+    executionSnapshot: executionSnapshotSchema,
+  })
+  .strict();
 
 export const taskResultStatusSchema = z.enum(["success", "failure", "no_data"]);
 
@@ -75,3 +109,4 @@ export const taskListQuerySchema = z.object({
 export type AgentCreateInput = z.infer<typeof agentCreateSchema>;
 export type AgentUpdateInput = z.infer<typeof agentUpdateSchema>;
 export type TaskUpdateInput = z.infer<typeof taskUpdateSchema>;
+export type ExecutionSnapshot = z.infer<typeof executionSnapshotSchema>;

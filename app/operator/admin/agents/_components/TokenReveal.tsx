@@ -29,14 +29,27 @@ export default function TokenReveal({
   agentName: string | null;
   onClose: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"token" | "install" | null>(null);
 
-  async function copy() {
+  async function copyToken() {
     if (!token) return;
     try {
       await navigator.clipboard.writeText(token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setCopied("token");
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function copyInstallCommand() {
+    if (!token) return;
+    const baseUrl = window.location.origin;
+    const command = `.\\install.cmd -BaseUrl "${baseUrl}" -Token "${token}"`;
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied("install");
+      setTimeout(() => setCopied(null), 1500);
     } catch {
       /* ignore */
     }
@@ -63,15 +76,14 @@ export default function TokenReveal({
         </div>
 
         <p className="text-[11px] text-muted-foreground">
-          建议在 agent 端用 env 注入:
-          <code className="ml-1 rounded bg-muted px-1 py-0.5 font-mono">
-            CRAWLER_TOKEN=&lt;此 token&gt;
-          </code>
+          将项目的 <code className="font-mono">agent-reference</code> 目录复制到爬虫机,
+          在目录内运行下方复制的安装命令。Win10 / Win11 均从 CMD 启动,
+          不修改系统永久执行策略。
         </p>
 
         <AlertDialogFooter>
-          <Button type="button" variant="outline" onClick={copy} className="mr-auto">
-            {copied ? (
+          <Button type="button" variant="outline" onClick={copyToken} className="mr-auto">
+            {copied === "token" ? (
               <>
                 <Check className="size-3.5" />
                 已复制
@@ -80,6 +92,19 @@ export default function TokenReveal({
               <>
                 <Copy className="size-3.5" />
                 复制 Token
+              </>
+            )}
+          </Button>
+          <Button type="button" variant="outline" onClick={copyInstallCommand}>
+            {copied === "install" ? (
+              <>
+                <Check className="size-3.5" />
+                命令已复制
+              </>
+            ) : (
+              <>
+                <Copy className="size-3.5" />
+                复制安装命令
               </>
             )}
           </Button>

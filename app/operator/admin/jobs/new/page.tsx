@@ -7,19 +7,32 @@ import { ChevronLeft } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { listCsvTypes } from "@/lib/csv-types";
+import { buildRepositoryPresets } from "@/lib/job-repositories";
 
 import JobForm, { EMPTY_INITIAL } from "../_components/JobForm";
 
 export default async function NewJobPage() {
   await requireRole("ADMIN");
 
-  const [agents, csvTypes] = await Promise.all([
+  const [agents, csvTypes, repositorySources] = await Promise.all([
     prisma.crawlerAgent.findMany({
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, status: true },
     }),
     listCsvTypes(),
+    prisma.crawlerJob.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        agentId: true,
+        repoType: true,
+        repoUrl: true,
+        repoBranch: true,
+      },
+    }),
   ]);
+  const repositoryPresets = buildRepositoryPresets(repositorySources);
 
   return (
     <div className="p-8">
@@ -43,6 +56,7 @@ export default async function NewJobPage() {
         initial={EMPTY_INITIAL}
         agents={agents}
         csvTypes={csvTypes}
+        repositoryPresets={repositoryPresets}
       />
     </div>
   );

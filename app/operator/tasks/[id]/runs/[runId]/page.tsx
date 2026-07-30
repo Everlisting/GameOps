@@ -16,10 +16,19 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { fmtDateTime } from "@/lib/format";
-import { CSV_TYPE_LABEL } from "@/lib/validation/crawler";
+import {
+  CSV_TYPE_LABEL,
+  executionSnapshotSchema,
+} from "@/lib/validation/crawler";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 import TaskStatusBadge from "../../../_components/TaskStatusBadge";
 import RunActions from "./_components/RunActions";
@@ -60,6 +69,12 @@ export default async function RunDetailPage({
 
   const duration = computeDuration(t.startedAt, t.finishedAt);
   const hasLog = !!t.logPath;
+  const parsedExecutionSnapshot = executionSnapshotSchema.safeParse(
+    t.executionSnapshot,
+  );
+  const executionSnapshot = parsedExecutionSnapshot.success
+    ? parsedExecutionSnapshot.data
+    : null;
 
   return (
     <div className="p-8">
@@ -123,6 +138,9 @@ export default async function RunDetailPage({
               <span className="text-muted-foreground">—</span>
             )}
           </KV>
+          <KV label="配置版本">
+            {t.jobRevision ? `v${t.jobRevision}(已冻结)` : "历史任务"}
+          </KV>
           <KV label="优先级">{t.priority}</KV>
           <KV label="开始时间">
             {t.startedAt ? fmtDateTime(t.startedAt) : "—"}
@@ -157,6 +175,84 @@ export default async function RunDetailPage({
               </pre>
             </div>
           )}
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>复现信息</CardTitle>
+            <CardDescription>
+              首次执行前冻结实际源码 revision 和环境指纹；重跑会继续使用同一源码。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2 md:grid-cols-2">
+            <KV label="源码 revision">
+              {t.sourceRevision ? (
+                <span className="break-all font-mono">{t.sourceRevision}</span>
+              ) : (
+                <span className="text-muted-foreground">
+                  {t.status === "PENDING" ? "等待 Agent 领取后冻结" : "历史任务未记录"}
+                </span>
+              )}
+            </KV>
+            <KV label="重跑来源">
+              {t.rerunOfTaskId ? (
+                <Link
+                  href={`/operator/tasks/${params.id}/runs/${t.rerunOfTaskId}`}
+                  className="break-all font-mono hover:text-primary"
+                >
+                  {t.rerunOfTaskId}
+                </Link>
+              ) : (
+                "首次执行"
+              )}
+            </KV>
+            <KV label="Agent">
+              {executionSnapshot
+                ? `${executionSnapshot.agentVersion} · ${executionSnapshot.hostname}`
+                : "—"}
+            </KV>
+            <KV label="Python">
+              {executionSnapshot?.pythonVersion ?? "—"}
+            </KV>
+            <KV label="Git">
+              {executionSnapshot?.gitVersion ?? "—"}
+            </KV>
+            <KV label="操作系统">
+              {executionSnapshot?.platform ?? "—"}
+            </KV>
+            <KV label="冻结时间">
+              {executionSnapshot
+                ? fmtDateTime(new Date(executionSnapshot.capturedAt))
+                : "—"}
+            </KV>
+            <KV label="依赖数量">
+              {executionSnapshot
+                ? `${executionSnapshot.dependencies.length} 个`
+                : "—"}
+            </KV>
+            <div className="flex flex-col gap-2 md:col-span-2">
+              <KV label="依赖指纹">
+                <span className="break-all font-mono">
+                  {executionSnapshot?.dependencyFingerprint ?? "—"}
+                </span>
+              </KV>
+              <KV label="命令指纹">
+                <span className="break-all font-mono">
+                  {executionSnapshot?.commandHash ?? "—"}
+                </span>
+              </KV>
+            </div>
+            {executionSnapshot && executionSnapshot.dependencies.length > 0 ? (
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-xs text-muted-foreground">
+                  Python 依赖清单
+                </span>
+                <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs leading-relaxed">
+                  {executionSnapshot.dependencies.join("\n")}
+                </pre>
+              </div>
+            ) : null}
+          </CardContent>
         </Card>
 
         <Card className="space-y-2 p-5 lg:col-span-2">

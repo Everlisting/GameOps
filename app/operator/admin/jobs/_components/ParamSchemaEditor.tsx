@@ -7,12 +7,15 @@
 import { Trash2, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -104,11 +107,13 @@ export default function ParamSchemaEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(["DATE", "STRING", "NUMBER", "ENUM", "EXCEL"] as const).map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {TYPE_LABEL[t]}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {(["DATE", "STRING", "NUMBER", "ENUM", "EXCEL"] as const).map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {TYPE_LABEL[t]}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -181,16 +186,16 @@ export default function ParamSchemaEditor({
                 </p>
               </div>
             )}
-            <div className="col-span-12 flex items-center gap-2 text-xs">
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
+            <Field className="col-span-12" orientation="horizontal">
+                <Checkbox
+                  id={`param-required-${i}`}
                   checked={item.required ?? false}
-                  onChange={(e) => update(i, { required: e.target.checked })}
+                  onCheckedChange={(checked) => update(i, { required: checked === true })}
                 />
+              <FieldLabel htmlFor={`param-required-${i}`}>
                 必填
-              </label>
-            </div>
+              </FieldLabel>
+            </Field>
           </div>
         </Card>
       ))}

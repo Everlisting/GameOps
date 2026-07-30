@@ -178,7 +178,10 @@ data-hub/
   - 尚未接 agent:slg_public 可被 agent 拉取运行(`workdir=crawlers/slg_public`,`python scripts/fetch_*.py`),需要时在中台建对应 Job。
 
 ### 迁移踩坑备忘(repoUrl 变更时必看)
-- executor `sync_repo` 对已存在 checkout 只 `git fetch` 现有 remote,**不因 Job.repoUrl 改了就换 remote** → 改 repoUrl 必须连带删该 Job 工作区强制重 clone。
+- Agent v0.4 起工作副本按规范化 `repoType + repoUrl` 共享,目录为
+  `workspaces/repos/<urlHash>/<repoName>/`;同仓库的多个 Job 不再重复 clone,
+  `workdir` 只负责选择仓库内的爬虫子目录。repoUrl 改变会自然映射到新的缓存目录,
+  且复用前会校验 `remote.origin.url`。
 - executor `_run_check`(git clone/pull)**无 timeout** → 私有仓认证挂起会无限卡住 agent(并发=1 被占死),值得给它加超时。
 - 私有仓 SSH:GitHub deploy key 是**单仓**范围(问候语 `Hi user/repo!`),一把公钥全站只能当一个仓的 deploy key;多仓要么各配 key+`~/.ssh/config` Host 别名(本次做法),要么用账号级 key。
 - Win32 `ssh-keygen` 不展开 `~`(ssh 客户端会),生成 key 用 `$env:USERPROFILE` 全路径。

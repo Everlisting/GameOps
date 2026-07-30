@@ -13,9 +13,11 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+AGENT_VERSION = "0.5.0"
+
 # 1. 加载 .env(脚本同目录优先)
 _HERE = Path(__file__).resolve().parent
-load_dotenv(_HERE / ".env")
+load_dotenv(_HERE / ".env", encoding="utf-8-sig")
 
 try:
     BASE = os.environ["CRAWLER_BASE_URL"].rstrip("/")

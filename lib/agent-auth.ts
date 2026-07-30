@@ -16,6 +16,7 @@ import { forbidden, unauthorized } from "@/lib/errors";
 export type AuthenticatedAgent = {
   id: string;
   name: string;
+  agentVersion: string | null;
 };
 
 /** 从 Authorization 头解析 agent token,校验通过则返回 agent;失败抛 401/403。 */
@@ -38,6 +39,7 @@ export async function requireAgent(req: Request): Promise<AuthenticatedAgent> {
       name: true,
       status: true,
       tokenHash: true,
+      agentVersion: true,
     },
   });
   if (!agent) throw unauthorized("Token 无效");
@@ -61,6 +63,7 @@ export async function requireAgent(req: Request): Promise<AuthenticatedAgent> {
   return {
     id: agent.id,
     name: agent.name,
+    agentVersion: agent.agentVersion,
   };
 }
 

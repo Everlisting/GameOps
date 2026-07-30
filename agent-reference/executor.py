@@ -1,18 +1,18 @@
 """
 executor.py — 任务执行器,常驻进程。
 
-由 Windows 任务计划在开机时启动一次,内部循环:
+由 agent.py 在主线程启动,内部循环:
   claim → sync_repo → render command → run + tee log → upload result
-不再调 /heartbeat —— 那是 heartbeat.py 的独立活。
-
-executor 卡死 / 异常退出时,任务计划程序的"如果任务失败则重启"会兜底重拉。
+心跳由 agent.py 的独立后台线程负责,长任务不会阻塞心跳。
 """
 
 from __future__ import annotations
 
 import json
+import hashlib
 import locale
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -20,11 +20,18 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 
-from common import BASE, SESSION, WORK_ROOT, make_logger
+from common import AGENT_VERSION, BASE, SESSION, WORK_ROOT, make_logger
+from repo_workspace import (
+    extract_repo_name,
+    is_path_within,
+    normalize_repo_url,
+    shared_repo_dir,
+)
 
 log = make_logger("executor")
 
@@ -35,6 +42,7 @@ IDLE_POLL_SEC = 10
 ERROR_BACKOFF_SEC = 10
 # 跑命令时多久 ping 一次 /log 探活,看任务是否被中台取消
 CANCEL_POLL_SEC = 5
+BUSY_EVENT = threading.Event()
 
 
 class TaskCanceledError(RuntimeError):
@@ -154,54 +162,311 @@ def upload_failure(task_id: str, exit_code: int | None, message: str) -> None:
         log.exception("upload_failure failed: %s", ex)
 
 
+def _command_version(command: str, *args: str) -> str:
+    executable = shutil.which(command)
+    if executable is None:
+        return "未安装"
+    completed = subprocess.run(
+        [executable, *args],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    lines = (completed.stdout or completed.stderr).strip().splitlines()
+    return lines[0][:120] if lines else f"exit={completed.returncode}"
+
+
+def _python_executable(argv: list[str]) -> str:
+    if argv:
+        resolved = shutil.which(argv[0])
+        if resolved and Path(argv[0]).name.lower() in {
+            "python",
+            "python.exe",
+            "python3",
+            "python3.exe",
+            "py",
+            "py.exe",
+        }:
+            return resolved
+    return sys.executable
+
+
+def _python_version(python_executable: str) -> str:
+    completed = subprocess.run(
+        [
+            python_executable,
+            "-c",
+            "import platform; print(platform.python_version())",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    version = completed.stdout.strip()
+    return version[:128] if completed.returncode == 0 and version else "unknown"
+
+
+def _python_dependencies(python_executable: str) -> list[str]:
+    completed = subprocess.run(
+        [
+            python_executable,
+            "-m",
+            "pip",
+            "--disable-pip-version-check",
+            "freeze",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if completed.returncode != 0:
+        log.warning("pip freeze failed exit=%s", completed.returncode)
+        return []
+    return sorted(
+        line.strip()[:500]
+        for line in completed.stdout.splitlines()
+        if line.strip()
+    )[:1000]
+
+
+def build_execution_snapshot(argv: list[str]) -> dict:
+    python_executable = _python_executable(argv)
+    dependencies = _python_dependencies(python_executable)
+    dependency_text = "\n".join(dependencies).encode("utf-8")
+    command_text = json.dumps(
+        argv,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "schemaVersion": 1,
+        "capturedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "agentVersion": AGENT_VERSION,
+        "hostname": platform.node() or "unknown",
+        "platform": platform.platform(),
+        "pythonVersion": _python_version(python_executable),
+        "pythonExecutable": python_executable,
+        "gitVersion": _command_version("git", "--version"),
+        "dependencyFingerprint": hashlib.sha256(dependency_text).hexdigest(),
+        "dependencies": dependencies,
+        # 不上传渲染后的命令明文,避免参数值中的密钥再次扩散;hash 足够用于核对。
+        "commandHash": hashlib.sha256(command_text).hexdigest(),
+    }
+
+
+def prepare_execution(
+    task_id: str,
+    source_revision: str,
+    execution_snapshot: dict,
+) -> None:
+    response = SESSION.post(
+        f"{BASE}/api/agent/tasks/{task_id}/prepare",
+        json={
+            "sourceRevision": source_revision,
+            "executionSnapshot": execution_snapshot,
+        },
+        timeout=30,
+    )
+    if response.status_code == 404:
+        raise TaskCanceledError(
+            f"task prepare rejected by server (HTTP {response.status_code})"
+        )
+    if response.status_code >= 400:
+        try:
+            error = response.json().get("error") or {}
+            detail = json.dumps(error, ensure_ascii=False)
+        except Exception:
+            detail = response.text[:1000]
+        if response.status_code == 409 and (
+            "状态不可" in detail or "不属于当前 agent" in detail
+        ):
+            raise TaskCanceledError(
+                f"task prepare rejected by server (HTTP 409): {detail}"
+            )
+        raise RuntimeError(
+            f"task prepare rejected by server "
+            f"(HTTP {response.status_code}): {detail}"
+        )
+
+
 # ── 仓库同步 ────────────────────────────────────────
 
-def extract_repo_name(url: str) -> str:
-    """从 repoUrl 提取仓库目录名,作为 clone 目标的目录名。
+def _git_origin_url(repo_dir: Path) -> str | None:
+    res = subprocess.run(
+        ["git", "config", "--get", "remote.origin.url"],
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode != 0:
+        return None
+    value = res.stdout.strip()
+    return value or None
 
-    保留原仓库目录名很重要:很多 Python 项目用 `from <repo-name> import xxx`,
-    依赖目录本身的名字。如果直接 clone 到 `job-<id>/`,目录名变 `job-cmpw...`,
-    import 就会失配。
 
-    git@github.com:foo/bar.git    -> bar
-    https://github.com/foo/bar.git -> bar
-    https://example.com/svn/repo   -> repo
+def _migrate_legacy_job_repo(job: dict, repo_dir: Path) -> bool:
+    """Move this Job's old checkout into the shared cache when safe.
+
+    The old outer job-<id> directory is intentionally left in place. Other
+    legacy Job checkouts are never deleted automatically.
     """
-    s = url.rstrip("/")
-    if s.endswith(".git"):
-        s = s[:-4]
-    last = re.split(r"[/:]", s)[-1]
-    # 防御:剔除文件系统非法字符
-    last = re.sub(r"[^A-Za-z0-9_.\-]", "_", last)
-    return last or "repo"
+    if repo_dir.exists():
+        return False
+
+    repo_name = extract_repo_name(job["repoUrl"])
+    legacy_repo_dir = WORK_ROOT / f"job-{job['id']}" / repo_name
+    if not legacy_repo_dir.exists():
+        return False
+
+    if job["repoType"] == "GIT":
+        if not (legacy_repo_dir / ".git").exists():
+            return False
+        origin = _git_origin_url(legacy_repo_dir)
+        if origin is None or normalize_repo_url(origin) != normalize_repo_url(job["repoUrl"]):
+            return False
+    elif job["repoType"] == "SVN":
+        if not (legacy_repo_dir / ".svn").exists():
+            return False
+    else:
+        return False
+
+    repo_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(legacy_repo_dir), str(repo_dir))
+    log.info("migrated legacy repo workspace %s -> %s", legacy_repo_dir, repo_dir)
+    return True
 
 
-def sync_repo(job: dict, repo_dir: Path) -> None:
+def _checkout_git_branch(repo_dir: Path, branch: str | None) -> None:
+    if branch:
+        remote_ref = f"origin/{branch}"
+        _run_check(["git", "checkout", "-B", branch, remote_ref], cwd=str(repo_dir))
+        _run_check(["git", "reset", "--hard", remote_ref], cwd=str(repo_dir))
+        return
+
+    # An empty Job branch means the remote default branch, not whichever
+    # branch a previous Job happened to leave checked out.
+    default_ref = subprocess.run(
+        ["git", "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+    )
+    if default_ref.returncode == 0 and default_ref.stdout.strip().startswith("origin/"):
+        remote_ref = default_ref.stdout.strip()
+        default_branch = remote_ref.removeprefix("origin/")
+        _run_check(
+            ["git", "checkout", "-B", default_branch, remote_ref],
+            cwd=str(repo_dir),
+        )
+        _run_check(["git", "reset", "--hard", remote_ref], cwd=str(repo_dir))
+        return
+
+    _run_check(["git", "pull", "--ff-only"], cwd=str(repo_dir))
+
+
+def _checkout_git_revision(repo_dir: Path, revision: str) -> None:
+    _run_check(
+        ["git", "cat-file", "-e", f"{revision}^{{commit}}"],
+        cwd=str(repo_dir),
+    )
+    _run_check(["git", "checkout", "--detach", revision], cwd=str(repo_dir))
+    _run_check(["git", "reset", "--hard", revision], cwd=str(repo_dir))
+
+
+def _git_revision(repo_dir: Path) -> str:
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    revision = completed.stdout.strip()
+    if completed.returncode != 0 or not re.fullmatch(r"[a-fA-F0-9]{40,64}", revision):
+        raise RuntimeError("无法解析 Git HEAD revision")
+    return revision.lower()
+
+
+def _svn_revision(repo_dir: Path) -> str:
+    completed = subprocess.run(
+        ["svn", "info", "--show-item", "revision"],
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    revision = completed.stdout.strip()
+    if completed.returncode != 0 or not revision.isdigit():
+        raise RuntimeError("无法解析 SVN revision")
+    return revision
+
+
+def sync_repo(
+    job: dict,
+    repo_dir: Path,
+    source_revision: str | None = None,
+) -> tuple[str, str]:
     repo_type = job["repoType"]
     url = job["repoUrl"]
     branch = job.get("repoBranch") or None
+    migrated = _migrate_legacy_job_repo(job, repo_dir)
 
     if repo_type == "GIT":
         if not (repo_dir / ".git").exists():
+            if repo_dir.exists():
+                raise RuntimeError(f"共享仓库目录存在但不是 Git 工作副本: {repo_dir}")
             repo_dir.parent.mkdir(parents=True, exist_ok=True)
             cmd = ["git", "clone"]
-            if branch:
+            if branch and not source_revision:
                 cmd += ["-b", branch]
             cmd += [url, str(repo_dir)]
             _run_check(cmd, cwd=str(repo_dir.parent))
+            if source_revision:
+                _checkout_git_revision(repo_dir, source_revision)
+                return "cloned+pinned", _git_revision(repo_dir)
+            return "cloned", _git_revision(repo_dir)
         else:
+            origin = _git_origin_url(repo_dir)
+            if origin is None:
+                raise RuntimeError(f"共享 Git 工作副本缺少 remote.origin.url: {repo_dir}")
+            if normalize_repo_url(origin) != normalize_repo_url(url):
+                raise RuntimeError(
+                    f"共享 Git 工作副本远端不匹配: expected={url}, actual={origin}"
+                )
             _run_check(["git", "fetch", "--all", "--prune"], cwd=str(repo_dir))
-            if branch:
-                _run_check(["git", "checkout", branch], cwd=str(repo_dir))
-                _run_check(["git", "reset", "--hard", f"origin/{branch}"], cwd=str(repo_dir))
+            if source_revision:
+                _checkout_git_revision(repo_dir, source_revision)
+                action = "migrated+pinned" if migrated else "pinned"
             else:
-                _run_check(["git", "pull", "--ff-only"], cwd=str(repo_dir))
+                _checkout_git_branch(repo_dir, branch)
+                action = "migrated+updated" if migrated else "updated"
+            return action, _git_revision(repo_dir)
     elif repo_type == "SVN":
         if not repo_dir.exists():
             repo_dir.parent.mkdir(parents=True, exist_ok=True)
-            _run_check(["svn", "checkout", url, str(repo_dir)])
+            cmd = ["svn", "checkout"]
+            if source_revision:
+                cmd += ["-r", source_revision]
+            cmd += [url, str(repo_dir)]
+            _run_check(cmd)
+            return (
+                "checked-out+pinned" if source_revision else "checked-out",
+                _svn_revision(repo_dir),
+            )
         else:
-            _run_check(["svn", "update"], cwd=str(repo_dir))
+            if not (repo_dir / ".svn").exists():
+                raise RuntimeError(f"共享仓库目录存在但不是 SVN 工作副本: {repo_dir}")
+            cmd = ["svn", "update"]
+            if source_revision:
+                cmd += ["-r", source_revision]
+            _run_check(cmd, cwd=str(repo_dir))
+            action = "migrated+updated" if migrated else "updated"
+            if source_revision:
+                action = "migrated+pinned" if migrated else "pinned"
+            return action, _svn_revision(repo_dir)
     else:
         raise RuntimeError(f"未知 repoType: {repo_type}")
 
@@ -403,12 +668,12 @@ def collect_outputs(job: dict, workdir: Path) -> list[tuple[str | None, Path]]:
                 raise RuntimeError(f"missing output (glob 无匹配): {rel}")
             for m in file_matches:
                 abs_path = m.resolve()
-                if not str(abs_path).startswith(str(workdir_resolved)):
+                if not is_path_within(abs_path, workdir_resolved):
                     raise RuntimeError(f"output 路径越权: {rel} -> {abs_path}")
                 found.append((csv_type, abs_path))
         else:
             abs_path = (workdir / rel).resolve()
-            if not str(abs_path).startswith(str(workdir_resolved)):
+            if not is_path_within(abs_path, workdir_resolved):
                 raise RuntimeError(f"output 路径越权: {rel}")
             if not abs_path.is_file():
                 if optional:
@@ -425,14 +690,12 @@ def handle_task(task: dict) -> None:
     job = task["job"]
     params = task.get("paramValues") or {}
 
-    # 目录布局:WORK_ROOT/job-<jobId>/<repoName>/
-    # 外层 job-<id> 隔离不同 Job;内层用真实仓库名,
-    # 保证 `from <repoName> import ...` 这种依赖目录名的 import 仍能工作。
-    job_root = WORK_ROOT / f"job-{job['id']}"
-    repo_name = extract_repo_name(job["repoUrl"])
-    repo_dir = job_root / repo_name
+    # 目录布局:WORK_ROOT/repos/<repoType>-<normalized-url-hash>/<repoName>/
+    # 同 repoType + repoUrl 的所有 Job 共用唯一工作副本;Agent 并发=1,
+    # 每个 Task 同步后再切换自己的 repoBranch,然后进入 Job.workdir 执行。
+    repo_dir = shared_repo_dir(WORK_ROOT, job["repoType"], job["repoUrl"])
     workdir = (repo_dir / (job.get("workdir") or ".")).resolve()
-    if not str(workdir).startswith(str(repo_dir.resolve())):
+    if not is_path_within(workdir, repo_dir):
         raise RuntimeError("job.workdir 越权")
 
     log.info("=== task %s seq=#%s job=%s ===", tid, task.get("sequenceNumber"), job["name"])
@@ -440,7 +703,19 @@ def handle_task(task: dict) -> None:
 
     try:
         push_log(tid, f"[agent] sync {job['repoType']} {job['repoUrl']} ({job.get('repoBranch') or 'default'})\n".encode())
-        sync_repo(job, repo_dir)
+        requested_revision = task.get("sourceRevision") or None
+        sync_action, source_revision = sync_repo(
+            job,
+            repo_dir,
+            requested_revision,
+        )
+        push_log(
+            tid,
+            (
+                f"[agent] repo cache {sync_action}: {repo_dir}\n"
+                f"[agent] source revision: {source_revision}\n"
+            ).encode(),
+        )
     except Exception as ex:
         msg = f"sync_repo failed: {ex}"
         log.error(msg)
@@ -455,6 +730,28 @@ def handle_task(task: dict) -> None:
     except Exception as ex:
         msg = f"render_command failed: {ex}"
         log.error(msg)
+        push_log(tid, (msg + "\n").encode())
+        upload_failure(tid, None, msg)
+        return
+
+    try:
+        execution_snapshot = build_execution_snapshot(argv)
+        prepare_execution(tid, source_revision, execution_snapshot)
+        push_log(
+            tid,
+            (
+                "[agent] execution frozen: "
+                f"revision={source_revision}, "
+                f"dependencies={len(execution_snapshot['dependencies'])}, "
+                f"fingerprint={execution_snapshot['dependencyFingerprint'][:12]}\n"
+            ).encode(),
+        )
+    except TaskCanceledError:
+        log.info("task %s canceled before command start", tid)
+        return
+    except Exception as ex:
+        msg = f"prepare_execution failed: {type(ex).__name__}: {ex}"
+        log.exception(msg)
         push_log(tid, (msg + "\n").encode())
         upload_failure(tid, None, msg)
         return
@@ -554,7 +851,11 @@ def main() -> None:
             if task is None:
                 time.sleep(IDLE_POLL_SEC)
                 continue
-            handle_task(task)
+            BUSY_EVENT.set()
+            try:
+                handle_task(task)
+            finally:
+                BUSY_EVENT.clear()
             # 跑完立刻再 claim,不睡(可能后面排着队)
         except KeyboardInterrupt:
             log.info("bye")

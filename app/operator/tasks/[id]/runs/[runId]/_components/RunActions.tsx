@@ -3,7 +3,7 @@
 /**
  * 执行详情页头部操作:
  *   - RUNNING / PENDING:停止(PATCH status=CANCELED,带二次确认 modal)
- *   - FAILED / CANCELED:重排队(PATCH status=PENDING)+ 重跑(POST rerun 建新 task)
+ *   - FAILED / CANCELED:重排队(PATCH status=PENDING)+ 按冻结版本重跑
  *   - SUCCEEDED:重跑
  */
 import * as React from "react";
@@ -137,7 +137,7 @@ export default function RunActions({
               )
             }
           >
-            重跑(克隆新 task)
+            按原版本重跑
           </Button>
         )}
       </div>

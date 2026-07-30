@@ -8,7 +8,7 @@ import path from "node:path";
 import { prisma } from "@/lib/db";
 import { conflict, notFound } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit";
-import { createTaskFromJob } from "@/lib/jobs";
+import { createTaskFromFrozenTask } from "@/lib/jobs";
 
 export interface TaskActor {
   id: string | null; // 操作人 user.id;null=系统
@@ -64,25 +64,24 @@ export async function cancelCrawlerTask(
   return { fromStatus: t.status };
 }
 
-/** 重跑一条采集任务:基于原 Task 的 jobId+参数克隆一条新 PENDING 任务(原任务不动),审计 task.rerun。 */
+/** 重跑一条采集任务:克隆原 Task 的冻结配置、参数和源码 revision,原任务不动。 */
 export async function rerunCrawlerTask(
   taskId: string,
   actor: TaskActor,
 ): Promise<{ newTaskId: string; sourceTaskId: string; jobId: string }> {
   const src = await prisma.crawlerTask.findUnique({
     where: { id: taskId },
-    select: { jobId: true, paramValues: true, priority: true },
+    select: {
+      jobId: true,
+      paramValues: true,
+      jobRevision: true,
+      sourceRevision: true,
+    },
   });
   if (!src) throw notFound("任务不存在");
   if (!src.jobId) throw conflict("该任务没有关联 Job(历史数据),不支持重跑");
 
-  const created = await createTaskFromJob({
-    jobId: src.jobId,
-    paramValues: (src.paramValues as Record<string, unknown>) ?? {},
-    trigger: "MANUAL",
-    createdById: actor.id,
-    priority: src.priority,
-  });
+  const created = await createTaskFromFrozenTask(taskId, actor.id);
 
   await recordAudit({
     actorId: actor.id,
@@ -90,7 +89,13 @@ export async function rerunCrawlerTask(
     action: "task.rerun",
     targetType: "task",
     targetId: created.id,
-    details: { sourceTaskId: taskId, jobId: src.jobId, paramValues: src.paramValues },
+    details: {
+      sourceTaskId: taskId,
+      jobId: src.jobId,
+      jobRevision: src.jobRevision,
+      sourceRevision: src.sourceRevision,
+      paramValues: src.paramValues,
+    },
   });
 
   return { newTaskId: created.id, sourceTaskId: taskId, jobId: src.jobId };

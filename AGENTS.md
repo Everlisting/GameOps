@@ -15,9 +15,9 @@
 ## 架构要点(详见 docs/architecture.md)
 - 三类角色层级:ADMIN ⊃ OPERATOR,CREATOR 独立对外。共用登录入口,按 role 跳转。
 - 爬虫 Agent 拉模型:爬虫机轮询中台领任务、回传 CSV,中台不主动连爬虫机。
-- **Jenkins 风格 Job/Task**:Job 是模板(绑 Agent + repo + 命令模板 + 参数 schema + 产物清单 + 可选 cron),Task 是一次执行。Agent 并发=1;失败不自动重试,手动重跑克隆新 task。详见 `docs/agent-protocol.md`。
+- **Jenkins 风格 Job/Task**:Job 是模板(绑 Agent + repo + 命令模板 + 参数 schema + 产物清单 + 可选 cron),Task 是一次执行。Task 创建时冻结 `jobRevision + jobSnapshot`,Agent 执行前再冻结实际 `sourceRevision + executionSnapshot`;排队后编辑模板不改变本次执行,重跑克隆原配置与源码 revision。同一 Agent 上相同 `repoType + repoUrl` 的 Job 共用一个本地仓库副本,`workdir` 选择仓库内执行目录。Agent 并发=1;失败不自动重试。详见 `docs/agent-protocol.md`。
 - **关键动作走审计**:`task.trigger / cancel / requeue / rerun / priority` 都写 `AuditLog`(actorId + actorUsername 快照 + targetType/targetId + details JSON)。
-- **enabled 字段语义**:仅控制 cron 自动触发;手动触发(MANUAL/rerun)始终允许。
+- **Job 开关语义**:`enabled` 仅控制 cron 自动触发,手动触发(MANUAL/rerun)始终允许;`active` 是总开关,关闭后任何方式都不可触发。
 - **产物分类入库**:Job.outputs 支持 glob(`*` `?` `[]`) + `optional` 标志;csvType 非空 → 入 `data/raw/<csvType>/` 并跑 parser;csvType 空 → 入 `_uncategorized/` 仅留底可下载,不解析。
 - **时区**:PG 数据库强制 `timezone='UTC'`,前端用 `lib/format.ts` 锁 Asia/Shanghai 渲染;raw SQL 用 `(NOW() AT TIME ZONE 'UTC')` 显式 UTC。
 - CSV→表映射写在代码内(每种 csvType 一个解析器,见 lib/parsers/index.ts)。

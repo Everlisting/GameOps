@@ -81,17 +81,12 @@ export const PATCH = route(async (req, { params }) => {
   if (input.outputs !== undefined) data.outputs = input.outputs as unknown as Prisma.InputJsonValue;
   // cronExpression 显式可空,null = 清掉定时
   if ("cronExpression" in input) data.cronExpression = input.cronExpression ?? null;
+  // 每次成功编辑都形成一个新配置版本。新建 Task 会冻结该 revision 的执行配置。
+  data.revision = { increment: 1 };
 
-  // 改 agentId 时,把已经 PENDING 的任务也跟着搬到新 agent(否则会卡在旧机器队列里)
-  await prisma.$transaction(async (tx) => {
-    await tx.crawlerJob.update({ where: { id }, data });
-    if (input.agentId && input.agentId !== existing.agentId) {
-      await tx.crawlerTask.updateMany({
-        where: { jobId: id, status: "PENDING" },
-        data: { agentId: input.agentId },
-      });
-    }
-  });
+  // 已经 PENDING 的 Task 保留创建时的 agentId + jobSnapshot,不随模板迁移,
+  // 避免“排队后改模板”改变实际执行内容。
+  await prisma.crawlerJob.update({ where: { id }, data });
 
   // 通知 cron scheduler 增量同步
   try {

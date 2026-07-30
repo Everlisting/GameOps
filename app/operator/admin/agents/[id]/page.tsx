@@ -11,6 +11,13 @@ import { prisma } from "@/lib/db";
 import { fmtDateTime } from "@/lib/format";
 import { isOffline } from "@/lib/agent-offline";
 import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 import AgentEditForm from "../_components/AgentEditForm";
 
@@ -27,6 +34,12 @@ export default async function EditAgentPage({
       status: true,
       lastSeenAt: true,
       lastSeenIp: true,
+      lastHeartbeatAt: true,
+      agentVersion: true,
+      hostname: true,
+      pythonVersion: true,
+      gitVersion: true,
+      executorStatus: true,
       createdAt: true,
       createdBy: { select: { username: true } },
       _count: { select: { jobs: true, tasks: true } },
@@ -73,6 +86,26 @@ export default async function EditAgentPage({
         </p>
       </header>
 
+      <Card className="mb-5">
+        <CardHeader>
+          <CardTitle>部署状态</CardTitle>
+          <CardDescription>
+            Agent 安装完成并持续上报心跳后,这里会显示运行环境与版本。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+          <StatusItem
+            label="独立心跳"
+            value={a.lastHeartbeatAt ? fmtDateTime(a.lastHeartbeatAt) : "尚未收到"}
+          />
+          <StatusItem label="执行器" value={a.executorStatus ?? "未知"} />
+          <StatusItem label="Agent 版本" value={a.agentVersion ?? "未上报"} />
+          <StatusItem label="主机名" value={a.hostname ?? "未上报"} />
+          <StatusItem label="Python" value={a.pythonVersion ?? "未上报"} />
+          <StatusItem label="Git" value={a.gitVersion ?? "未上报"} />
+        </CardContent>
+      </Card>
+
       <AgentEditForm
         initial={{
           id: a.id,
@@ -80,6 +113,15 @@ export default async function EditAgentPage({
           status: a.status,
         }}
       />
+    </div>
+  );
+}
+
+function StatusItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="break-all font-medium">{value}</span>
     </div>
   );
 }

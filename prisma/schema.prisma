@@ -258,15 +258,22 @@ model Inspiration {
 // 爬虫机:管理员创建,token 以 `<agentId>.<secret>` 形式发给 agent,服务端只存 secret 段 argon2 哈希。
 // 一台 Agent 可绑定多个 Job,但并发=1(串行执行队列);离线判定走 lastSeenAt(>10min 视为离线)。
 model CrawlerAgent {
-  id          String             @id @default(cuid())
-  name        String             @unique // 机器名 / 标识(管理员设置)
-  tokenHash   String // <secret> 段的 argon2 哈希
-  status      CrawlerAgentStatus @default(ACTIVE)
-  lastSeenAt  DateTime? // 最近一次成功鉴权时间;离线判定依据
-  lastSeenIp  String?
-  createdById String
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id              String             @id @default(cuid())
+  name            String             @unique // 机器名 / 标识(管理员设置)
+  tokenHash       String // <secret> 段的 argon2 哈希
+  status          CrawlerAgentStatus @default(ACTIVE)
+  lastSeenAt      DateTime? // 最近一次成功鉴权时间;离线判定依据
+  lastSeenIp      String?
+  lastHeartbeatAt DateTime? // 独立心跳时间,避免 claim/log 请求掩盖心跳进程异常
+  agentVersion    String?
+  hostname        String?
+  pythonVersion   String?
+  gitVersion      String?
+  executorStatus  String? // idle / busy
+  diagnostics     Json? // Agent 启动时上报的环境检查快照
+  createdById     String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   createdBy User          @relation("createdAgents", fields: [createdById], references: [id], onDelete: Restrict)
   jobs      CrawlerJob[] // 绑定到本机的 Job
@@ -289,10 +296,11 @@ model CrawlerJob {
   command        String // 命令模板,内含 {{paramName}} 占位符
   timeoutMinutes Int             @default(30) // 单次执行超时(到点 agent kill)
   paramSchema    Json            @default("[]") // [{name, type, required, default?, options?[]}]
-  outputs        Json            @default("[]") // [{path, csvType?}] 仅带 csvType 的产物会上传中台入库
+  outputs        Json            @default("[]") // [{path, csvType?}];全部上传,csvType 为空时仅归档不解析
   cronExpression String? // 5 段标准 cron;null = 仅手动
   enabled        Boolean         @default(true) // 仅控 cron 自动触发开关(定时开/关)
   active         Boolean         @default(true) // 任务整体启用/停用;停用 = 不可触发(含手动),与 enabled 分离
+  revision       Int             @default(1) // 每次编辑递增;Task 创建时冻结对应 revision
   createdById    String
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -313,6 +321,11 @@ model CrawlerTask {
   agentId        String? // 冗余 job.agentId 加速队列查询;历史任务可能 null
   sequenceNumber Int? // Job 内第 N 次执行(展示用 #42);历史任务 null
   paramValues    Json               @default("{}") // 本次执行的参数实际值
+  jobRevision    Int? // 创建 Task 时对应的 Job revision;历史任务为空
+  jobSnapshot    Json? // 冻结的仓库/命令/参数 schema/产物配置;claim 优先读取它
+  sourceRevision String? // Agent 实际执行的 Git commit / SVN revision;首次执行前冻结
+  executionSnapshot Json? // 本次执行环境:Agent/Python/Git/OS/依赖指纹/命令指纹
+  rerunOfTaskId  String? // 重跑来源;克隆原 Task 的冻结配置与 sourceRevision
   trigger        CrawlerTaskTrigger
   priority       Int                @default(0) // 大的优先
   status         CrawlerTaskStatus  @default(PENDING)
@@ -329,10 +342,13 @@ model CrawlerTask {
   agent     CrawlerAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
   createdBy User?         @relation("createdTasks", fields: [createdById], references: [id], onDelete: SetNull)
   datasets  RawDataset[] // 1:N 一个 Task 可上传多份带 csvType 的 CSV
+  rerunOf   CrawlerTask?  @relation("CrawlerTaskReruns", fields: [rerunOfTaskId], references: [id], onDelete: SetNull)
+  reruns    CrawlerTask[] @relation("CrawlerTaskReruns")
 
   @@index([status, priority, createdAt])
   @@index([agentId, status, priority, createdAt]) // agent 队列查询主索引
   @@index([jobId, sequenceNumber])
+  @@index([rerunOfTaskId])
 }
 
 // 原始 CSV 数据集:agent 上传后落盘到 data/raw/<csvType>/<id>.csv,DB 只存元信息。
@@ -685,7 +701,7 @@ model AiMessage {
   role           String // user / assistant / tool
   content        Json
   parentId       String? // 助手消息 → 所回答的 user 消息 id;user 消息为 null
-  active          Boolean @default(true) // 同一 parent 下当前选中的助手版本;user 恒 true
+  active         Boolean @default(true) // 同一 parent 下当前选中的助手版本;user 恒 true
   createdAt      DateTime @default(now())
 
   conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

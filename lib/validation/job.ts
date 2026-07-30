@@ -3,7 +3,7 @@
  *
  * CrawlerJob = 任务模板,定义"任务怎么跑":
  *   绑定的爬虫机 / 代码仓库 / 工作目录 / 命令模板(含 {{var}}) / 参数 schema /
- *   产物清单(可选 csvType,带的会被上传中台入库) / 单次超时 / 可选 cron。
+ *   产物清单(全部上传;可选 csvType 决定是否解析入库) / 单次超时 / 可选 cron。
  *
  * 每次"执行"是一条 CrawlerTask(由 trigger API 或 cron 自动创建)。
  */
@@ -106,7 +106,7 @@ export type ParamSchemaItem = z.infer<typeof paramItemSchema>;
 
 // ── 产物清单单项 ──────────────────────────────────────
 // path: 相对 workdir 的文件路径(命令执行完后,agent 按这里捡产物);支持 glob(* / ? / [])
-// csvType: 可选;带则上传中台入库;不带则留在爬虫机(由脚本自处理,例如发飞书)
+// csvType: 可选;带则解析入库;不带仍上传归档到 _uncategorized,但不解析
 // optional: 可选;true 时文件缺失(或 glob 无匹配)不报错,直接跳过
 // filterRoot: 可选;入库前的行级筛选,树状结构:
 //   - 叶子(leaf):{ column, operator, value? }

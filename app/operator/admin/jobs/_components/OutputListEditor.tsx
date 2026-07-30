@@ -13,12 +13,15 @@ import * as React from "react";
 import { Trash2, Plus, FilterIcon, FolderPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -113,7 +116,7 @@ export default function OutputListEditor({
                 />
               </div>
               <div className="col-span-4">
-                <Label className="text-[11px]">csvType(空 = 不入库)</Label>
+                <Label className="text-[11px]">处理方式</Label>
                 <Select
                   value={item.csvType ?? NO_CSV}
                   onValueChange={(v) =>
@@ -128,12 +131,14 @@ export default function OutputListEditor({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NO_CSV}>不入库</SelectItem>
-                    {csvTypes.map((t) => (
-                      <SelectItem key={t.name} value={t.name}>
-                        {t.label} ({t.name})
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      <SelectItem value={NO_CSV}>仅归档,不解析</SelectItem>
+                      {csvTypes.map((t) => (
+                        <SelectItem key={t.name} value={t.name}>
+                          解析入库 · {t.label} ({t.name})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -148,19 +153,18 @@ export default function OutputListEditor({
                   <Trash2 className="size-4" />
                 </Button>
               </div>
-              <div className="col-span-12 flex items-center gap-1.5 text-xs">
-                <input
+              <Field className="col-span-12" orientation="horizontal">
+                <Checkbox
                   id={`output-optional-${i}`}
-                  type="checkbox"
                   checked={item.optional ?? false}
-                  onChange={(e) =>
-                    update(i, { optional: e.target.checked || undefined })
+                  onCheckedChange={(checked) =>
+                    update(i, { optional: checked === true || undefined })
                   }
                 />
-                <label htmlFor={`output-optional-${i}`} className="cursor-pointer">
+                <FieldLabel htmlFor={`output-optional-${i}`}>
                   可选(文件 / glob 无匹配时不报错)
-                </label>
-              </div>
+                </FieldLabel>
+              </Field>
 
               {/* 筛选树编辑器:csvType 注册了列元数据时显示 */}
               {item.csvType && (
@@ -301,8 +305,10 @@ function FilterGroupEditor({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="AND">AND(全部满足)</SelectItem>
-            <SelectItem value="OR">OR(任一满足)</SelectItem>
+            <SelectGroup>
+              <SelectItem value="AND">AND(全部满足)</SelectItem>
+              <SelectItem value="OR">OR(任一满足)</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
         <Button type="button" variant="outline" size="sm" onClick={addLeaf}>
@@ -404,14 +410,16 @@ function FilterLeafEditor({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {columns.map((c) => (
-              <SelectItem key={c.name} value={c.name}>
-                {c.label ?? c.name}
-                <span className="ml-1 text-[10px] text-muted-foreground">
-                  ({c.type})
-                </span>
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {columns.map((c) => (
+                <SelectItem key={c.name} value={c.name}>
+                  {c.label ?? c.name}
+                  <span className="ml-1 text-[10px] text-muted-foreground">
+                    ({c.type})
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
@@ -430,11 +438,13 @@ function FilterLeafEditor({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {availableOps.map((op) => (
-              <SelectItem key={op} value={op}>
-                {OPERATOR_LABEL[op]}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {availableOps.map((op) => (
+                <SelectItem key={op} value={op}>
+                  {OPERATOR_LABEL[op]}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>

@@ -11,10 +11,26 @@ import { route, parseJson } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { requireAgent } from "@/lib/agent-auth";
 import { heartbeatRequestSchema } from "@/lib/validation/crawler";
+import type { Prisma } from "@prisma/client";
 
 export const POST = route(async (req) => {
   const agent = await requireAgent(req);
-  await parseJson(req, heartbeatRequestSchema); // 入参基本校验,目前未持久化
+  const input = await parseJson(req, heartbeatRequestSchema);
+
+  await prisma.crawlerAgent.update({
+    where: { id: agent.id },
+    data: {
+      lastHeartbeatAt: new Date(),
+      ...(input.agentStatus ? { executorStatus: input.agentStatus } : {}),
+      ...(input.version ? { agentVersion: input.version } : {}),
+      ...(input.hostname ? { hostname: input.hostname } : {}),
+      ...(input.pythonVersion ? { pythonVersion: input.pythonVersion } : {}),
+      ...(input.gitVersion ? { gitVersion: input.gitVersion } : {}),
+      ...(input.diagnostics
+        ? { diagnostics: input.diagnostics as Prisma.InputJsonValue }
+        : {}),
+    },
+  });
 
   const pending = await prisma.crawlerTask.count({
     where: {

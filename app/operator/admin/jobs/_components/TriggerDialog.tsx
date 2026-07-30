@@ -3,7 +3,7 @@
 /**
  * 手动触发 Job 一次,按 paramSchema 渲染参数表单。
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,16 @@ export default function TriggerDialog({
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const next: Record<string, unknown> = {};
+    for (const p of paramSchema) {
+      if (p.default !== undefined) next[p.name] = p.default;
+    }
+    setValues(next);
+    setError(null);
+  }, [open, paramSchema]);
 
   async function submit() {
     setError(null);

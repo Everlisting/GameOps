@@ -88,6 +88,7 @@ export const POST = route(async (req) => {
       outputs: input.outputs as unknown as Prisma.InputJsonValue,
       cronExpression: input.cronExpression ?? null,
       enabled: input.enabled,
+      active: input.active,
       createdById: session.sub,
     },
     select: { id: true, name: true, createdAt: true },

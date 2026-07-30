@@ -1,30 +1,18 @@
-"""
-heartbeat.py — 一次性心跳上报,执行完就退出。
-
-由 Windows 任务计划程序每 1 分钟触发一次。
-中台 10 分钟无心跳判离线,1 分钟间隔 = 10 倍安全余量。
-
-不做任何任务领取 / 命令执行 —— 那是 executor.py 的活。
-"""
+"""一次性心跳 smoke test。常驻心跳由 agent.py 的后台线程负责。"""
 
 from __future__ import annotations
 
 import sys
 
-from common import BASE, SESSION, make_logger
+from agent import send_heartbeat_once
+from common import make_logger
 
 log = make_logger("heartbeat")
 
 
 def main() -> int:
     try:
-        r = SESSION.post(
-            f"{BASE}/api/agent/heartbeat",
-            json={"agentStatus": "idle", "version": "0.2.0"},
-            timeout=10,
-        )
-        r.raise_for_status()
-        data = r.json()
+        data = send_heartbeat_once()
         log.info(
             "ok pending=%s suggestPollMs=%s",
             data.get("pending"),

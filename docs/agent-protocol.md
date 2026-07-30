@@ -1,4 +1,4 @@
-# 爬虫 Agent ↔ 中台 协议(阶段 4,Jenkins-style 重构后)
+# 爬虫 Agent ↔ 中台 协议
 
 > 单向出站:爬虫机轮询中台领任务、回传日志与产物。中台**不**主动连爬虫机。
 >
@@ -8,6 +8,9 @@
 > - **抢占式已删除**:`kind` / `capabilities` / `csvType` 派单逻辑全部下线;Agent 只看自己 `agentId` 队列。
 > - **失败一律失败**:`git pull 失败` / `命令非零退出` / `声明的产物缺失` 三种都终态化为 FAILED,不自动重试,需要管理员/运营手动重跑(克隆新 Task)。
 > - **enabled 仅控 cron**:Job.enabled=false 时 cron 不再自动触发,**手动触发(MANUAL/rerun)依然允许**。
+> - **active 是总开关**:Job.active=false 时手动 / rerun / cron 均不可触发。
+> - **Task 冻结配置**:创建 Task 时写入 `jobRevision + jobSnapshot`;排队后编辑 Job 不改变本次执行。
+> - **执行可复现**:Agent 启动子进程前冻结实际 Git commit / SVN revision 与运行环境;重新排队和重跑固定原 revision。
 > - **关键动作走审计**:trigger / cancel / requeue / rerun / priority 都写一条 `AuditLog`(actor + 时间 + details JSON)。
 
 ---
@@ -36,11 +39,13 @@ CRAWLER_TOKEN=<agentId>.<secret>
 ## 2. Agent 主循环(伪代码)
 
 ```
-loop:
-    next_ms = heartbeat()          # 上报心跳,拿建议轮询间隔
+heartbeat_thread:
+    every 60s heartbeat()          # 独立线程,长任务不阻塞心跳
+
+executor_loop:
     task = claim()                 # 领一条本机的 PENDING
     if task is None:
-        sleep(next_ms); continue
+        sleep(10s); continue
 
     log = open_log_stream(task.id) # 后续 stdout/stderr 通过 /log 推
     try:
@@ -54,7 +59,7 @@ loop:
         upload_result(task.id, failure, errorMessage=str(ex))
 ```
 
-中台对 Agent 的全部约束就是上面这五步;每一步对应一个 HTTP 端点。
+参考实现由一个 `agent.py` 常驻进程承载心跳线程和 executor 主循环;Windows 只注册一个计划任务。
 
 ---
 
@@ -65,7 +70,18 @@ loop:
 **Body**(可选):
 
 ```json
-{ "agentStatus": "idle", "version": "0.2.0" }
+{
+  "agentStatus": "idle",
+  "version": "0.4.0",
+  "hostname": "crawler-win-01",
+  "pythonVersion": "3.12.4",
+  "gitVersion": "git version 2.45.1.windows.1",
+  "diagnostics": {
+    "platform": "Windows-11-...",
+    "pythonExecutable": "D:\\crawler\\agent-reference\\.venv\\Scripts\\python.exe",
+    "gitAvailable": true
+  }
+}
 ```
 
 **Resp**:
@@ -78,7 +94,8 @@ loop:
 }
 ```
 
-`pending` 仅统计**本 Agent 队列**里的 PENDING 数。`suggestPollMs` 有活 5s、无活 30s。
+心跳会持久化 `lastHeartbeatAt`、执行器状态、Agent/Python/Git 版本和诊断快照。
+`pending` 仅统计**本 Agent 队列**里的 PENDING 数。`suggestPollMs` 保留为协议提示。
 
 ### 3.2 `POST /api/agent/tasks/claim`
 
@@ -97,6 +114,8 @@ loop:
   "task": {
     "id": "ckxxxx",
     "sequenceNumber": 42,
+    "jobRevision": 3,
+    "sourceRevision": null,
     "priority": 0,
     "createdAt": "2026-06-01T11:50:00.000Z",
     "paramValues": { "startDate": "2026-05-01", "endDate": "2026-05-04" },
@@ -122,15 +141,51 @@ loop:
 
 **并发安全**:服务端单语句 `UPDATE … SELECT FOR UPDATE SKIP LOCKED`,且嵌入 `NOT EXISTS (RUNNING for self)`,**同 Agent 已有 RUNNING 时直接返回 null**(并发=1 由服务端保证)。Agent 端无需自己做 lock。
 
-**Agent 端必做**:
-1. 按 `job.repoType` `git clone/pull` 或 `svn checkout/update` 到本地工作区,**保留原仓库目录名**(`workspaces/job-<id>/<repoName>/`),checkout 到 `repoBranch`(为空 = 默认分支)。**拉代码失败即终态失败**。
-2. 用 `job.paramValues` 渲染 `job.command` 里的 `{{var}}`(渲染规则见 §4);**同时**把所有 paramValues 作为 env 变量注入子进程(脚本可 `os.environ["开始时间"]` 读取)。
-3. 在 `job.workdir`(相对仓库根的路径)下执行命令,捕获 stdout+stderr,**实时**通过 §3.3 推回中台。
-4. 等命令退出或 `job.timeoutMinutes` 触发超时(超时 = 杀进程 + 终态失败)。
-5. 检查 `job.outputs[*].path` 是否都存在(支持 glob `*` `?` `[]`),`optional: true` 的项无匹配静默跳过,否则缺一即失败。
-6. **上传所有匹配到的产物**(无论有无 csvType)。`csvType` 非空 → 走 parser/snapshot 入解析层;`csvType` 空 → 留底入 `_uncategorized/`,数据集页可下载。
+`task.job` 优先来自 Task 创建时冻结的 `jobSnapshot`;只有历史 Task 没有快照时才回退读取当前 Job。
+因此已经 PENDING 的 Task 不受后续模板编辑、换机器或修改命令影响。
+`/claim` 要求 Agent `0.5.0+`;旧版本返回 409,不会领取 P3 Task。未调用
+`/prepare` 的旧 Agent 上报结果时,Task 会被终态标记为 FAILED。
 
-### 3.3 `POST /api/agent/tasks/{id}/log`
+**Agent 端必做**:
+1. 按规范化后的 `job.repoType + repoUrl` 定位唯一共享工作副本:`workspaces/repos/<repoType>-<urlHash>/<repoName>/`。首次 `git clone` / `svn checkout`,后续 Job 复用同一副本并 `fetch/update`。`task.sourceRevision` 非空时必须检出该 revision;为空时按 Job 分支更新并解析实际 revision。旧版 `workspaces/job-<id>/<repoName>/` 在首次命中时安全迁移。**拉代码或固定 revision 失败即终态失败**。
+2. 用 `task.paramValues` 渲染 `job.command` 里的 `{{var}}`(渲染规则见 §4);**同时**把所有 paramValues 作为 env 变量注入子进程(脚本可 `os.environ["开始时间"]` 读取)。
+3. 调用 §3.3 冻结实际源码 revision 与执行环境。冻结失败时禁止启动子进程。
+4. 在 `job.workdir`(相对仓库根的路径)下执行命令,捕获 stdout+stderr,**实时**通过 §3.4 推回中台。
+5. 等命令退出或 `job.timeoutMinutes` 触发超时(超时 = 杀进程 + 终态失败)。
+6. 检查 `job.outputs[*].path` 是否都存在(支持 glob `*` `?` `[]`),`optional: true` 的项无匹配静默跳过,否则缺一即失败。
+7. **上传所有匹配到的产物**(无论有无 csvType)。`csvType` 非空 → 走 parser/snapshot 入解析层;`csvType` 空 → 留底入 `_uncategorized/`,数据集页可下载。
+
+### 3.3 `POST /api/agent/tasks/{id}/prepare`
+
+Agent 完成仓库同步、解析出准确 revision 后调用,且必须在启动子进程之前完成。
+
+```json
+{
+  "sourceRevision": "f8ac17db2bdcb384dd3892a1de07558d21da016a",
+  "executionSnapshot": {
+    "schemaVersion": 1,
+    "capturedAt": "2026-07-30T07:30:00.000Z",
+    "agentVersion": "0.5.0",
+    "hostname": "CRAWLER-01",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "pythonVersion": "3.12.8",
+    "pythonExecutable": "D:\\crawler\\agent-reference\\.venv\\Scripts\\python.exe",
+    "gitVersion": "git version 2.50.1.windows.1",
+    "dependencyFingerprint": "<pip-freeze-sha256>",
+    "dependencies": ["requests==2.34.2"],
+    "commandHash": "<rendered-argv-sha256>"
+  }
+}
+```
+
+- `sourceRevision` 首次写入后不可修改。
+- Git 必须上报完整 commit hash;SVN 上报数字 revision。
+- `dependencies` 是 Agent Python 环境的 `pip freeze`;指纹按排序后逐行拼接计算。
+- `commandHash` 对渲染后的 argv 计算,不上传命令明文,避免参数中的密钥再次扩散。
+- 重新排队 / 重跑时,服务端会核对 Agent、OS、Python、Git、依赖和命令指纹;任一漂移则拒绝执行并将 Task 置为失败。要使用新环境应从 Job 手动发起一次新执行。
+- 当前 Task 已冻结成不同 revision 时返回 409,Agent 必须停止执行。
+
+### 3.4 `POST /api/agent/tasks/{id}/log`
 
 实时推子进程输出。append-only。同时**作为取消检测通道**。
 
@@ -164,7 +219,7 @@ Query(四选一):
 - `X-Log-Size`:文件总字节数
 - `X-Log-Status`:当前 task 状态(决定 UI 是否继续轮询)
 
-### 3.4 `POST /api/agent/tasks/{id}/result`
+### 3.5 `POST /api/agent/tasks/{id}/result`
 
 终态上报。一次调用,Task 进入 SUCCEEDED 或 FAILED,**不可重试**。
 
@@ -270,7 +325,7 @@ for r in rows:
 | 声明的产物缺失 | Agent | `"missing output: out/video_detail.csv"` |
 | 中台收到 `status=failure` | 中台 | (透传 Agent 的) |
 
-**重试**:管理员可在 task 详情页点「重跑」(走 `/api/operator/tasks/[id]/rerun`),会用同样的 `paramValues` 克隆一条新 Task,原 Task 历史保留。
+**重试**:管理员可在 task 详情页点「按原版本重跑」(走 `/api/operator/tasks/[id]/rerun`),会克隆原 Task 的 `jobSnapshot + jobRevision + paramValues + sourceRevision`,并记录 `rerunOfTaskId`;原 Task 历史保留。
 
 ---
 
@@ -345,7 +400,7 @@ PENDING ──claim──▶ RUNNING ──result(success)──▶ SUCCEEDED
 ```
 
 **没有自动重试边**,FAILED 不会自己跳回 PENDING。
-**rerun vs requeue**:rerun 克隆新 task(留历史),requeue 把当前 task 重置回 PENDING(覆盖原历史)。运营 UI 都给。
+**rerun vs requeue**:rerun 克隆新 task并保留来源链路;requeue 把当前 task 重置回 PENDING。两者都固定已有 `sourceRevision`,并在启动前校验执行环境与原快照一致。
 
 ---
 
@@ -361,8 +416,12 @@ PENDING ──claim──▶ RUNNING ──result(success)──▶ SUCCEEDED
 | `lib/log-cleanup.ts` | 90 天日志清理 |
 | `app/api/agent/heartbeat/route.ts` | 心跳 |
 | `app/api/agent/tasks/claim/route.ts` | SKIP LOCKED + 并发=1 |
+| `app/api/agent/tasks/[id]/prepare/route.ts` | 冻结源码 revision + 执行环境 |
 | `app/api/agent/tasks/[id]/log/route.ts` | 流式日志 append |
 | `app/api/agent/tasks/[id]/result/route.ts` | 多文件多 csvType 终态上报 |
 | `app/api/admin/jobs/*` | Job CRUD + trigger |
 | `app/api/admin/cron-preview/route.ts` | cron 预览 |
 | `docs/agent-setup-guide.md` | 给运维的接入操作手册 + Python 参考实现 |
+| `agent-reference/install.cmd` | Win10 / Win11 通用安装入口,本进程绕过 Execution Policy |
+| `agent-reference/install.ps1` | 安装 / 鉴权验证 / 注册单一计划任务的实现 |
+| `agent-reference/agent.py` | 单一常驻入口(独立心跳线程 + executor 主循环) |
