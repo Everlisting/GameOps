@@ -5,6 +5,7 @@
  * MVP 仅支持文本类文件(txt / md / csv / json)。
  */
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { RefreshCw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -237,7 +238,12 @@ export function KnowledgePanel() {
               <div className="divide-y rounded-md border">
                 {b.documents.map((d) => (
                   <div key={d.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <span className="min-w-0 flex-1 truncate">{d.title}</span>
+                    <Link
+                      href={`/operator/assistant/knowledge/${d.id}`}
+                      className="min-w-0 flex-1 truncate font-medium hover:underline"
+                    >
+                      {d.title}
+                    </Link>
                     <span
                       className={cn(
                         "shrink-0 rounded-full px-2 py-0.5 text-[11px]",

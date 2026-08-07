@@ -17,6 +17,7 @@ export function knowledgeSearchTool(session: SessionPayload) {
         data: hits.map((h) => ({
           title: h.title,
           kb: h.kbName,
+          version: h.version,
           score: h.score,
           content: h.content,
         })),

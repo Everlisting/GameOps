@@ -49,6 +49,10 @@ export type AuditAction =
   | "assistant.conversation.delete" // 删除会话
   | "kb.upload"                 // 知识库上传(10.3)
   | "kb.delete"                 // 知识库删除(10.3)
+  | "kb.draft.update"           // 保存知识库正文草稿
+  | "kb.publish"                // 发布知识库版本
+  | "kb.restore"                // 回滚知识库版本
+  | "kb.reindex"                // 基于当前正文创建重建索引版本
   // 阶段10.4 · 需审批的写操作
   | "approval.create"           // 写工具生成一条待审批提案
   | "approval.approve"          // 运营批准(触发执行)

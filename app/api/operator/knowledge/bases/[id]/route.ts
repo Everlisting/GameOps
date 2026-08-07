@@ -31,7 +31,11 @@ export const DELETE = route(async (_req, { params }) => {
   if (!id) throw badRequest("缺少 id");
   const kb = await prisma.knowledgeBase.findUnique({ where: { id }, select: { id: true, name: true } });
   if (!kb) throw new AppError("NOT_FOUND", "知识库不存在");
-  await prisma.knowledgeBase.delete({ where: { id } });
+  // 先解除 document → published version 指针，再由知识库级联删除版本和切块，避免环形外键删除冲突。
+  await prisma.$transaction([
+    prisma.knowledgeDocument.updateMany({ where: { kbId: id }, data: { publishedVersionId: null } }),
+    prisma.knowledgeBase.delete({ where: { id } }),
+  ]);
   await recordAudit({
     actorId: session.sub,
     actorUsername: session.username,

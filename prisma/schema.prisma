@@ -316,27 +316,27 @@ model CrawlerJob {
 // 爬虫任务(一次执行):来源 = 手动 trigger 或 cron 自动建。
 // jobId / agentId / sequenceNumber / paramValues 在新模型下均必填,但历史数据(改造前)允许 null。
 model CrawlerTask {
-  id             String             @id @default(cuid())
-  jobId          String? // 关联 Job;历史任务为 null
-  agentId        String? // 冗余 job.agentId 加速队列查询;历史任务可能 null
-  sequenceNumber Int? // Job 内第 N 次执行(展示用 #42);历史任务 null
-  paramValues    Json               @default("{}") // 本次执行的参数实际值
-  jobRevision    Int? // 创建 Task 时对应的 Job revision;历史任务为空
-  jobSnapshot    Json? // 冻结的仓库/命令/参数 schema/产物配置;claim 优先读取它
-  sourceRevision String? // Agent 实际执行的 Git commit / SVN revision;首次执行前冻结
+  id                String             @id @default(cuid())
+  jobId             String? // 关联 Job;历史任务为 null
+  agentId           String? // 冗余 job.agentId 加速队列查询;历史任务可能 null
+  sequenceNumber    Int? // Job 内第 N 次执行(展示用 #42);历史任务 null
+  paramValues       Json               @default("{}") // 本次执行的参数实际值
+  jobRevision       Int? // 创建 Task 时对应的 Job revision;历史任务为空
+  jobSnapshot       Json? // 冻结的仓库/命令/参数 schema/产物配置;claim 优先读取它
+  sourceRevision    String? // Agent 实际执行的 Git commit / SVN revision;首次执行前冻结
   executionSnapshot Json? // 本次执行环境:Agent/Python/Git/OS/依赖指纹/命令指纹
-  rerunOfTaskId  String? // 重跑来源;克隆原 Task 的冻结配置与 sourceRevision
-  trigger        CrawlerTaskTrigger
-  priority       Int                @default(0) // 大的优先
-  status         CrawlerTaskStatus  @default(PENDING)
-  startedAt      DateTime? // Agent /claim 时设
-  finishedAt     DateTime?
-  errorMessage   String?
-  exitCode       Int? // 命令子进程退出码
-  logPath        String? // 日志文件路径,默认 data/logs/<id>.log
-  createdById    String? // AUTO 任务为 null
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  rerunOfTaskId     String? // 重跑来源;克隆原 Task 的冻结配置与 sourceRevision
+  trigger           CrawlerTaskTrigger
+  priority          Int                @default(0) // 大的优先
+  status            CrawlerTaskStatus  @default(PENDING)
+  startedAt         DateTime? // Agent /claim 时设
+  finishedAt        DateTime?
+  errorMessage      String?
+  exitCode          Int? // 命令子进程退出码
+  logPath           String? // 日志文件路径,默认 data/logs/<id>.log
+  createdById       String? // AUTO 任务为 null
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   job       CrawlerJob?   @relation(fields: [jobId], references: [id], onDelete: SetNull)
   agent     CrawlerAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
@@ -701,7 +701,7 @@ model AiMessage {
   role           String // user / assistant / tool
   content        Json
   parentId       String? // 助手消息 → 所回答的 user 消息 id;user 消息为 null
-  active         Boolean @default(true) // 同一 parent 下当前选中的助手版本;user 恒 true
+  active         Boolean  @default(true) // 同一 parent 下当前选中的助手版本;user 恒 true
   createdAt      DateTime @default(now())
 
   conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -750,24 +750,54 @@ model KnowledgeBase {
 
 /// 阶段10.3 · 知识库文档。原文件留底可选;解析后切块入 KnowledgeChunk。
 model KnowledgeDocument {
-  id          String   @id @default(cuid())
-  kbId        String
-  title       String
-  source      String // upload / manual ...
-  mimeType    String
-  storagePath String? // 原文件留底路径(MVP 可空)
-  status      String   @default("pending") // pending / indexing / published / failed
-  error       String?
-  chunkCount  Int      @default(0)
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  kbId               String
+  title              String
+  source             String // upload / manual ...
+  mimeType           String
+  storagePath        String? // 不可变原件路径；正文编辑存 KnowledgeDocumentVersion
+  status             String   @default("pending") // 兼容列表摘要；发布真相以 publishedVersionId 为准
+  error              String?
+  chunkCount         Int      @default(0)
+  publishedVersionId String?  @unique
+  createdById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  kb     KnowledgeBase    @relation(fields: [kbId], references: [id], onDelete: Cascade)
-  chunks KnowledgeChunk[]
+  kb               KnowledgeBase              @relation(fields: [kbId], references: [id], onDelete: Cascade)
+  chunks           KnowledgeChunk[]
+  versions         KnowledgeDocumentVersion[] @relation("KnowledgeDocumentVersions")
+  publishedVersion KnowledgeDocumentVersion?  @relation("PublishedKnowledgeVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
 
   @@index([kbId, status])
   @@map("knowledge_document")
+}
+
+/// 可编辑正文的不可变发布版本。draft 可修改并用 revision 乐观锁；published/superseded 不再原地修改。
+model KnowledgeDocumentVersion {
+  id          String    @id @default(cuid())
+  documentId  String
+  version     Int
+  content     String    @db.Text
+  format      String    @default("markdown") // markdown / plain
+  status      String    @default("draft") // draft / parsing / pending / indexing / published / superseded / failed
+  revision    Int       @default(1)
+  checksum    String
+  error       String?
+  chunkCount  Int       @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  document    KnowledgeDocument  @relation("KnowledgeDocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+  publishedBy KnowledgeDocument? @relation("PublishedKnowledgeVersion")
+  chunks      KnowledgeChunk[]
+
+  @@unique([documentId, version])
+  @@index([documentId, status])
+  @@map("knowledge_document_version")
 }
 
 /// 阶段10.3 · 切块 + 向量。embedding 为 pgvector 列(维度随嵌入模型,默认 1024:百炼 text-embedding-v3 / bge-m3)。
@@ -775,6 +805,7 @@ model KnowledgeDocument {
 model KnowledgeChunk {
   id         String                       @id @default(cuid())
   documentId String
+  versionId  String
   kbId       String // 冗余,检索按 kb 过滤用
   ordinal    Int
   content    String
@@ -782,8 +813,10 @@ model KnowledgeChunk {
   tokenCount Int?
   createdAt  DateTime                     @default(now())
 
-  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document KnowledgeDocument        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version  KnowledgeDocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
+  @@unique([versionId, ordinal])
   @@index([documentId, ordinal])
   @@index([kbId])
   @@map("knowledge_chunk")

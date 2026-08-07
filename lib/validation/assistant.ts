@@ -61,6 +61,34 @@ export const knowledgeSearchApiSchema = z.object({
   k: z.number().int().min(1).max(20).optional(),
 });
 
+const knowledgeContentSchema = z.string().max(2_000_000, "正文不能超过 200 万字符");
+
+/** PATCH /knowledge/documents/[id]：标题可独立更新；正文保存必须带草稿 revision。 */
+export const knowledgeDocumentPatchSchema = z
+  .object({
+    title: z.string().trim().min(1, "标题不能为空").max(200).optional(),
+    content: knowledgeContentSchema.optional(),
+    format: z.enum(["markdown", "plain"]).optional(),
+    baseRevision: z.number().int().min(0).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.title === undefined && value.content === undefined && value.format === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "无更新字段" });
+    }
+    if ((value.content !== undefined || value.format !== undefined) && value.baseRevision === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "保存正文必须携带 baseRevision" });
+    }
+  });
+
+export const knowledgePublishSchema = z.object({
+  versionId: z.string().min(1),
+  baseRevision: z.number().int().min(1),
+});
+
+export const knowledgeRestoreSchema = z.object({
+  versionId: z.string().min(1),
+});
+
 /** PATCH /conversations/[id] 入参(置顶 / 重命名,至少一项) */
 export const conversationPatchSchema = z
   .object({
