@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GameOps · 创作者端使用手册</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1a1c1e; --muted:#6b7280;
+    --border:#e5e7eb; --brand:#059669; --brand-soft:#ecfdf5; --code:#f3f4f6;
+    --warn:#b45309; --warn-soft:#fffbeb; --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 8px rgba(0,0,0,.03);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e0f11; --panel:#17181b; --ink:#e7e9ec; --muted:#9aa1ab;
+      --border:#2a2c31; --brand:#34d399; --brand-soft:#0c2a20; --code:#1e2024;
+      --warn:#fbbf24; --warn-soft:#2a2210; --shadow:none;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.75;font-size:15px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:250px 1fr;gap:44px}
+  header.top{grid-column:1/-1;padding:40px 0 26px;border-bottom:1px solid var(--border);margin-bottom:8px}
+  .badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+    color:var(--brand);background:var(--brand-soft);padding:5px 11px;border-radius:99px;border:1px solid var(--border)}
+  header.top h1{margin:14px 0 6px;font-size:28px;letter-spacing:-.4px}
+  header.top p{margin:0;color:var(--muted);font-size:14px;max-width:70ch}
+  nav.toc{position:sticky;top:20px;align-self:start;font-size:13px;max-height:calc(100vh - 40px);overflow:auto}
+  nav.toc .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:14px 0 8px;font-weight:700}
+  nav.toc .lbl:first-child{margin-top:0}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 10px;border-radius:7px;border-left:2px solid transparent}
+  nav.toc a:hover{color:var(--ink);background:var(--panel)}
+  main{min-width:0;padding-bottom:80px}
+  section{margin-bottom:46px;scroll-margin-top:20px}
+  h2{font-size:21px;margin:0 0 6px;letter-spacing:-.3px;display:flex;align-items:center;gap:11px;padding-top:8px}
+  h2 .n{display:inline-flex;align-items:center;justify-content:center;width:27px;height:27px;border-radius:8px;
+    background:var(--brand);color:#fff;font-size:13px;font-weight:700;flex:none}
+  .lead{color:var(--muted);margin:0 0 18px;font-size:14px}
+  h3{font-size:16px;margin:26px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  h4{font-size:14px;margin:18px 0 6px;color:var(--ink)}
+  p{margin:0 0 12px}
+  ul,ol{margin:0 0 14px;padding-left:22px}
+  li{margin:5px 0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:14px 0}
+  code{background:var(--code);padding:2px 6px;border-radius:5px;font-size:12.5px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  .path{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--brand);
+    background:var(--brand-soft);border:1px solid var(--border);padding:2px 8px;border-radius:6px;display:inline-block}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+  .steps>li{counter-increment:s;position:relative;padding:2px 0 2px 42px;margin:12px 0}
+  .steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:27px;height:27px;border-radius:99px;
+    background:var(--brand-soft);color:var(--brand);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .steps>li b{display:block;margin-bottom:1px}
+  .note{background:var(--warn-soft);border:1px solid var(--border);border-left:3px solid var(--warn);
+    border-radius:10px;padding:12px 16px;font-size:13.5px;color:var(--ink);margin:14px 0}
+  .note b{color:var(--warn)}
+  .tip{background:var(--brand-soft);border:1px solid var(--border);border-left:3px solid var(--brand);
+    border-radius:10px;padding:12px 16px;font-size:13.5px;margin:14px 0}
+  .tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--panel);margin:14px 0}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--code)}
+  tbody tr:last-child td{border-bottom:none}
+  td:first-child{white-space:nowrap;font-weight:500}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 9px;border-radius:99px;border:1px solid var(--border);white-space:nowrap}
+  .p-ok{color:#059669;background:#ecfdf5} .p-warn{color:#b45309;background:#fffbeb}
+  .p-bad{color:#dc2626;background:#fef2f2} .p-mut{color:#6b7280;background:#f3f4f6}
+  @media (prefers-color-scheme: dark){
+    .p-ok{background:#0c2a20} .p-warn{background:#2a2210} .p-bad{background:#2a1414} .p-mut{background:#22242a}
+  }
+  .kbd{background:var(--panel);border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12px;font-family:ui-monospace,monospace}
+  footer{grid-column:1/-1;border-top:1px solid var(--border);padding:24px 0 44px;color:var(--muted);font-size:12.5px}
+  @media(max-width:880px){.wrap{grid-template-columns:1fr;gap:0}nav.toc{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="badge">● 创作者端 · CREATOR</span>
+    <h1>GameOps 创作者端使用手册</h1>
+    <p>本手册面向平台创作者,逐页说明每个界面元素、每个按钮的作用与操作步骤。创作者端真实访问地址以 <span class="path">/dashboard</span> 开头。第一次使用请先读「1 登录与账号」与「2 界面导览」。</p>
+  </header>
+
+  <nav class="toc">
+    <p class="lbl">开始</p>
+    <a href="#login">1 · 登录与账号</a>
+    <a href="#layout">2 · 界面导览</a>
+    <p class="lbl">日常使用</p>
+    <a href="#overview">3 · 概览页</a>
+    <a href="#activities">4 · 活动列表</a>
+    <a href="#activity-detail">5 · 活动详情与报名</a>
+    <a href="#submit">6 · 投稿</a>
+    <a href="#mysubs">7 · 我的投稿</a>
+    <a href="#incentive">8 · 预估激励</a>
+    <a href="#inspiration">9 · 创作灵感</a>
+    <p class="lbl">账户</p>
+    <a href="#notifications">10 · 通知</a>
+    <a href="#account">11 · 账户设置</a>
+    <p class="lbl">附录</p>
+    <a href="#legend">A · 状态图例</a>
+    <a href="#faq">B · 常见问题</a>
+  </nav>
+
+  <main>
+    <!-- 1 -->
+    <section id="login">
+      <h2><span class="n">1</span>登录与账号</h2>
+      <p class="lead">所有角色共用一个登录入口,系统按账号角色自动分流。创作者账号需注册并经运营审核后方可使用。</p>
+
+      <h3>1.1 着陆页</h3>
+      <p>打开系统首页(<span class="path">/login</span>)是一张产品着陆页。你需要用到的只有右上角两个入口:</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>元素</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td>右上「登录」</td><td>弹出登录/注册浮层,并停在「登录」标签。</td></tr>
+          <tr><td>右上「Get started」/ 页面中间「Get started」</td><td>弹出同一浮层,停在「注册」标签。</td></tr>
+        </tbody>
+      </table></div>
+      <p>浮层可按 <span class="kbd">Esc</span> 或点浮层外部关闭。浮层内顶部有「登录 / 注册」两个切换标签。</p>
+
+      <h3>1.2 注册账号</h3>
+      <p>在浮层切到「注册」标签,依次填写:</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>字段</th><th>说明 / 要求</th></tr></thead>
+        <tbody>
+          <tr><td>昵称</td><td>对外展示的名字,必填。</td></tr>
+          <tr><td>用户名</td><td>登录用,3–32 字符,必填,唯一。</td></tr>
+          <tr><td>邮箱</td><td>用于找回/通知,建议填写。</td></tr>
+          <tr><td>密码</td><td>输入时下方有强度条(较弱 / 一般 / 良好 / 强),右侧眼睛图标可切换明文显示。</td></tr>
+          <tr><td>确认密码</td><td>两次不一致会即时红字提示。</td></tr>
+          <tr><td>同意条款</td><td>必须勾选「服务条款与隐私政策」复选框,否则「创建账号」按钮不可点。</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note"><b>注册后不会立即登录。</b>提交成功后会显示绿色提示「账号已提交运营审核,审核通过后即可登录」,并给出「去登录页等待 →」链接。请等待运营审核。</div>
+
+      <h3>1.3 登录</h3>
+      <ol class="steps">
+        <li><b>输入用户名与密码</b>密码框右侧眼睛图标可切换显示明文。</li>
+        <li><b>记住此设备</b>默认勾选,便于下次免密。「忘记密码?」暂未开放。</li>
+        <li><b>点「登录」</b>成功后创作者自动进入 <span class="path">/dashboard</span> 概览页。</li>
+      </ol>
+
+      <h3>1.4 账号三种状态</h3>
+      <div class="tblwrap"><table>
+        <thead><tr><th>状态</th><th>能做什么</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill p-warn">待审核</span></td><td>刚注册,尚不能登录使用,等待运营通过。</td></tr>
+          <tr><td><span class="pill p-ok">已启用</span></td><td>正常账号,可报名、投稿。</td></tr>
+          <tr><td><span class="pill p-mut">已停用</span></td><td>被运营停用,无法登录/投稿,需联系运营。</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- 2 -->
+    <section id="layout">
+      <h2><span class="n">2</span>界面导览</h2>
+      <p class="lead">登录后是左右布局:左侧固定导航栏,右侧是当前页面内容。以下元素在每个页面都在。</p>
+
+      <h3>2.1 左侧导航栏</h3>
+      <p>顶部品牌块显示「GameOps · 创作者工作台」。下面是四个主菜单,点击即跳转:</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>菜单</th><th>去向</th><th>二级项(展开)</th></tr></thead>
+        <tbody>
+          <tr><td>概览</td><td>数据首页</td><td>—</td></tr>
+          <tr><td>活动</td><td>活动列表</td><td>已参加 / 进行中 / 已结束</td></tr>
+          <tr><td>我的投稿</td><td>投稿管理</td><td>全部投稿 / 待审核 / 已通过 / 未通过</td></tr>
+          <tr><td>创作灵感</td><td>资源库</td><td>—</td></tr>
+        </tbody>
+      </table></div>
+      <p>导航栏可折叠成图标条(点栏边缘的折叠条 / Rail),窄屏时自动收起。</p>
+
+      <h3>2.2 左下角账户菜单</h3>
+      <p>左下角是你的头像 + 昵称 + <code>@用户名</code>,点击展开下拉菜单,包含:</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>菜单项</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td>账户设置</td><td>进入个人资料与安全设置页(见第 11 节)。</td></tr>
+          <tr><td>通知</td><td>进入通知页(见第 10 节)。</td></tr>
+          <tr><td>深色模式 / 浅色模式</td><td>一键切换整站明暗主题,随点随变。</td></tr>
+          <tr><td>退出登录</td><td>结束会话并返回登录页。</td></tr>
+        </tbody>
+      </table></div>
+      <div class="tip">大部分列表页顶部有标题与说明文字;活动/投稿详情页左上角有「返回」链接回到上一层。</div>
+    </section>
+
+    <!-- 3 -->
+    <section id="overview">
+      <h2><span class="n">3</span>概览页</h2>
+      <p class="lead"><span class="path">/dashboard</span> · 登录后的首页,一屏看清你的报名与投稿状态。</p>
+
+      <h4>顶部四张统计卡</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>卡片</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>已报名活动</td><td>你累计报名过的活动数。</td></tr>
+          <tr><td><span class="pill p-warn">待审核</span></td><td>已提交、等待运营审核的投稿数。</td></tr>
+          <tr><td><span class="pill p-ok">已通过</span></td><td>审核通过的投稿数。</td></tr>
+          <tr><td><span class="pill p-bad">未通过</span></td><td>被驳回的投稿数。</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>我的预估激励(有激励时才显示)</h4>
+      <p>大字显示所有活动的预估激励总额(¥),下方列出金额最高的前 5 个活动,点活动名进入该活动详情。若某条被运营调过,会带「已调整」标记。右上「查看活动 →」跳到活动列表。<b>金额以最终结算为准。</b></p>
+
+      <h4>下半区:最近投稿 + 进行中的活动</h4>
+      <ul>
+        <li><b>最近投稿</b>(左)——最近 8 条投稿,每行显示标题、平台、所属活动、时间和状态徽标。右上「查看全部 →」进入我的投稿。</li>
+        <li><b>进行中的活动</b>(右)——平台当前进行中的活动,已报名的打「已报名」绿标,显示起止时间与报名/投稿人数。</li>
+      </ul>
+    </section>
+
+    <!-- 4 -->
+    <section id="activities">
+      <h2><span class="n">4</span>活动列表</h2>
+      <p class="lead"><span class="path">/dashboard/activities</span> · 浏览可参与和已结束的活动,封面卡片按月份分组。</p>
+
+      <h4>筛选条(页面顶部)</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>控件</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td>搜索框</td><td>按活动名称模糊搜索。</td></tr>
+          <tr><td>日期范围(起 / 止)</td><td>按活动开始时间筛选落在区间内的活动。</td></tr>
+          <tr><td>状态(来自左侧二级菜单)</td><td>已参加(只看报名过的)/ 进行中 / 已结束。默认展示「进行中 + 已结束」。</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>活动卡片</h4>
+      <p>每张卡片是一个活动,元素包括:封面图、左上角状态徽标(进行中/已结束/草稿)、若已报名则并排「已报名」绿标、活动名、两行描述、底部起止日期与报名/投稿人数。<b>点卡片任意位置进入活动详情。</b></p>
+      <div class="tip">卡片按「年 月」分段,每段右上角显示该月活动数量,便于回看往期活动。</div>
+    </section>
+
+    <!-- 5 -->
+    <section id="activity-detail">
+      <h2><span class="n">5</span>活动详情与报名</h2>
+      <p class="lead"><span class="path">/dashboard/activities/[id]</span> · 活动的完整信息、报名、投稿都在这一页。</p>
+
+      <h4>页面结构(从上到下)</h4>
+      <ol>
+        <li><b>返回活动列表</b>——左上角链接。</li>
+        <li><b>封面大图卡</b>——封面 + 状态徽标 + 是否已报名 + 活动名 + 起止时间 + 报名/投稿总数;下方是活动描述。</li>
+        <li><b>参与活动卡</b>——见下方报名说明。</li>
+        <li><b>我的预估激励卡</b>——运营重算后才出现,含金额与「规则贡献明细」(见第 8 节)。</li>
+        <li><b>向本活动投稿</b>(左下)+ <b>我的投稿·本活动</b>(右下)。</li>
+      </ol>
+
+      <h4>报名</h4>
+      <ol class="steps">
+        <li><b>确认活动进行中</b>只有状态为 <span class="pill p-ok">进行中</span> 时,「参与活动」卡右侧才有报名按钮。</li>
+        <li><b>点击报名</b>成功后卡片显示报名时间,并出现「已报名」标记。</li>
+        <li><b>报名是投稿的前提</b>未报名时,下方投稿区会提示「请先报名该活动后再投稿」。</li>
+      </ol>
+      <div class="note">活动到达发布时间会自动从「草稿」变「进行中」,到截止时间自动变「已结束」。已结束的活动不可报名、不可投稿。</div>
+
+      <h4>我的投稿(本活动)</h4>
+      <p>右下卡片列出你在本活动下的全部投稿:标题(可点开原链接)、平台、提交时间、审核备注(若有)、状态徽标。</p>
+    </section>
+
+    <!-- 6 -->
+    <section id="submit">
+      <h2><span class="n">6</span>投稿</h2>
+      <p class="lead">在已报名的进行中活动详情页填写投稿表单。字段如下:</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>字段</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>挂载活动</td><td>在活动详情页投稿时已固定为本活动,不出现此项;若从通用入口投稿,可下拉选择活动或「不挂活动」。</td></tr>
+          <tr><td>标题</td><td>作品标题。</td></tr>
+          <tr><td>链接</td><td>作品的公开访问地址,以 <code>https://</code> 开头。</td></tr>
+          <tr><td>平台</td><td>下拉四选:抖音 / 哔哩哔哩 / 小红书 / 快手。</td></tr>
+        </tbody>
+      </table></div>
+      <ol class="steps">
+        <li><b>填写并点「提交投稿」</b>按钮在提交中会显示「提交中…」。</li>
+        <li><b>成功提示</b>成功后显示绿色「已提交,等待审核」,表单标题/链接清空,可继续投下一篇。</li>
+        <li><b>失败提示</b>字段有误会在按钮上方红字说明原因,据此修改重试。</li>
+      </ol>
+      <div class="note"><b>链接必须真实可访问、指向本人作品。</b>运营会打开链接核验标题与内容;平台已删除或取不到标题的作品在统计中会被标记为「已删除隐藏」,不计入激励。</div>
+    </section>
+
+    <!-- 7 -->
+    <section id="mysubs">
+      <h2><span class="n">7</span>我的投稿</h2>
+      <p class="lead"><span class="path">/dashboard/submissions</span> · 集中管理全部作品,按所属活动分组、按月份分段。</p>
+
+      <h4>筛选</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>入口 / 控件</th><th>行为</th></tr></thead>
+        <tbody>
+          <tr><td>全部投稿(默认)</td><td>提供搜索框(按标题或活动名)+ 日期范围筛选。</td></tr>
+          <tr><td>待审核 / 已通过 / 未通过</td><td>来自左侧二级菜单,<b>固定只看本月</b>,不显示日期控件。</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>分组卡片</h4>
+      <p>投稿按活动折叠成卡片(未挂活动的归为「未挂活动的独立投稿」)。卡片标题栏显示活动名、活动状态徽标、该组稿件数,以及三态计数徽标(待审 / 已通过 / 未通过);右侧「查看活动」跳转。点标题栏展开,内部逐条列出:</p>
+      <ul>
+        <li>作品标题(点击打开原链接)、平台 + 提交时间;</li>
+        <li>若运营写了「审核备注」,显示在下方——<b>被驳回时按备注修改后可重新投稿</b>;</li>
+        <li>行尾是该稿件的状态徽标。</li>
+      </ul>
+    </section>
+
+    <!-- 8 -->
+    <section id="incentive">
+      <h2><span class="n">8</span>预估激励</h2>
+      <p class="lead">激励是活动奖励的量化金额,由运营配置规则、系统自动计算,可在概览页与活动详情页查看。</p>
+
+      <h4>规则贡献明细</h4>
+      <p>在活动详情的激励卡内,会逐条列出每个规则块对总额的贡献,例如 <code>#1 分档 +¥50.00</code>、<code>#2 每投稿 +¥20.00</code>。这让你清楚金额由哪些部分构成。</p>
+
+      <h4>字段含义</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>字段</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>系统预估</td><td>引擎按运营配置自动算出的金额。</td></tr>
+          <tr><td><span class="pill p-mut">已调整</span></td><td>运营做过人工调整,页面会同时展示调整后金额、原系统预估值,以及「调整说明」。</td></tr>
+          <tr><td>更新于</td><td>该激励最近一次被重算的时间。</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note"><b>预估 ≠ 最终结算。</b>金额会随运营多次重算/调整而变化;只有审核通过的投稿参与计算,被隐藏/删除的作品不计入。一切以最终结算为准。</div>
+    </section>
+
+    <!-- 9 -->
+    <section id="inspiration">
+      <h2><span class="n">9</span>创作灵感</h2>
+      <p class="lead"><span class="path">/dashboard/inspirations</span> · 运营维护的创作资源库。</p>
+      <ul>
+        <li><b>顶部 Tab</b>——按大类切换:视频教程 / 文档教程 / 创作素材。</li>
+        <li><b>标签过滤</b>——点标签快速筛选相关内容(标签按出现频次排列)。</li>
+        <li><b>搜索</b>——按关键词查找。</li>
+        <li><b>卡片</b>——封面 + 标题 + 摘要;点开查看正文或跳转外部链接/素材。</li>
+      </ul>
+      <p>只显示运营已发布的内容;库为空时显示「灵感库正在筹备中」。</p>
+    </section>
+
+    <!-- 10 -->
+    <section id="notifications">
+      <h2><span class="n">10</span>通知</h2>
+      <p class="lead"><span class="path">/dashboard/notifications</span> · 由左下角账户菜单进入。</p>
+      <p>规划用于展示审核结果、活动节点、激励发放等通知。当前为占位页,显示「暂无通知」。审核结果目前请在「我的投稿」中查看状态与备注。</p>
+    </section>
+
+    <!-- 11 -->
+    <section id="account">
+      <h2><span class="n">11</span>账户设置</h2>
+      <p class="lead"><span class="path">/dashboard/account</span> · 维护个人资料与账户安全。资料越准确,运营越容易核验你的投稿归属。</p>
+
+      <h4>资料概览卡</h4>
+      <p>顶部展示当前头像、昵称、<code>@用户名</code> 与邮箱。</p>
+
+      <h4>编辑资料</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>项</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>头像</td><td>从预设头像网格中点选一个,选中项右下角打勾;下方「清空头像」可移除。</td></tr>
+          <tr><td>昵称</td><td>对外展示名。</td></tr>
+          <tr><td>团号</td><td>组织内部编号。</td></tr>
+          <tr><td>易闪 ID</td><td>形如 <code>YS123456</code>。</td></tr>
+          <tr><td>抖音昵称 / 抖音号 / 抖音主页链接</td><td>你的抖音账号信息,链接以 <code>https://</code> 开头。</td></tr>
+        </tbody>
+      </table></div>
+      <p>底部「保存」提交,「重置」放弃改动恢复原值;保存成功显示「已保存」。</p>
+
+      <h4>账户安全</h4>
+      <ul>
+        <li><b>邮箱</b>——修改绑定邮箱。</li>
+        <li><b>密码</b>——修改登录密码,<b>需要先输入当前密码</b>。</li>
+      </ul>
+    </section>
+
+    <!-- Appendix -->
+    <section id="legend">
+      <h2><span class="n">A</span>状态图例</h2>
+      <div class="tblwrap"><table>
+        <thead><tr><th>对象</th><th>状态</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>账号</td><td><span class="pill p-warn">待审核</span> <span class="pill p-ok">已启用</span> <span class="pill p-mut">已停用</span></td><td>注册审核状态。</td></tr>
+          <tr><td>活动</td><td><span class="pill p-mut">草稿</span> <span class="pill p-ok">进行中</span> <span class="pill p-mut">已结束</span></td><td>只有进行中可报名/投稿。</td></tr>
+          <tr><td>投稿</td><td><span class="pill p-warn">待审核</span> <span class="pill p-ok">已通过</span> <span class="pill p-bad">未通过</span></td><td>运营多维审核后的最终态。</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="faq">
+      <h2><span class="n">B</span>常见问题</h2>
+      <div class="card">
+        <h4 style="margin-top:0">看不到投稿表单?</h4>
+        <p>需同时满足:活动「进行中」+ 你已报名 + 账号「已启用」。任一不满足都不显示。</p>
+        <h4>投稿被判「未通过」怎么办?</h4>
+        <p>在「我的投稿」或活动详情里查看该稿件的「审核备注」,按说明修改后重新投稿。</p>
+        <h4>激励金额一直在变?</h4>
+        <p>正常。运营会随活动进展多次重算并可能人工调整,卡片上的「更新于」标示最近时间。以最终结算为准。</p>
+        <h4>注册后登录不了?</h4>
+        <p>账号可能仍「待审核」或被「停用」。请联系运营确认状态。</p>
+        <h4>怎么切换深浅色 / 退出登录?</h4>
+        <p>都在左下角头像菜单里。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>GameOps 游戏运营中台 · 创作者端使用手册 · 内容依据线上系统实现整理,如界面有更新以实际为准。</footer>
+</div>
+</body>
+</html>

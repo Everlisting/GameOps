@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GameOps · 管理端使用手册</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1a1c1e; --muted:#6b7280;
+    --border:#e5e7eb; --brand:#7c3aed; --brand-soft:#f5f3ff; --code:#f3f4f6;
+    --warn:#b45309; --warn-soft:#fffbeb; --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 8px rgba(0,0,0,.03);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e0f11; --panel:#17181b; --ink:#e7e9ec; --muted:#9aa1ab;
+      --border:#2a2c31; --brand:#a78bfa; --brand-soft:#1e1233; --code:#1e2024;
+      --warn:#fbbf24; --warn-soft:#2a2210; --shadow:none;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.75;font-size:15px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1220px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:250px 1fr;gap:44px}
+  header.top{grid-column:1/-1;padding:40px 0 26px;border-bottom:1px solid var(--border);margin-bottom:8px}
+  .badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+    color:var(--brand);background:var(--brand-soft);padding:5px 11px;border-radius:99px;border:1px solid var(--border)}
+  header.top h1{margin:14px 0 6px;font-size:28px;letter-spacing:-.4px}
+  header.top p{margin:0;color:var(--muted);font-size:14px;max-width:74ch}
+  nav.toc{position:sticky;top:20px;align-self:start;font-size:13px;max-height:calc(100vh - 40px);overflow:auto}
+  nav.toc .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:14px 0 8px;font-weight:700}
+  nav.toc .lbl:first-child{margin-top:0}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 10px;border-radius:7px}
+  nav.toc a:hover{color:var(--ink);background:var(--panel)}
+  main{min-width:0;padding-bottom:80px}
+  section{margin-bottom:46px;scroll-margin-top:20px}
+  h2{font-size:21px;margin:0 0 6px;letter-spacing:-.3px;display:flex;align-items:center;gap:11px;padding-top:8px}
+  h2 .n{display:inline-flex;align-items:center;justify-content:center;min-width:27px;height:27px;border-radius:8px;padding:0 6px;
+    background:var(--brand);color:#fff;font-size:13px;font-weight:700;flex:none}
+  .lead{color:var(--muted);margin:0 0 18px;font-size:14px}
+  h3{font-size:16px;margin:26px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  h4{font-size:14px;margin:18px 0 6px}
+  p{margin:0 0 12px}
+  ul,ol{margin:0 0 14px;padding-left:22px}
+  li{margin:5px 0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:14px 0}
+  code{background:var(--code);padding:2px 6px;border-radius:5px;font-size:12.5px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;padding:14px 16px;overflow-x:auto;font-size:12.5px;margin:12px 0;line-height:1.6}
+  pre code{background:none;padding:0}
+  .path{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--brand);
+    background:var(--brand-soft);border:1px solid var(--border);padding:2px 8px;border-radius:6px;display:inline-block}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+  .steps>li{counter-increment:s;position:relative;padding:2px 0 2px 42px;margin:12px 0}
+  .steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:27px;height:27px;border-radius:99px;
+    background:var(--brand-soft);color:var(--brand);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .steps>li b{display:block;margin-bottom:1px}
+  .note{background:var(--warn-soft);border:1px solid var(--border);border-left:3px solid var(--warn);
+    border-radius:10px;padding:12px 16px;font-size:13.5px;margin:14px 0}
+  .note b{color:var(--warn)}
+  .tip{background:var(--brand-soft);border:1px solid var(--border);border-left:3px solid var(--brand);
+    border-radius:10px;padding:12px 16px;font-size:13.5px;margin:14px 0}
+  .tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--panel);margin:14px 0}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--code)}
+  tbody tr:last-child td{border-bottom:none}
+  td:first-child{white-space:nowrap;font-weight:500}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 9px;border-radius:99px;border:1px solid var(--border);white-space:nowrap}
+  .p-ok{color:#059669;background:#ecfdf5} .p-warn{color:#b45309;background:#fffbeb}
+  .p-bad{color:#dc2626;background:#fef2f2} .p-mut{color:#6b7280;background:#f3f4f6}
+  .p-info{color:#7c3aed;background:#f5f3ff}
+  @media (prefers-color-scheme: dark){
+    .p-ok{background:#0c2a20} .p-warn{background:#2a2210} .p-bad{background:#2a1414} .p-mut{background:#22242a} .p-info{background:#1e1233}
+  }
+  footer{grid-column:1/-1;border-top:1px solid var(--border);padding:24px 0 44px;color:var(--muted);font-size:12.5px}
+  @media(max-width:880px){.wrap{grid-template-columns:1fr;gap:0}nav.toc{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="badge">◆ 管理端 · ADMIN</span>
+    <h1>GameOps 管理端使用手册</h1>
+    <p>本手册覆盖管理员专属的「管理面板」,路径以 <span class="path">/operator/admin</span> 开头。管理员同时拥有运营端全部功能(见《运营端手册》)。本册逐页说明账户、爬虫 Job / 机器、csvType、飞书外发、审计与错误日志、模型设置及关键运行约束。</p>
+  </header>
+
+  <nav class="toc">
+    <p class="lbl">概念</p>
+    <a href="#intro">1 · 管理员权限</a>
+    <p class="lbl">管理面板</p>
+    <a href="#operators">2 · 运营账户</a>
+    <a href="#jobs">3 · 爬虫 Job</a>
+    <a href="#agents">4 · 爬虫机</a>
+    <a href="#csvtypes">5 · csvType 管理</a>
+    <a href="#feishu">6 · 飞书外发</a>
+    <a href="#audit">7 · 审计日志</a>
+    <a href="#logs">8 · 运行错误</a>
+    <p class="lbl">模型 / 约束</p>
+    <a href="#modelcfg">9 · 模型设置</a>
+    <a href="#constraints">10 · 关键运行约束</a>
+    <a href="#env">11 · 环境变量与命令</a>
+  </nav>
+
+  <main>
+    <!-- 1 -->
+    <section id="intro">
+      <h2><span class="n">1</span>管理员权限</h2>
+      <p class="lead">管理员 = 运营全部功能 + 「管理面板」分组 + 若干仅管理员的子页。</p>
+      <div class="card">
+        <p>用管理员账号登录后,左侧除「运营工作区」外多出 <b>管理面板</b> 分组:运营账户、爬虫 Job、爬虫机、csvType 管理、飞书外发、审计日志、运行错误。此外,舆情监控与 AI 助手的「模型设置 / 知识库 / 用量统计」等子页也仅对管理员开放,采集任务的「新建 Job」按钮也仅管理员可见。</p>
+      </div>
+      <div class="note"><b>权限边界:</b>普通运营看不到管理面板;涉及触发/删除/重跑舆情、改模型、维护知识库、改 Job 模板、管账户/机器等敏感动作均限管理员。</div>
+    </section>
+
+    <!-- 2 -->
+    <section id="operators">
+      <h2><span class="n">2</span>运营账户</h2>
+      <p class="lead"><span class="path">/operator/admin/operators</span> · 创建与维护后台账户(仅 OPERATOR / ADMIN;创作者账号在「创作者管理」处理)。</p>
+      <h4>列表</h4>
+      <ul>
+        <li>筛选:角色(运营 / 管理员)、状态(启用 / 停用)、用户名搜索。</li>
+        <li>列:用户名 · 邮箱 · 角色徽标 · 状态 · 创建时间。右上「新建账户」。</li>
+      </ul>
+      <ol class="steps">
+        <li><b>新建账户</b>填用户名、初始密码、角色。密码以 argon2 哈希存储。</li>
+        <li><b>编辑</b>调整资料/角色或重置密码。</li>
+        <li><b>启停</b>停用后该账户无法登录。</li>
+      </ol>
+      <div class="tip">最小授权原则:日常审核/运营给 OPERATOR;只有需要管机器、账户、外发的人才给 ADMIN。</div>
+    </section>
+
+    <!-- 3 -->
+    <section id="jobs">
+      <h2><span class="n">3</span>爬虫 Job</h2>
+      <p class="lead"><span class="path">/operator/admin/jobs</span> · Jenkins 风格采集模板。<b>Job 是模板,每次执行叫 Task。</b></p>
+
+      <h3>3.1 列表</h3>
+      <p>筛选:全部 / 启用中 / 已停用。右上「新建 Job」。每行可切换启停,点进查看/编辑。</p>
+
+      <h3>3.2 新建 / 编辑 Job 表单</h3>
+      <div class="tblwrap"><table>
+        <thead><tr><th>区块</th><th>字段</th></tr></thead>
+        <tbody>
+          <tr><td>基础信息</td><td>Job 名称*、绑定爬虫机*(下拉,已停用机器不可选)、描述。</td></tr>
+          <tr><td>代码 &amp; 执行</td><td>仓库类型(Git / SVN)、仓库地址*、分支(Git)、工作目录(相对仓库根)、超时(1–720 分钟)、<b>命令模板*</b>。</td></tr>
+          <tr><td>参数定义</td><td>定义运行参数;触发时 UI 按类型(日期 / 文本 / 数值 / 枚举 / EXCEL)自动生成表单。</td></tr>
+          <tr><td>产物清单</td><td>脚本跑完后 agent 按此收集产物;带 csvType 的上传入库,不带的留在爬虫机本地。</td></tr>
+          <tr><td>调度</td><td>Cron 表达式(可选)+ 两个开关(见下)。</td></tr>
+        </tbody>
+      </table></div>
+      <h4>命令模板</h4>
+      <p>用 <code>{{参数名}}</code> 引用参数,例:<code>python run.py --start={{startDate}} --end={{endDate}}</code>。支持中文参数名(如 <code>{{开始时间}}</code>)。</p>
+      <h4>两个开关(务必分清)</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>开关</th><th>语义</th></tr></thead>
+        <tbody>
+          <tr><td>定时启用(enabled)</td><td><b>仅</b>控制 cron 自动触发;关掉后不再定时跑,<b>但手动触发仍可</b>。</td></tr>
+          <tr><td>任务启用(active)</td><td>整体总开关;<b>停用后任何方式都不可触发</b>(含手动 / rerun)。</td></tr>
+        </tbody>
+      </table></div>
+      <h4>产物入库规则</h4>
+      <ul>
+        <li>产物清单支持 glob(<code>*</code> <code>?</code> <code>[]</code>)与 <code>optional</code> 标志。</li>
+        <li><b>csvType 非空</b> → 入 <code>data/raw/&lt;csvType&gt;/</code> 并跑 parser 解析入明细表。</li>
+        <li><b>csvType 空</b> → 入 <code>_uncategorized/</code>,仅留底可下载、不解析。</li>
+      </ul>
+      <div class="note">失败不自动重试;手动重跑克隆出新 Task(保留原记录)。每台爬虫机并发=1。改模板属高危操作,不放开给运营。</div>
+    </section>
+
+    <!-- 4 -->
+    <section id="agents">
+      <h2><span class="n">4</span>爬虫机(Agent)</h2>
+      <p class="lead"><span class="path">/operator/admin/agents</span> · 采集端机器。<b>拉模型</b>:机器主动轮询中台领任务、回传 CSV,中台从不主动连机器。</p>
+      <h4>列表</h4>
+      <ul>
+        <li>筛选:启用 / 停用 + 名称搜索。</li>
+        <li>列:名称 · 状态 · 最近心跳时间 · 最近来源 IP · 创建人 · 关联任务/Job 数。</li>
+        <li><b>状态为「启用」但超过 10 分钟无心跳</b>会红色高亮标 OFFLINE。右上「新建机器」。</li>
+      </ul>
+      <ol class="steps">
+        <li><b>新建机器</b>创建后获得 token;爬虫端配置该 token 后即可上线轮询。</li>
+        <li><b>重置 token</b>在机器详情可重置(旧 token 失效)。</li>
+        <li><b>绑定</b>任务通过 Job 显式绑定到某台机器执行。</li>
+      </ol>
+      <h4>取消机制</h4>
+      <p>任务执行期间 agent 每 5 秒空 POST <code>/log</code>;若中台返回 4xx(表示已取消),agent 立即 kill 子进程。</p>
+      <div class="tip">部署形态:中台在阿里云,爬虫机在本地 Windows 内网,仅单向出站访问中台——无需给爬虫机开公网入站。</div>
+    </section>
+
+    <!-- 5 -->
+    <section id="csvtypes">
+      <h2><span class="n">5</span>csvType 管理</h2>
+      <p class="lead"><span class="path">/operator/admin/csv-types</span> · 维护 CSV 类型清单。csvType 决定产物入哪张明细表、用哪个解析器。</p>
+      <ul>
+        <li>每种 csvType 对应代码内的一个解析器,例:<code>douyin_video_detail</code>→视频明细、<code>live_detail</code>→直播明细、<code>anchor_roster</code>→主播名单。</li>
+        <li>在此登记/停用 csvType,供 Job 产物清单与手动导入选择。</li>
+      </ul>
+      <div class="note"><b>CSV→表的映射逻辑写在代码里。</b>真正的新格式需开发补一个 parser;本页管理的是可选清单与元数据,不是映射本身。</div>
+    </section>
+
+    <!-- 6 -->
+    <section id="feishu">
+      <h2><span class="n">6</span>飞书外发</h2>
+      <p class="lead"><span class="path">/operator/admin/feishu</span> · 通过飞书群自定义机器人 webhook 外发通知/日报。</p>
+      <h4>新增 webhook</h4>
+      <p>填:名称* · webhook 地址* · 加签密钥(可选)· 是否发日报。提交后地址与密钥只保存不回显,列表仅显示打码串。</p>
+      <h4>每个 webhook 的操作</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>操作</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td>启用开关</td><td>控制该 webhook 是否生效。</td></tr>
+          <tr><td>日报开关</td><td>是否纳入运营日报定时推送。</td></tr>
+          <tr><td>测试</td><td>发一条测试消息验证连通与加签。</td></tr>
+          <tr><td>发日报</td><td>立即手动推送一次日报。</td></tr>
+          <tr><td>编辑 / 删除</td><td>修改名称/地址/密钥/开关;删除该配置。</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note">webhook 地址与加签密钥属敏感信息,妥善保管、不要外泄。相关功能上线前若报错,需先执行 <code>pnpm db:generate</code>。</div>
+    </section>
+
+    <!-- 7 -->
+    <section id="audit">
+      <h2><span class="n">7</span>审计日志</h2>
+      <p class="lead"><span class="path">/operator/admin/audit-logs</span> · 关键动作留痕,用于追责与复盘。</p>
+      <h4>筛选与分页</h4>
+      <ul>
+        <li>筛选(URL 同步):操作人(用户名模糊)· 动作 · 目标类型 · 时间段。</li>
+        <li><b>数据范围硬底近 60 天</b>——用户填的开始时间只能在此窗口内再收窄,不能往前翻。</li>
+        <li>每页条数可选 25 / 50 / 100 / 200;按时间倒序。</li>
+        <li>每行「详情」点开 Dialog 显示完整 <code>details</code> JSON。</li>
+      </ul>
+      <h4>记录的动作</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>类别</th><th>动作</th></tr></thead>
+        <tbody>
+          <tr><td>采集任务</td><td><code>task.trigger / cancel / requeue / rerun / priority</code></td></tr>
+          <tr><td>数据导入</td><td><code>data.import</code>(主播 / 视频 / 直播 / 易闪)</td></tr>
+          <tr><td>激励</td><td><code>incentive.compute</code> / <code>incentive.adjust</code></td></tr>
+          <tr><td>舆情</td><td><code>opinion.trigger / rerun / delete / settings.update</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>每条含:操作人 ID + 用户名快照、目标类型/ID、details JSON、时间。<b>敏感明文(如 apiKey)永不入日志。</b></p>
+    </section>
+
+    <!-- 8 -->
+    <section id="logs">
+      <h2><span class="n">8</span>运行错误</h2>
+      <p class="lead"><span class="path">/operator/admin/logs</span> · 系统运行错误(ErrorLog)查询,用于排障。</p>
+      <ul>
+        <li>只读列出高价值 error/fatal 日志(后端错误经隔离队列写入,前端错误也上报),按发生时间倒序。</li>
+        <li>筛选:级别 · 模块(模糊)· requestId · traceId · taskId · fingerprint · 时间段;每页 25/50/100/200。</li>
+        <li><b>数据范围硬底近 90 天;不提供未脱敏原始日志下载。</b>每行可点开详情。</li>
+      </ul>
+      <div class="note">若页面提示「运行错误表尚未就绪」:需停 dev、执行 <code>pnpm db:migrate</code> 生成 <code>error_log</code> 表并重新生成 Prisma client,再设 <code>LOG_ERROR_DB_ENABLED=true</code>。</div>
+    </section>
+
+    <!-- 9 -->
+    <section id="modelcfg">
+      <h2><span class="n">9</span>模型设置(舆情 / AI 助手)</h2>
+      <p class="lead">仅管理员可配置的 LLM 相关设置,入口在对应模块的二级菜单。</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>入口</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td>舆情 · 模型设置 <span class="path">/operator/opinion/settings</span></td><td>配置分析服务所用 LLM(单例),apiKey 以 AES-256-GCM 加密存储。</td></tr>
+          <tr><td>AI 助手 · 模型设置 <span class="path">/operator/assistant/settings</span></td><td>配置对话助手模型。</td></tr>
+          <tr><td>AI 助手 · 知识库 <span class="path">/operator/assistant/knowledge</span></td><td>维护 RAG 知识条目。</td></tr>
+          <tr><td>AI 助手 · 用量统计 <span class="path">/operator/assistant/usage</span></td><td>查看调用量 / 成本。</td></tr>
+        </tbody>
+      </table></div>
+      <div class="tip">舆情报告由独立分析服务(Docker 容器)生成,中台仅代理调用。若报告触发失败,先在此确认模型配置与分析服务连通性。</div>
+    </section>
+
+    <!-- 10 -->
+    <section id="constraints">
+      <h2><span class="n">10</span>关键运行约束</h2>
+      <p class="lead">排障与配置时需知的技术边界。</p>
+      <h4>活动状态与激励</h4>
+      <ul>
+        <li>活动状态在读取时自动流转:草稿→(发布时间到点)进行中→(截止到点)已结束。</li>
+        <li>隐藏(hidden)的作品不参与任何统计与激励;只有审核通过的投稿计入激励。</li>
+      </ul>
+      <h4>数据分层</h4>
+      <p>原始层(留底)→ 明细层(upsert 只留最新)→ 每日汇总层(历史趋势)。</p>
+      <h4>时区</h4>
+      <p>数据库强制 <code>timezone='UTC'</code>;前端锁 Asia/Shanghai 渲染;审计/错误日志的时间筛选把输入显式当作北京时间(+08:00)。</p>
+      <h4>任务日志查看模式</h4>
+      <p>Task 日志页默认折叠,展开只渲染尾 100 行;支持 <code>?lines=N</code> / <code>?tail=N</code> / <code>?offset=N</code> / <code>?download=1</code> 四种模式。</p>
+      <div class="note"><b>改数据模型的正确姿势:</b>先改 <code>schema.prisma</code> → migrate → 写代码,不手写 SQL DDL;提交前跑 <code>pnpm typecheck &amp;&amp; pnpm test</code>。</div>
+    </section>
+
+    <!-- 11 -->
+    <section id="env">
+      <h2><span class="n">11</span>环境变量与命令</h2>
+      <h4>参数注入与命令渲染</h4>
+      <ul>
+        <li>参数名允许中文/字母/数字/下划线;agent 把参数值全部注入子进程环境变量,脚本用 <code>os.environ["开始时间"]</code> 读取。</li>
+        <li>EXCEL 类型参数:运营端上传 .xlsx/.csv,前端解析为数组后经 env 字符串(JSON)传给脚本。</li>
+      </ul>
+      <h4>舆情 / 分析服务环境变量</h4>
+      <pre><code>ANALYSIS_BASE_URL       # 分析服务地址(dev 默认 http://127.0.0.1:8000)
+ANALYSIS_SHARED_SECRET  # Bearer token,与分析服务同源
+OPINION_AES_KEY         # 32 字节 base64,加密 apiKey 用</code></pre>
+      <p>上述缺失时只 warn 不阻塞其他功能,首次触发舆情接口时才懒失败。</p>
+      <h4>分析服务本地启动</h4>
+      <pre><code>cd F:\Kaifa\data-hub\services\slg
+docker compose up -d   # 先在 shell 或该目录 .env 设 ANALYSIS_SHARED_SECRET</code></pre>
+      <h4>常用命令</h4>
+      <pre><code>pnpm dev / build
+pnpm db:migrate / db:generate / db:studio / db:seed
+pnpm typecheck / lint / test / test:e2e</code></pre>
+    </section>
+  </main>
+
+  <footer>GameOps 游戏运营中台 · 管理端使用手册 · 内容依据线上系统实现整理,如界面有更新以实际为准。运营通用功能见《运营端手册》。</footer>
+</div>
+</body>
+</html>

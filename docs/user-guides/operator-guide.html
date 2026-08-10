@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GameOps · 运营端使用手册</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1a1c1e; --muted:#6b7280;
+    --border:#e5e7eb; --brand:#2563eb; --brand-soft:#eff6ff; --code:#f3f4f6;
+    --warn:#b45309; --warn-soft:#fffbeb; --shadow:0 1px 2px rgba(0,0,0,.04),0 1px 8px rgba(0,0,0,.03);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e0f11; --panel:#17181b; --ink:#e7e9ec; --muted:#9aa1ab;
+      --border:#2a2c31; --brand:#60a5fa; --brand-soft:#122036; --code:#1e2024;
+      --warn:#fbbf24; --warn-soft:#2a2210; --shadow:none;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.75;font-size:15px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1220px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:250px 1fr;gap:44px}
+  header.top{grid-column:1/-1;padding:40px 0 26px;border-bottom:1px solid var(--border);margin-bottom:8px}
+  .badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+    color:var(--brand);background:var(--brand-soft);padding:5px 11px;border-radius:99px;border:1px solid var(--border)}
+  header.top h1{margin:14px 0 6px;font-size:28px;letter-spacing:-.4px}
+  header.top p{margin:0;color:var(--muted);font-size:14px;max-width:74ch}
+  nav.toc{position:sticky;top:20px;align-self:start;font-size:13px;max-height:calc(100vh - 40px);overflow:auto}
+  nav.toc .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:14px 0 8px;font-weight:700}
+  nav.toc .lbl:first-child{margin-top:0}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 10px;border-radius:7px}
+  nav.toc a:hover{color:var(--ink);background:var(--panel)}
+  main{min-width:0;padding-bottom:80px}
+  section{margin-bottom:46px;scroll-margin-top:20px}
+  h2{font-size:21px;margin:0 0 6px;letter-spacing:-.3px;display:flex;align-items:center;gap:11px;padding-top:8px}
+  h2 .n{display:inline-flex;align-items:center;justify-content:center;min-width:27px;height:27px;border-radius:8px;padding:0 6px;
+    background:var(--brand);color:#fff;font-size:13px;font-weight:700;flex:none}
+  .lead{color:var(--muted);margin:0 0 18px;font-size:14px}
+  h3{font-size:16px;margin:26px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  h4{font-size:14px;margin:18px 0 6px}
+  p{margin:0 0 12px}
+  ul,ol{margin:0 0 14px;padding-left:22px}
+  li{margin:5px 0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin:14px 0}
+  code{background:var(--code);padding:2px 6px;border-radius:5px;font-size:12.5px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  .path{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--brand);
+    background:var(--brand-soft);border:1px solid var(--border);padding:2px 8px;border-radius:6px;display:inline-block}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+  .steps>li{counter-increment:s;position:relative;padding:2px 0 2px 42px;margin:12px 0}
+  .steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:27px;height:27px;border-radius:99px;
+    background:var(--brand-soft);color:var(--brand);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .steps>li b{display:block;margin-bottom:1px}
+  .note{background:var(--warn-soft);border:1px solid var(--border);border-left:3px solid var(--warn);
+    border-radius:10px;padding:12px 16px;font-size:13.5px;margin:14px 0}
+  .note b{color:var(--warn)}
+  .tip{background:var(--brand-soft);border:1px solid var(--border);border-left:3px solid var(--brand);
+    border-radius:10px;padding:12px 16px;font-size:13.5px;margin:14px 0}
+  .tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--panel);margin:14px 0}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--code)}
+  tbody tr:last-child td{border-bottom:none}
+  td:first-child{white-space:nowrap;font-weight:500}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 9px;border-radius:99px;border:1px solid var(--border);white-space:nowrap}
+  .p-ok{color:#059669;background:#ecfdf5} .p-warn{color:#b45309;background:#fffbeb}
+  .p-bad{color:#dc2626;background:#fef2f2} .p-mut{color:#6b7280;background:#f3f4f6}
+  .p-info{color:#2563eb;background:#eff6ff}
+  @media (prefers-color-scheme: dark){
+    .p-ok{background:#0c2a20} .p-warn{background:#2a2210} .p-bad{background:#2a1414} .p-mut{background:#22242a} .p-info{background:#122036}
+  }
+  .adminonly{display:inline-block;font-size:10.5px;font-weight:700;color:#9333ea;background:#faf5ff;border:1px solid var(--border);
+    padding:1px 7px;border-radius:99px;vertical-align:middle;margin-left:6px}
+  @media (prefers-color-scheme: dark){.adminonly{background:#1e1030;color:#c084fc}}
+  footer{grid-column:1/-1;border-top:1px solid var(--border);padding:24px 0 44px;color:var(--muted);font-size:12.5px}
+  @media(max-width:880px){.wrap{grid-template-columns:1fr;gap:0}nav.toc{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="badge">■ 运营端 · OPERATOR</span>
+    <h1>GameOps 运营端使用手册</h1>
+    <p>本手册面向运营人员,逐页说明界面元素与操作步骤。运营端地址以 <span class="path">/operator</span> 开头。标注 <span class="adminonly">仅管理员</span> 的功能对普通运营隐藏或只读,详见《管理端手册》。管理员拥有运营的全部功能。</p>
+  </header>
+
+  <nav class="toc">
+    <p class="lbl">开始</p>
+    <a href="#login">1 · 登录与角色</a>
+    <a href="#layout">2 · 界面导览</a>
+    <a href="#overview">3 · 概览</a>
+    <a href="#bi">4 · BI 大屏</a>
+    <p class="lbl">数据</p>
+    <a href="#data">5 · 项目数据</a>
+    <p class="lbl">内容运营</p>
+    <a href="#activities">6 · 活动管理</a>
+    <a href="#incentive">7 · 激励结算</a>
+    <a href="#submissions">8 · 稿件审核</a>
+    <a href="#creators">9 · 创作者管理</a>
+    <a href="#inspiration">10 · 创作灵感</a>
+    <p class="lbl">智能与监控</p>
+    <a href="#opinion">11 · 舆情监控</a>
+    <a href="#assistant">12 · AI 助手</a>
+    <p class="lbl">采集</p>
+    <a href="#tasks">13 · 采集任务</a>
+    <a href="#datasets">14 · 采集数据</a>
+    <p class="lbl">账户 / 附录</p>
+    <a href="#account">15 · 账户设置</a>
+    <a href="#perm">A · 权限速查</a>
+  </nav>
+
+  <main>
+    <!-- 1 -->
+    <section id="login">
+      <h2><span class="n">1</span>登录与角色</h2>
+      <p class="lead">与创作者共用登录入口。用运营/管理员账号登录后,自动进入 <span class="path">/operator/dashboard</span>。</p>
+      <ul>
+        <li><b>角色层级</b>:管理员(ADMIN)⊃ 运营(OPERATOR)。管理员比运营多一整组「管理面板」。</li>
+        <li><b>账号来源</b>:运营/管理员账号由管理员在「运营账户管理」中创建,<b>不能自行注册</b>(注册入口只产出创作者账号)。</li>
+      </ul>
+    </section>
+
+    <!-- 2 -->
+    <section id="layout">
+      <h2><span class="n">2</span>界面导览</h2>
+      <p class="lead">左侧导航 + 右侧内容。顶部品牌显示「GameOps · 运营后台」。</p>
+
+      <h3>2.1 左侧导航分组</h3>
+      <p><b>运营工作区</b>(所有人可见):概览、BI 大屏、项目数据、活动管理、舆情监控、稿件管理、创作者管理、创作灵感、AI 助手、采集任务、采集数据。<br>
+      <b>管理面板</b> <span class="adminonly">仅管理员</span>:运营账户、爬虫 Job、爬虫机、csvType 管理、飞书外发、审计日志、运行错误。</p>
+      <p>多数菜单有二级项(如活动管理下的「全部/进行中/草稿/已结束」),点一级进默认页,点二级带筛选进入。</p>
+
+      <h3>2.2 左下角账户菜单</h3>
+      <p>显示你的用户名 + 角色徽标(<span class="pill p-info">管理员</span> 或 <span class="pill p-mut">运营</span>)。下拉含:<b>账户设置</b>、<b>深色/浅色模式</b>切换、<b>退出登录</b>。</p>
+      <div class="tip">带日期时间的筛选统一用日期时间选择器;下拉统一用 Select 组件;URL 会同步筛选条件,便于分享带筛选的链接。</div>
+    </section>
+
+    <!-- 3 -->
+    <section id="overview">
+      <h2><span class="n">3</span>概览</h2>
+      <p class="lead"><span class="path">/operator/dashboard</span> · 聚焦「当前要跟进」的指标与待办。</p>
+      <h4>5 张统计卡(点击跳转到对应列表)</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>卡片</th><th>含义 / 跳转</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill p-warn">待审稿件</span></td><td>待审核投稿总数 → 稿件待审。</td></tr>
+          <tr><td><span class="pill p-warn">待审创作者</span></td><td>注册待审核人数 → 创作者待审。</td></tr>
+          <tr><td><span class="pill p-ok">进行中活动</span></td><td>进行中活动数 → 活动列表。</td></tr>
+          <tr><td><span class="pill p-info">本月报名</span></td><td>本自然月报名总数。</td></tr>
+          <tr><td><span class="pill p-info">本月投稿</span></td><td>本自然月投稿总数。</td></tr>
+        </tbody>
+      </table></div>
+      <h4>待办区</h4>
+      <ul>
+        <li><b>待审稿件</b>——每条显示创作者头像、标题、平台、活动、时间,以及三维审核进度标 <span class="pill p-info">标</span><span class="pill p-info">内</span><span class="pill p-info">易</span>。点击进入审核页。</li>
+        <li><b>最近审核动作</b>——最近通过/驳回记录。</li>
+        <li><b>待审创作者</b> 与 <b>进行中活动</b>——右列快捷入口。</li>
+      </ul>
+    </section>
+
+    <!-- 4 -->
+    <section id="bi">
+      <h2><span class="n">4</span>BI 大屏</h2>
+      <p class="lead"><span class="path">/operator/bi</span> · 数据可视化看板,适合投屏。</p>
+      <ul>
+        <li>交互式折线图(趋势)、环形图(占比)等,基于平台明细数据聚合。</li>
+        <li>支持浏览器全屏模式,用于会议/投屏。</li>
+      </ul>
+    </section>
+
+    <!-- 5 -->
+    <section id="data">
+      <h2><span class="n">5</span>项目数据</h2>
+      <p class="lead">三张明细表:主播 / 视频 / 直播。均支持<b>手动导入</b>(补录、回填)与<b>导出</b>,爬虫上报复用同一套解析器。三页默认只看本月,可用日期筛选查往月;顶部有统计卡,支持排序与分页(每页条数可选)。</p>
+
+      <h3>5.1 主播数据 <span class="path">/operator/data/streamers</span></h3>
+      <p>以<b>名单</b>为基表(即使本月没发作品,主播也在列),数值列由视频与直播明细按 UID 聚合而来。</p>
+      <h4>列</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>来源</th><th>字段</th></tr></thead>
+        <tbody>
+          <tr><td>名单(导入)</td><td>平台 · UID · 昵称 · 抖音号 · 入会时间 · 团号 · 运营经纪人 · 招募经纪人 · 粉丝量</td></tr>
+          <tr><td>视频聚合</td><td>作品数 · 作品播放量 · 作品推荐播放量 · 涨粉</td></tr>
+          <tr><td>直播聚合</td><td>直播天数 · 直播时长 · ACU · 曝光人数/次数 · 进直播间人数/次数 · 人均观看时长</td></tr>
+        </tbody>
+      </table></div>
+      <h4>顶部统计</h4><p>名单主播数 / 总作品数 / 总作品播放量 / 总作品推荐播放量(随名单筛选变化)。</p>
+      <h4>操作与筛选</h4>
+      <ul>
+        <li><b>导入</b>(右上)——上传名单表,识别列:主播平台 / UID(必需)/ 昵称 / 抖音号 / 入会时间 / 团号 / 运营经纪人 / 招募经纪人 / 粉丝量;按(平台, UID)去重更新,<b>只写身份字段、缺列不覆盖</b>。</li>
+        <li><b>导出</b>——导出当前筛选结果。</li>
+        <li><b>搜索 / 团号</b>——作用于名单;<b>日期窗口</b>——同时收窄视频与直播聚合区间(不影响主播是否在列)。</li>
+        <li>表头可点击排序。</li>
+      </ul>
+      <div class="note">源表无「直播场次」列,故本页无此指标;被隐藏/删除的作品不计入统计。</div>
+
+      <h3>5.2 视频数据 <span class="path">/operator/data/videos</span></h3>
+      <h4>列</h4><p>平台 · 视频ID · 链接 · 标题 · 发布时间 · 创作者UID/昵称/抖音号 · 播放量 · 推荐播放量 · 点赞 · 评论 · 分享 · 涨粉 · 运营经纪人 · 招募经纪人 · 备注(团号)· 隐藏状态。</p>
+      <h4>顶部统计</h4><p>作品条数 / 作品人数(去重 UID)/ 总播放量 / 总推荐播放量。</p>
+      <h4>操作</h4>
+      <ul>
+        <li><b>导入视频明细</b>——上传 CSV/Excel(固定类型 <code>douyin_video_detail</code>),用于补录/回填。</li>
+        <li><b>导出</b>、<b>发布日期筛选</b>(默认本月)、<b>团号 / 搜索</b>、表头排序。</li>
+        <li><b>状态筛选</b>:正常 / 已删除隐藏 / 全部。</li>
+      </ul>
+      <div class="note"><b>达人删除/隐藏机制:</b>每次导入按 CSV 的「发布日期窗口」比对——窗口内在库但本次缺失、或只有链接无标题的作品判为 <span class="pill p-mut">已删除隐藏</span>;窗口外不动;重新出现自动恢复。<b>隐藏行不参与任何统计与激励</b>,仅留存展示。</div>
+
+      <h3>5.3 直播数据 <span class="path">/operator/data/live</span></h3>
+      <p>数据源 <code>LiveStat</code>,<b>主播 × 自然日一行</b>,来自「所有主播画像表」。</p>
+      <h4>列</h4><p>平台 · UID · 日期 · 昵称 · 抖音号 · 音浪 · 有效开播时长 · 曝光人数/次数 · 进直播间人数/次数 · 进直播间转化率 · 人均观看时长 · 打赏人数/次数 · 新增粉丝 · ACU · 备注(团号)。</p>
+      <h4>顶部统计</h4><p>记录数 / 主播数 / 总开播时长 / 总曝光人数。</p>
+      <h4>导入规则</h4>
+      <ul>
+        <li>只入「有效开播时长 &gt; 0」的行(空开播行跳过并计数);排除游戏流水两列不入库;日期按 UTC 存日期型。</li>
+        <li>操作:导入 / 导出 / 日期筛选(默认本月)/ 搜索 / 团号 / 排序。</li>
+      </ul>
+      <div class="tip">所有导入都会写审计(<code>data.import</code>),可在管理面板「审计日志」按操作人追溯。</div>
+    </section>
+
+    <!-- 6 -->
+    <section id="activities">
+      <h2><span class="n">6</span>活动管理</h2>
+      <p class="lead">创建活动、配置激励规则、推动状态流转。</p>
+
+      <h3>6.1 活动列表 <span class="path">/operator/activities</span></h3>
+      <ul>
+        <li><b>右上「新建活动」</b>——进入创建表单。</li>
+        <li><b>筛选</b>——搜索(活动名)+ 日期范围;左侧二级菜单按状态:全部 / 进行中 / 草稿 / 已结束。</li>
+        <li><b>卡片</b>——封面 + 状态徽标 + 活动名 + 描述 + 起止 + 报名/投稿数;草稿若设了定时发布,右上角有「定时发布」小标。点卡进详情。</li>
+      </ul>
+
+      <h3>6.2 新建 / 编辑活动</h3>
+      <p>新建的活动默认是<b>草稿</b>。表单分块:</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>区块</th><th>字段 / 说明</th></tr></thead>
+        <tbody>
+          <tr><td>基础信息</td><td>活动名称*(≤120 字)、活动描述(≤2000 字)、封面图、开始时间*、结束时间*。</td></tr>
+          <tr><td>封面图</td><td>点击上传 PNG/JPG/WebP/GIF,≤5 MB,建议 16:9;可更换或移除。</td></tr>
+          <tr><td>激励规则</td><td>可折叠区,叠加最多 10 条规则(见 7.1);标题显示「已配 N 条」。</td></tr>
+          <tr><td>定时发布(仅草稿)</td><td>设定发布时间,到点自动转「进行中」;留空则需手动上线。</td></tr>
+        </tbody>
+      </table></div>
+      <h4>编辑权限随状态变化</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>状态</th><th>可编辑性</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill p-mut">草稿</span></td><td>全部可改,含定时发布。底部按钮「创建草稿 / 保存」。</td></tr>
+          <tr><td><span class="pill p-ok">进行中</span></td><td>默认锁定。右上角横幅「点击解锁」→ 二级确认弹窗「确认解锁」后才能改。可「重新锁定」。</td></tr>
+          <tr><td><span class="pill p-mut">已结束</span></td><td>永久只读,基础信息与规则都不可改,只有「返回」。</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>6.3 活动详情</h3>
+      <p>顶部有活动信息与状态;下方是活动表单(按上面权限规则)+ 激励结算区(见第 7 节)。</p>
+    </section>
+
+    <!-- 7 -->
+    <section id="incentive">
+      <h2><span class="n">7</span>激励结算</h2>
+      <p class="lead">激励引擎按你配置的规则,为「报名 ∪ 投稿」的候选人计算金额。</p>
+
+      <h3>7.1 七类规则块</h3>
+      <p>每条规则可选挂 <b>cap</b>(封顶金额)与 <b>cpmCap</b>(每千播放封顶;创作者 views=0 时不生效)。</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>规则</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>TIER 分档</td><td>按某指标落入档位给不同金额。</td></tr>
+          <tr><td>FORMULA 公式</td><td>按公式(如播放量×系数)计算。</td></tr>
+          <tr><td>SHARE_POOL 分池</td><td>固定奖池按贡献占比分配。</td></tr>
+          <tr><td>RANK 排名</td><td>按名次给奖。</td></tr>
+          <tr><td>PER_SUBMISSION 计件</td><td>每篇合格投稿固定金额。</td></tr>
+          <tr><td>ACTIVITY_THRESHOLD 门槛</td><td>达到活跃门槛才发放。</td></tr>
+          <tr><td>BASE_PLUS_STEP 底+步进</td><td>保底 + 按量阶梯递增。</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>7.2 重算与人工调整</h3>
+      <ol class="steps">
+        <li><b>全活动重算</b>在活动结算区触发,引擎重算所有候选人金额并落库,创作者端同步可见。审计 <code>incentive.compute</code>。</li>
+        <li><b>人工调整单条</b>对个别创作者在系统预估上手改金额并填「调整说明」,原预估值保留、创作者端显示「已调整」。审计 <code>incentive.adjust</code>。</li>
+      </ol>
+      <div class="note">只有审核通过的投稿参与激励;被隐藏/删除的作品一律排除。</div>
+    </section>
+
+    <!-- 8 -->
+    <section id="submissions">
+      <h2><span class="n">8</span>稿件审核</h2>
+      <p class="lead"><span class="path">/operator/submissions</span> · 三维独立评审:标题 / 内容 / 易闪。</p>
+
+      <h3>8.1 汇总卡片视图(默认)</h3>
+      <p>稿件按活动汇总成卡片(按活动开始月份分段),每卡显示该活动三态稿件计数。筛选:搜索(活动名 / 抖音昵称 / 抖音号 / 易闪 ID)+ 日期范围 + 左侧状态菜单。<b>点卡片进入该活动的审核表格。</b>右上「导入易闪结果」见 8.3。</p>
+
+      <h3>8.2 审核表格(点卡片进入)</h3>
+      <p>进入某活动后,顶部有「当前活动」提示 + 筛选(可加平台筛选)+ 分页;表格列出该活动稿件,支持批量审核。左上「返回活动汇总」。</p>
+      <h4>三维审核</h4>
+      <div class="tblwrap"><table>
+        <thead><tr><th>维度</th><th>标</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>标题</td><td><span class="pill p-info">标</span></td><td>标题是否合规、契合活动主题。</td></tr>
+          <tr><td>内容</td><td><span class="pill p-info">内</span></td><td>作品内容质量与合规性。</td></tr>
+          <tr><td>易闪</td><td><span class="pill p-info">易</span></td><td>易闪维度校验(可配合易闪结果导入)。</td></tr>
+        </tbody>
+      </table></div>
+      <ol class="steps">
+        <li><b>逐维评审</b>三张子卡片各自给出通过/驳回并可填备注,<b>独立保存</b>。</li>
+        <li><b>得出最终态</b>系统汇总三维得出投稿最终状态(<span class="pill p-warn">待审核</span> / <span class="pill p-ok">已通过</span> / <span class="pill p-bad">未通过</span>),备注对创作者可见。</li>
+      </ol>
+
+      <h3>8.3 导入易闪结果</h3>
+      <p><span class="path">/operator/submissions/import-yishan</span> · 批量回填易闪维度的数据/结论,减少逐条操作。</p>
+    </section>
+
+    <!-- 9 -->
+    <section id="creators">
+      <h2><span class="n">9</span>创作者管理</h2>
+      <p class="lead"><span class="path">/operator/creators</span> · 审核注册、维护账号与平台账号信息。</p>
+      <h4>筛选与列</h4>
+      <ul>
+        <li><b>搜索</b>命中 抖音 UID / 抖音昵称 / 抖音号 / 易闪 ID;<b>团号</b>独立筛选;左侧状态菜单:全部 / 待审核 / 已启用 / 已停用;支持分页。</li>
+        <li>若有待审核,右上会出现「待审核 N · 去审核」快捷入口。</li>
+        <li><b>表格列</b>:创作者(头像+昵称+@用户名)· 抖音UID · 抖音昵称 · 抖音号 · 易闪ID · 团号 · 等级 · 状态 · 报名数 · 投稿数 · 注册时间。点行进详情。</li>
+      </ul>
+      <ol class="steps">
+        <li><b>审核注册</b>在「待审核」中核验资料后通过/拒绝。通过后账号变 <span class="pill p-ok">已启用</span>,方可投稿。</li>
+        <li><b>启用 / 停用</b>在详情页切换;停用后该创作者无法登录/投稿。</li>
+      </ol>
+    </section>
+
+    <!-- 10 -->
+    <section id="inspiration">
+      <h2><span class="n">10</span>创作灵感</h2>
+      <p class="lead"><span class="path">/operator/inspirations</span> · 维护给创作者的资源库。</p>
+      <ul>
+        <li>三类内容:视频教程 / 文档教程 / 创作素材;左侧二级菜单可按类型或「草稿」筛选。</li>
+        <li>新建条目可填标题、摘要、正文/链接、封面、标签;先存<b>草稿</b>,发布后才对创作者可见。</li>
+      </ul>
+    </section>
+
+    <!-- 11 -->
+    <section id="opinion">
+      <h2><span class="n">11</span>舆情监控</h2>
+      <p class="lead">三份报告:私域 / 公域 / 对比。运营可查看列表与报告;<b>触发 / 删除 / 重跑与模型设置仅管理员</b>。</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>页面</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td>私域舆情</td><td>基于聊天记录导出的社群深度报告。</td></tr>
+          <tr><td>公域舆情</td><td>抖音 / B 站 / 小红书 三平台评论合并后的深度报告。</td></tr>
+          <tr><td>对比报告</td><td>读取已完成的私域 + 公域固化结果,做叠加解读。</td></tr>
+          <tr><td>模型设置 <span class="adminonly">仅管理员</span></td><td>LLM 配置(apiKey 加密存储)。</td></tr>
+        </tbody>
+      </table></div>
+      <h4>页面元素</h4>
+      <ul>
+        <li>顶部统计卡(各状态任务数)+ 任务表格(<b>自动轮询刷新</b>状态)+ 分页 / 每页条数。</li>
+        <li>管理员右上有「触发」按钮(私域/公域为上传文件对话框,对比为选择已完成报告对话框)。</li>
+        <li>未配置模型时显示黄色提示条(仅管理员可见并前往设置)。</li>
+        <li>任务完成后,点进可经鉴权在新页面打开 HTML 报告(非 iframe)。产物由后台每 10 秒从分析服务拉回。</li>
+      </ul>
+      <div class="note">若长时间无结果:可能分析服务未启动或未配置模型,请联系管理员检查「模型设置」并重新触发。</div>
+    </section>
+
+    <!-- 12 -->
+    <section id="assistant">
+      <h2><span class="n">12</span>AI 助手</h2>
+      <p class="lead"><span class="path">/operator/assistant</span> · 用自然语言问项目数据,自动取数并标注统计口径与来源。</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>子页</th><th>用途</th><th>权限</th></tr></thead>
+        <tbody>
+          <tr><td>对话</td><td>问视频/主播/活动/激励/采集任务等数据。</td><td>运营可用</td></tr>
+          <tr><td>知识检索</td><td>直接检索知识库条目。</td><td>运营可用</td></tr>
+          <tr><td>反馈</td><td>对回答质量提交反馈。</td><td>运营可用</td></tr>
+          <tr><td>知识库 / 用量统计 / 模型设置 <span class="adminonly">仅管理员</span></td><td>维护知识、看用量、配模型。</td><td>仅管理员</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- 13 -->
+    <section id="tasks">
+      <h2><span class="n">13</span>采集任务</h2>
+      <p class="lead"><span class="path">/operator/tasks</span> · Jenkins 风格的三层视图。</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th>层级</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td>① Job 列表(本页)</td><td>每行一个采集模板:名称、绑定爬虫机、cron(中文描述)、最近运行状态+时间、总执行次数。筛选:全部 / 启用中 / 已停用 + 搜索。</td></tr>
+          <tr><td>② Job 详情</td><td>点 Job 名进入:触发表单(按参数定义生成)+ 最近执行列表。</td></tr>
+          <tr><td>③ 单次执行</td><td>点某次执行:参数、耗时、折叠日志(展开只渲染尾 100 行,可下载完整日志)。</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li><b>手动触发</b>随时可用;失败不自动重试,重跑会克隆出一个新执行。每台爬虫机并发=1。</li>
+        <li><b>「新建 Job」按钮仅管理员可见</b>(改模板属高危操作)。</li>
+        <li>关键动作(触发/取消/重排/重跑/改优先级)都写审计。</li>
+      </ul>
+    </section>
+
+    <!-- 14 -->
+    <section id="datasets">
+      <h2><span class="n">14</span>采集数据</h2>
+      <p class="lead"><span class="path">/operator/datasets</span> · 爬虫上传的原始 CSV 留底,可下载与重跑解析。</p>
+      <ul>
+        <li>列表(最近 200 条):csvType、文件名/大小、行数、解析状态(已解析/解析错误)、来源任务(Job + 执行序号 + 触发人)、时间。</li>
+        <li>每行有<b>下载</b>按钮(需登录)。可按 csvType 过滤。</li>
+        <li>未分类产物入 <code>_uncategorized/</code>,仅留底可下载、不解析。</li>
+      </ul>
+    </section>
+
+    <!-- 15 -->
+    <section id="account">
+      <h2><span class="n">15</span>账户设置</h2>
+      <p class="lead"><span class="path">/operator/account</span> · 由左下角账户菜单进入。</p>
+      <ul>
+        <li>顶部卡片显示用户名、邮箱、角色徽标、账号状态、创建/更新时间。</li>
+        <li><b>账户安全</b>:修改邮箱;修改登录密码(<b>需当前密码</b>)。</li>
+        <li>账号的角色与状态由管理员维护,本页不可自改。</li>
+      </ul>
+    </section>
+
+    <!-- Appendix -->
+    <section id="perm">
+      <h2><span class="n">A</span>权限速查:运营 vs 管理员</h2>
+      <div class="tblwrap"><table>
+        <thead><tr><th>功能</th><th>运营 OPERATOR</th><th>管理员 ADMIN</th></tr></thead>
+        <tbody>
+          <tr><td>概览 / BI / 项目数据 / 活动 / 稿件 / 创作者 / 创作灵感</td><td>✔ 全功能</td><td>✔</td></tr>
+          <tr><td>激励重算 / 调整</td><td>✔</td><td>✔</td></tr>
+          <tr><td>采集任务:查看 / 手动触发</td><td>✔</td><td>✔</td></tr>
+          <tr><td>采集任务:新建/编辑 Job 模板</td><td>✘</td><td>✔</td></tr>
+          <tr><td>舆情:查看报告</td><td>✔ 只读</td><td>✔ 触发/删除/重跑/设置</td></tr>
+          <tr><td>AI 助手:对话/检索/反馈</td><td>✔</td><td>✔ + 知识库/用量/模型</td></tr>
+          <tr><td>管理面板(账户/机器/csvType/飞书/审计/错误日志)</td><td>✘ 不可见</td><td>✔ 见《管理端手册》</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+  </main>
+
+  <footer>GameOps 游戏运营中台 · 运营端使用手册 · 内容依据线上系统实现整理,如界面有更新以实际为准。管理面板功能见《管理端手册》。</footer>
+</div>
+</body>
+</html>

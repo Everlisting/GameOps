@@ -58,7 +58,11 @@
       "Skill(claude-api)",
       "PowerShell(pnpm add *)",
       "PowerShell(Select-String *)",
-      "Bash(pnpm exec *)"
+      "Bash(pnpm exec *)",
+      "PowerShell(docker version *)",
+      "PowerShell(docker run *)",
+      "PowerShell(docker exec gameops-pgvector *)",
+      "Bash(git commit *)"
     ]
   }
 }

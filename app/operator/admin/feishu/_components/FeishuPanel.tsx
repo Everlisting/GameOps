@@ -14,10 +14,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 
 interface Webhook {
   id: string;
@@ -43,6 +52,7 @@ export function FeishuPanel() {
   const [secret, setSecret] = React.useState("");
   const [daily, setDaily] = React.useState(false);
   const [adding, setAdding] = React.useState(false);
+  const [addOpen, setAddOpen] = React.useState(false);
 
   // 编辑弹窗
   const [editing, setEditing] = React.useState<Webhook | null>(null);
@@ -86,6 +96,7 @@ export function FeishuPanel() {
         setUrl("");
         setSecret("");
         setDaily(false);
+        setAddOpen(false);
         setFlash({ kind: "ok", text: "已添加" });
         void load();
       } else {
@@ -144,97 +155,137 @@ export function FeishuPanel() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* 新增 */}
-      <div className="rounded-lg border p-4">
-        <div className="mb-2 text-sm font-medium">新增飞书群</div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Input placeholder="群名称 / 用途标签" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input placeholder="webhook 地址(https://open.feishu.cn/…/hook/…)" value={url} onChange={(e) => setUrl(e.target.value)} />
-          <Input placeholder="加签密钥(可选)" value={secret} onChange={(e) => setSecret(e.target.value)} />
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Checkbox checked={daily} onCheckedChange={(v) => setDaily(v === true)} />
-            纳入每日 09:00 日报推送
-          </label>
-        </div>
-        <div className="mt-2">
-          <Button size="sm" onClick={add} disabled={adding}>
-            {adding ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-            添加
-          </Button>
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-4">
       {flash && (
-        <div
-          className={`rounded-md px-3 py-2 text-sm ${
-            flash.kind === "ok"
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
-              : "bg-red-500/10 text-red-700 dark:text-red-200"
-          }`}
-        >
+        <Badge variant={flash.kind === "ok" ? "success" : "destructive"} className="w-fit" role="status">
           {flash.text}
-        </div>
+        </Badge>
       )}
 
-      {/* 列表 */}
-      {loading ? (
-        <p className="text-sm text-muted-foreground">加载中…</p>
-      ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">还没有配置飞书群。</p>
-      ) : (
-        <div className="space-y-2">
-          {items.map((w) => (
-            <div key={w.id} className="rounded-lg border p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{w.name}</span>
-                    <Badge variant={w.enabled ? "success" : "muted"}>{w.enabled ? "启用" : "停用"}</Badge>
-                    {w.hasSecret && <Badge variant="secondary">加签</Badge>}
-                    {w.dailyReport && <Badge variant="warning">日报</Badge>}
-                  </div>
-                  <div className="mt-1 break-all font-mono text-xs text-muted-foreground">{w.urlMask}</div>
-                </div>
-                <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                  <Button size="xs" variant="outline" onClick={() => action(w.id, "test")} disabled={busyId === w.id}>
-                    <Beaker className="size-3" />
-                    测试
-                  </Button>
-                  <Button size="xs" variant="outline" onClick={() => action(w.id, "send")} disabled={busyId === w.id}>
-                    <Send className="size-3" />
-                    发日报
-                  </Button>
-                  <Button size="xs" variant="ghost" onClick={() => setEditing(w)}>
-                    <Pencil className="size-3" />
-                  </Button>
-                  <Button size="xs" variant="ghost" onClick={() => remove(w.id)} disabled={busyId === w.id}>
-                    <Trash2 className="size-3" />
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
-                <label className="flex items-center gap-1.5">
-                  <Checkbox
-                    checked={w.enabled}
-                    onCheckedChange={(v) => patch(w.id, { enabled: v === true })}
-                    disabled={busyId === w.id}
-                  />
-                  启用
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <Checkbox
-                    checked={w.dailyReport}
-                    onCheckedChange={(v) => patch(w.id, { dailyReport: v === true })}
-                    disabled={busyId === w.id}
-                  />
-                  每日日报
-                </label>
-              </div>
+      <Card>
+        <CardHeader className="flex-row items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <CardTitle>推送群</CardTitle>
+            <CardDescription>
+              {loading ? "正在读取配置…" : `已配置 ${items.length} 个群，可分别控制启用与日报推送。`}
+            </CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus data-icon="inline-start" />
+            新增群
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">加载中…</p>
+          ) : items.length === 0 ? (
+            <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+              还没有配置飞书群，点击右上角「新增群」开始。
             </div>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="flex flex-col gap-2">
+              {items.map((w) => (
+                <div key={w.id} className="rounded-lg border p-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{w.name}</span>
+                        <Badge variant={w.enabled ? "success" : "muted"}>{w.enabled ? "启用" : "停用"}</Badge>
+                        {w.hasSecret && <Badge variant="secondary">加签</Badge>}
+                        {w.dailyReport && <Badge variant="warning">日报</Badge>}
+                      </div>
+                      <div className="mt-1 break-all font-mono text-xs text-muted-foreground">{w.urlMask}</div>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-1.5 lg:justify-end">
+                      <Button size="xs" variant="outline" onClick={() => action(w.id, "test")} disabled={busyId === w.id}>
+                        <Beaker data-icon="inline-start" />
+                        测试
+                      </Button>
+                      <Button size="xs" variant="outline" onClick={() => action(w.id, "send")} disabled={busyId === w.id}>
+                        <Send data-icon="inline-start" />
+                        发日报
+                      </Button>
+                      <Button size="icon-xs" variant="ghost" aria-label={`编辑 ${w.name}`} onClick={() => setEditing(w)}>
+                        <Pencil />
+                      </Button>
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label={`删除 ${w.name}`}
+                        onClick={() => remove(w.id)}
+                        disabled={busyId === w.id}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-4">
+                    <Field orientation="horizontal" className="w-auto">
+                      <Checkbox
+                        id={`webhook-enabled-${w.id}`}
+                        checked={w.enabled}
+                        onCheckedChange={(v) => patch(w.id, { enabled: v === true })}
+                        disabled={busyId === w.id}
+                      />
+                      <FieldLabel htmlFor={`webhook-enabled-${w.id}`}>启用</FieldLabel>
+                    </Field>
+                    <Field orientation="horizontal" className="w-auto">
+                      <Checkbox
+                        id={`webhook-daily-${w.id}`}
+                        checked={w.dailyReport}
+                        onCheckedChange={(v) => patch(w.id, { dailyReport: v === true })}
+                        disabled={busyId === w.id}
+                      />
+                      <FieldLabel htmlFor={`webhook-daily-${w.id}`}>每日日报</FieldLabel>
+                    </Field>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新增飞书群</DialogTitle>
+            <DialogDescription>配置群机器人 Webhook；加签密钥只会加密保存，不会回显明文。</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="feishu-group-name">群名称 / 用途标签</FieldLabel>
+              <Input id="feishu-group-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="feishu-webhook-url">Webhook 地址</FieldLabel>
+              <Input
+                id="feishu-webhook-url"
+                placeholder="https://open.feishu.cn/…/hook/…"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="feishu-webhook-secret">加签密钥（可选）</FieldLabel>
+              <Input id="feishu-webhook-secret" value={secret} onChange={(e) => setSecret(e.target.value)} />
+            </Field>
+            <Field orientation="horizontal">
+              <Checkbox id="feishu-daily-report" checked={daily} onCheckedChange={(v) => setDaily(v === true)} />
+              <FieldLabel htmlFor="feishu-daily-report">纳入每日 09:00 日报推送</FieldLabel>
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setAddOpen(false)}>
+              取消
+            </Button>
+            <Button size="sm" onClick={add} disabled={adding}>
+              {adding ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Plus data-icon="inline-start" />}
+              添加
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {editing && (
         <EditDialog
@@ -298,27 +349,39 @@ function EditDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>编辑「{webhook.name}」</DialogTitle>
+          <DialogDescription>Webhook 地址或密钥留空时会保留当前配置。</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Input placeholder="群名称" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input
-            placeholder={`webhook 地址(留空不改,当前 ${webhook.urlMask})`}
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-          <Input
-            placeholder={webhook.hasSecret ? "加签密钥(留空不改)" : "加签密钥(可选)"}
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-          />
-          {err && <p className="text-xs text-red-600">{err}</p>}
-        </div>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="edit-feishu-name">群名称</FieldLabel>
+            <Input id="edit-feishu-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="edit-feishu-url">Webhook 地址</FieldLabel>
+            <Input
+              id="edit-feishu-url"
+              placeholder={`留空不改，当前 ${webhook.urlMask}`}
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="edit-feishu-secret">加签密钥</FieldLabel>
+            <Input
+              id="edit-feishu-secret"
+              placeholder={webhook.hasSecret ? "留空不改" : "可选"}
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+            />
+          </Field>
+          {err && <p className="text-xs text-destructive">{err}</p>}
+        </FieldGroup>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>
             取消
           </Button>
           <Button size="sm" onClick={save} disabled={saving}>
-            {saving && <Loader2 className="size-3.5 animate-spin" />}
+            {saving && <Loader2 data-icon="inline-start" className="animate-spin" />}
             保存
           </Button>
         </DialogFooter>
