@@ -5,7 +5,8 @@
  * URL / 加签密钥仅提交,不回显明文(列表只回打码串)。
  */
 import * as React from "react";
-import { Loader2, Send, Beaker, Pencil, Trash2, Plus } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Send, Beaker, Pencil, Trash2, Plus, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -170,10 +171,18 @@ export function FeishuPanel() {
               {loading ? "正在读取配置…" : `已配置 ${items.length} 个群，可分别控制启用与日报推送。`}
             </CardDescription>
           </div>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus data-icon="inline-start" />
-            新增群
-          </Button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/operator/admin/feishu/report">
+                <SlidersHorizontal data-icon="inline-start" />
+                日报配置
+              </Link>
+            </Button>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus data-icon="inline-start" />
+              新增群
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (

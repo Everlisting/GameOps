@@ -9,6 +9,7 @@
  * 每次执行落地为一条 CrawlerTask(/jobs/[id]/trigger 或 cron 自动建)。
  */
 import { route, parseJson } from "@/lib/api";
+import { buildManualTriggerInitialValues } from "@/lib/job-param-defaults";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { badRequest, conflict, notFound } from "@/lib/errors";
@@ -85,6 +86,10 @@ export const POST = route(async (req) => {
       command: input.command,
       timeoutMinutes: input.timeoutMinutes,
       paramSchema: input.paramSchema as unknown as Prisma.InputJsonValue,
+      manualParamDefaults: buildManualTriggerInitialValues(
+        input.paramSchema,
+        {},
+      ) as Prisma.InputJsonValue,
       outputs: input.outputs as unknown as Prisma.InputJsonValue,
       cronExpression: input.cronExpression ?? null,
       enabled: input.enabled,

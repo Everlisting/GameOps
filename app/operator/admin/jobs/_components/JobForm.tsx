@@ -371,7 +371,7 @@ export default function JobForm({
       <Card className="space-y-3 p-5">
         <h2 className="text-sm font-semibold">参数定义</h2>
         <p className="text-xs text-muted-foreground">
-          触发任务时按这里生成表单,所有参数都会自动注入脚本环境变量。只有确实需要命令行参数时才写 {"{{参数名}}"}。
+          定时默认值供 cron 自动运行使用；手动运行会独立记住最近填写值，不会改写定时参数。所有参数都会自动注入脚本环境变量。只有确实需要命令行参数时才写 {"{{参数名}}"}。
         </p>
         <ParamSchemaEditor
           value={data.paramSchema}

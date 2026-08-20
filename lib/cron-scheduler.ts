@@ -14,6 +14,10 @@
 import cron from "node-cron";
 
 import { prisma } from "@/lib/db";
+import {
+  buildCronParamValues,
+  type JobParamDefinition,
+} from "@/lib/job-param-defaults";
 import { createLogger } from "@/lib/logger";
 import { createTaskFromJob } from "@/lib/jobs";
 import { isValidCronExpression } from "@/lib/validation/job";
@@ -109,7 +113,7 @@ export async function removeJob(jobId: string): Promise<void> {
   }
 }
 
-/** Cron 回调:走 createTaskFromJob,paramValues 用 paramSchema 的 default 字段填。 */
+/** Cron 回调:走 createTaskFromJob,只用管理员配置的 paramSchema.default。 */
 async function fireJob(jobId: string, name: string): Promise<void> {
   try {
     const job = await prisma.crawlerJob.findUnique({
@@ -118,14 +122,8 @@ async function fireJob(jobId: string, name: string): Promise<void> {
     });
     if (!job || !job.enabled) return; // 已停用,跳过
 
-    const schema = (job.paramSchema as unknown as Array<{
-      name: string;
-      default?: unknown;
-    }>) ?? [];
-    const paramValues: Record<string, unknown> = {};
-    for (const item of schema) {
-      if (item.default !== undefined) paramValues[item.name] = item.default;
-    }
+    const schema = (job.paramSchema as unknown as JobParamDefinition[]) ?? [];
+    const paramValues = buildCronParamValues(schema);
 
     const task = await createTaskFromJob({
       jobId,

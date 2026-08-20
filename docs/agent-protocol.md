@@ -291,6 +291,10 @@ Query(四选一):
 
 `paramValues` 是中台校验过的 JSON 对象。每个参数在 Job.paramSchema 里声明类型:
 
+- `paramSchema[*].default` 是 cron 自动运行使用的参数值。
+- 最近一次手动触发的标量参数独立保存在 `CrawlerJob.manualParamDefaults`,只用于下次手动表单预填；手动运行不会改写 cron 默认值。
+- EXCEL 参数不会写入手动记忆,每次手动运行都需重新上传。
+
 | type | JSON 形态 | env 注入形态 | 例 |
 | --- | --- | --- | --- |
 | `DATE` | ISO 字符串 `"YYYY-MM-DD"` | 同 | `"2026-05-01"` |

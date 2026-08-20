@@ -60,6 +60,7 @@ export default async function EditJobPage({
       <JobEditPanel
         agents={agents}
         csvTypes={csvTypes}
+        manualParamDefaults={job.manualParamDefaults}
         initial={{
           id: job.id,
           name: job.name,

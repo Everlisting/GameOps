@@ -2,7 +2,8 @@
 
 /**
  * Job 详情页右上的"立即触发"卡片内容。
- * 默认值取 paramSchema.default。点"运行"POST /api/admin/jobs/[id]/trigger,
+ * 默认值优先取独立 manualParamDefaults，未记忆字段回退 paramSchema.default。
+ * 点"运行"POST /api/admin/jobs/[id]/trigger,
  * 成功后跳到新建出来的 run 详情(/operator/tasks/[jobId]/runs/[runId])。
  */
 import * as React from "react";
@@ -10,24 +11,23 @@ import { useRouter } from "next/navigation";
 import { Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { buildManualTriggerInitialValues } from "@/lib/job-param-defaults";
 import ParamForm from "@/app/operator/admin/jobs/_components/ParamForm";
 import type { ParamSchemaItem } from "@/app/operator/admin/jobs/_components/ParamSchemaEditor";
 
 export default function JobTriggerSection({
   jobId,
   paramSchema,
+  manualParamDefaults,
 }: {
   jobId: string;
   paramSchema: ParamSchemaItem[];
+  manualParamDefaults: unknown;
 }) {
   const router = useRouter();
-  const [values, setValues] = React.useState<Record<string, unknown>>(() => {
-    const init: Record<string, unknown> = {};
-    for (const p of paramSchema) {
-      if (p.default !== undefined) init[p.name] = p.default;
-    }
-    return init;
-  });
+  const [values, setValues] = React.useState<Record<string, unknown>>(() =>
+    buildManualTriggerInitialValues(paramSchema, manualParamDefaults),
+  );
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 

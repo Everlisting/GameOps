@@ -64,6 +64,7 @@ export default async function JobDetailPage({
       cronExpression: true,
       timeoutMinutes: true,
       paramSchema: true,
+      manualParamDefaults: true,
       outputs: true,
       createdAt: true,
       agent: {
@@ -229,6 +230,7 @@ export default async function JobDetailPage({
               )}
               <JobTriggerSection
                 jobId={job.id}
+                manualParamDefaults={job.manualParamDefaults}
                 paramSchema={
                   Array.isArray(job.paramSchema)
                     ? (job.paramSchema as Array<{

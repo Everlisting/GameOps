@@ -13,6 +13,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { route, parseJson } from "@/lib/api";
+import { buildManualParamDefaults } from "@/lib/job-param-defaults";
 import { createLogger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
@@ -23,11 +24,11 @@ import { recordAudit } from "@/lib/audit";
 const log = createLogger("job.trigger");
 
 /**
- * 把本次触发填的参数值写回 Job.paramSchema 的 default,下次触发自动预填。
- * 主要为 cookie 这类"填一次、长期复用、过期才换"的参数省去每次重填。
- * 只记标量(string / number)非空值;EXCEL 不支持 default,跳过。失败不影响触发。
+ * 把本次手动触发的标量参数保存到独立 manualParamDefaults,供下次手动表单预填。
+ * 不修改 paramSchema.default；后者只属于管理员配置和 cron 自动运行。
+ * EXCEL 不长期保存。失败不影响本次 Task 创建。
  */
-async function rememberParamDefaults(
+async function rememberManualParamDefaults(
   jobId: string,
   paramValues: Record<string, unknown>,
 ): Promise<void> {
@@ -37,23 +38,11 @@ async function rememberParamDefaults(
   });
   if (!job) return;
   const schema = (job.paramSchema as unknown as ParamSchemaItem[]) ?? [];
-  let changed = false;
-  const next = schema.map((item) => {
-    if (item.type === "EXCEL") return item;
-    const v = paramValues[item.name];
-    const scalar = (typeof v === "string" && v !== "") || typeof v === "number";
-    if (scalar && item.default !== v) {
-      changed = true;
-      return { ...item, default: v as string | number };
-    }
-    return item;
+  const remembered = buildManualParamDefaults(schema, paramValues);
+  await prisma.crawlerJob.update({
+    where: { id: jobId },
+    data: { manualParamDefaults: remembered as Prisma.InputJsonValue },
   });
-  if (changed) {
-    await prisma.crawlerJob.update({
-      where: { id: jobId },
-      data: { paramSchema: next as unknown as Prisma.InputJsonValue },
-    });
-  }
 }
 
 export const POST = route(async (req, { params }) => {
@@ -69,11 +58,11 @@ export const POST = route(async (req, { params }) => {
     priority: input.priority,
   });
 
-  // 记住本次参数值作为默认(cookie 等长期复用、过期才换),失败不影响触发
+  // 只更新独立的手动参数记忆，不修改 Job 配置 revision 或 cron 默认值。
   try {
-    await rememberParamDefaults(id, input.paramValues);
+    await rememberManualParamDefaults(id, input.paramValues);
   } catch (err) {
-    log.warn("记忆参数默认值失败(不影响触发)", { event: "job.trigger.remember_defaults_failed", jobId: id, err });
+    log.warn("记忆手动参数失败(不影响触发)", { event: "job.trigger.remember_manual_defaults_failed", jobId: id, err });
   }
 
   await recordAudit({

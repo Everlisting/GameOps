@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { buildManualTriggerInitialValues } from "@/lib/job-param-defaults";
 
 import ParamForm from "./ParamForm";
 import type { ParamSchemaItem } from "./ParamSchemaEditor";
@@ -23,36 +24,29 @@ export default function TriggerDialog({
   jobId,
   jobName,
   paramSchema,
+  manualParamDefaults,
   open,
   onOpenChange,
 }: {
   jobId: string;
   jobName: string;
   paramSchema: ParamSchemaItem[];
+  manualParamDefaults: unknown;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  // 用 paramSchema 的 default 预填
-  const [values, setValues] = useState<Record<string, unknown>>(() => {
-    const init: Record<string, unknown> = {};
-    for (const p of paramSchema) {
-      if (p.default !== undefined) init[p.name] = p.default;
-    }
-    return init;
-  });
+  const [values, setValues] = useState<Record<string, unknown>>(() =>
+    buildManualTriggerInitialValues(paramSchema, manualParamDefaults),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    const next: Record<string, unknown> = {};
-    for (const p of paramSchema) {
-      if (p.default !== undefined) next[p.name] = p.default;
-    }
-    setValues(next);
+    setValues(buildManualTriggerInitialValues(paramSchema, manualParamDefaults));
     setError(null);
-  }, [open, paramSchema]);
+  }, [open, paramSchema, manualParamDefaults]);
 
   async function submit() {
     setError(null);

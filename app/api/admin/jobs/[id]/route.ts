@@ -6,6 +6,7 @@
  * 鉴权:ADMIN
  */
 import { route, parseJson } from "@/lib/api";
+import { buildManualTriggerInitialValues } from "@/lib/job-param-defaults";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { badRequest, conflict, notFound } from "@/lib/errors";
@@ -36,7 +37,15 @@ export const PATCH = route(async (req, { params }) => {
 
   const existing = await prisma.crawlerJob.findUnique({
     where: { id },
-    select: { id: true, name: true, agentId: true, command: true, paramSchema: true, outputs: true },
+    select: {
+      id: true,
+      name: true,
+      agentId: true,
+      command: true,
+      paramSchema: true,
+      manualParamDefaults: true,
+      outputs: true,
+    },
   });
   if (!existing) throw notFound("Job 不存在");
 
@@ -77,7 +86,14 @@ export const PATCH = route(async (req, { params }) => {
   ] as const) {
     if (input[k] !== undefined) data[k] = input[k];
   }
-  if (input.paramSchema !== undefined) data.paramSchema = input.paramSchema as unknown as Prisma.InputJsonValue;
+  if (input.paramSchema !== undefined) {
+    data.paramSchema = input.paramSchema as unknown as Prisma.InputJsonValue;
+    // 保留已有手动记忆；新增参数从其 cron 默认值初始化，已删除参数同时清理。
+    data.manualParamDefaults = buildManualTriggerInitialValues(
+      input.paramSchema,
+      existing.manualParamDefaults,
+    ) as Prisma.InputJsonValue;
+  }
   if (input.outputs !== undefined) data.outputs = input.outputs as unknown as Prisma.InputJsonValue;
   // cronExpression 显式可空,null = 清掉定时
   if ("cronExpression" in input) data.cronExpression = input.cronExpression ?? null;

@@ -295,8 +295,9 @@ model CrawlerJob {
   workdir        String          @default(".") // 命令工作目录(仓库根的相对路径)
   command        String // 命令模板,内含 {{paramName}} 占位符
   timeoutMinutes Int             @default(30) // 单次执行超时(到点 agent kill)
-  paramSchema    Json            @default("[]") // [{name, type, required, default?, options?[]}]
-  outputs        Json            @default("[]") // [{path, csvType?}];全部上传,csvType 为空时仅归档不解析
+  paramSchema        Json            @default("[]") // [{name, type, required, default?, options?[]}]
+  manualParamDefaults Json           @default("{}") // 最近一次手动触发的标量参数;与 cron 使用的 paramSchema.default 隔离
+  outputs            Json            @default("[]") // [{path, csvType?}];全部上传,csvType 为空时仅归档不解析
   cronExpression String? // 5 段标准 cron;null = 仅手动
   enabled        Boolean         @default(true) // 仅控 cron 自动触发开关(定时开/关)
   active         Boolean         @default(true) // 任务整体启用/停用;停用 = 不可触发(含手动),与 enabled 分离
@@ -625,6 +626,27 @@ model FeishuWebhook {
   updatedAt   DateTime @updatedAt
 
   @@map("feishu_webhook")
+}
+
+/// 阶段6 · 飞书外发 · 运营数据日报配置(单例)。预览、手动发送与 cron 共用。
+model FeishuReportConfig {
+  id                Int      @id @default(1) // 单例锁:业务只写 id=1
+  titleTemplate     String   @default("运营数据日报 · {{date}}")
+  cardTemplate      String   @default("blue") // blue / turquoise / green / grey
+  intro             String   @default("") // 可选 lark_md 开场白
+  showVideoSummary  Boolean  @default(true)
+  videoSummaryTitle String   @default("视频(本月至今)")
+  showTopVideos     Boolean  @default(true)
+  topVideosTitle    String   @default("Top{{topN}} 作品(本月播放量)")
+  topVideoLimit     Int      @default(5)
+  showActivities    Boolean  @default(true)
+  activitiesTitle   String   @default("活动")
+  footer            String   @default("") // 可选 lark_md 结尾
+  updatedBy         String?
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+
+  @@map("feishu_report_config")
 }
 
 /// 阶段6 · 飞书双向对话 · 自建应用凭证(单例)。AppSecret/校验令牌/加密密钥 AES 加密存库。

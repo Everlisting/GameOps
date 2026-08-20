@@ -17,10 +17,12 @@ type AgentOption = { id: string; name: string; status: "ACTIVE" | "DISABLED" };
 
 export default function JobEditPanel({
   initial,
+  manualParamDefaults,
   agents,
   csvTypes,
 }: {
   initial: JobFormInitial & { id: string };
+  manualParamDefaults: unknown;
   agents: AgentOption[];
   csvTypes: CsvTypeOption[];
 }) {
@@ -81,6 +83,7 @@ export default function JobEditPanel({
         jobId={initial.id}
         jobName={initial.name}
         paramSchema={initial.paramSchema}
+        manualParamDefaults={manualParamDefaults}
         open={triggerOpen}
         onOpenChange={setTriggerOpen}
       />

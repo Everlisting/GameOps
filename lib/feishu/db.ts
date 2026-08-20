@@ -31,6 +31,38 @@ type FeishuWebhookDelegate = {
 export const feishuWebhookDb = (prisma as unknown as { feishuWebhook: FeishuWebhookDelegate })
   .feishuWebhook;
 
+// ── FeishuReportConfig(运营数据日报配置,单例)──────────────────────────
+export type FeishuReportConfigRow = {
+  id: number;
+  titleTemplate: string;
+  cardTemplate: string;
+  intro: string;
+  showVideoSummary: boolean;
+  videoSummaryTitle: string;
+  showTopVideos: boolean;
+  topVideosTitle: string;
+  topVideoLimit: number;
+  showActivities: boolean;
+  activitiesTitle: string;
+  footer: string;
+  updatedBy: string | null;
+  updatedAt: Date;
+  createdAt: Date;
+};
+
+type FeishuReportConfigDelegate = {
+  findUnique: (args: { where: { id: number } }) => Promise<FeishuReportConfigRow | null>;
+  upsert: (args: {
+    where: { id: number };
+    create: unknown;
+    update: unknown;
+  }) => Promise<FeishuReportConfigRow>;
+};
+
+export const feishuReportConfigDb = (
+  prisma as unknown as { feishuReportConfig: FeishuReportConfigDelegate }
+).feishuReportConfig;
+
 // ── FeishuApp(自建应用凭证,单例)──────────────────────────────────────
 export type FeishuAppRow = {
   id: number;

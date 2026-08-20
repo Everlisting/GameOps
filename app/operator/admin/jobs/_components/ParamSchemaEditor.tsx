@@ -118,7 +118,7 @@ export default function ParamSchemaEditor({
               </Select>
             </div>
             <div className="col-span-3">
-              <Label className="text-[11px]">默认值</Label>
+              <Label className="text-[11px]">定时默认值</Label>
               <Input
                 value={item.default === undefined ? "" : String(item.default)}
                 onChange={(e) => {

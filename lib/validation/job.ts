@@ -36,7 +36,8 @@ export const paramItemSchema = z
      */
     type: z.enum(["DATE", "STRING", "NUMBER", "ENUM", "EXCEL"]),
     required: z.boolean().default(false),
-    // 默认值类型与 type 对齐(string / number),DATE 用 ISO 字符串;EXCEL 无默认值
+    // cron 默认值类型与 type 对齐(string / number),DATE 用 ISO 字符串;EXCEL 无默认值
+    // 最近一次手动参数另存 CrawlerJob.manualParamDefaults,不得写回这里。
     default: z.union([z.string(), z.number()]).optional(),
     // ENUM 时必填(非空数组);其它 type 忽略
     options: z.array(trimNonEmpty(80)).max(50).optional(),

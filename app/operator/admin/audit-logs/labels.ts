@@ -21,6 +21,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "agent.rotateToken": "轮换 Token",
   "incentive.compute": "重算激励",
   "incentive.adjust": "调整激励",
+  "feishu.report.update": "修改飞书日报配置",
 };
 
 export const TARGET_TYPE_LABEL: Record<string, string> = {
@@ -31,6 +32,7 @@ export const TARGET_TYPE_LABEL: Record<string, string> = {
   user: "用户",
   activity: "活动",
   incentive: "激励",
+  feishu_report_config: "飞书日报配置",
 };
 
 /** 把 "task.trigger" 切成命名空间("task") + 中文动作 */

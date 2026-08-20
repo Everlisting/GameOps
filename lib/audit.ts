@@ -63,6 +63,7 @@ export type AuditAction =
   | "feishu.webhook.create"     // 新增 webhook
   | "feishu.webhook.update"     // 改 webhook
   | "feishu.webhook.delete"     // 删 webhook
+  | "feishu.report.update"      // 改运营数据日报配置
   | "feishu.app.update"         // 改自建应用配置(双向对话)
   | "feishu.chat.allow"         // 会话白名单开关
   | "feishu.chat.delete";       // 移除会话(白名单 + 绑定对话)
@@ -83,6 +84,7 @@ export type AuditTargetType =
   | "knowledge_document" // 知识库文档(10.3)
   | "ai_approval"        // 需审批的写操作(10.4)
   | "feishu_webhook"     // 飞书 webhook(阶段6)
+  | "feishu_report_config" // 飞书运营数据日报配置
   | "feishu_app"         // 飞书自建应用(双向对话)
   | "feishu_chat";       // 飞书会话白名单
 
