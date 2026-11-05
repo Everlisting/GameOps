@@ -12,7 +12,7 @@ export default async function AssistantPage() {
   const p = await readPublicProfile("chat");
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col p-6">
+    <div className="flex h-[calc(100svh-var(--workspace-content-offset))] flex-col p-6">
       <header className="mb-3">
         <h1 className="text-lg font-semibold">AI 助手</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">

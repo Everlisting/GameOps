@@ -3,15 +3,14 @@
  * 所有 /operator/* 页面进入前要求会话角色 >= OPERATOR(ADMIN 自动包含)。
  */
 import { requireRole } from "@/lib/rbac";
-import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
+  SidebarPageContent,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { OperatorSidebar } from "./_components/OperatorSidebar";
-import OperatorBreadcrumb from "./_components/OperatorBreadcrumb";
 import OfflineAgentBadge from "./_components/OfflineAgentBadge";
 
 export default async function OperatorLayout({
@@ -34,12 +33,7 @@ export default async function OperatorLayout({
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
             <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className="-ml-1" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 data-[orientation=vertical]:h-4"
-              />
-              <OperatorBreadcrumb />
+              <SidebarTrigger className="-ml-1 md:hidden" aria-label="打开侧边栏" />
             </div>
             {session.role === "ADMIN" && (
               <div className="px-4">
@@ -47,7 +41,7 @@ export default async function OperatorLayout({
               </div>
             )}
           </header>
-          {children}
+          <SidebarPageContent>{children}</SidebarPageContent>
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>

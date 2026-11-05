@@ -69,14 +69,18 @@ html, body {
   --chart-4: #faad14;
   --chart-5: #722ed1;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar: #f0f3fc;
+  --workspace-background: color-mix(in srgb, var(--sidebar) 50%, #ffffff);
+  --sidebar-foreground: #26334d;
+  --sidebar-nav-foreground: #222222;
+  --sidebar-primary: #315bd6;
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-accent: #e2e9fc;
+  --sidebar-hover-opacity: 60%; /* 悬停背景不透明度:越小越透明,0% 完全透明,100% 不透明。 */
+  --sidebar-hover: rgb(230 232 237 / var(--sidebar-hover-opacity));
+  --sidebar-accent-foreground: #284fbd;
+  --sidebar-border: #dce3f1;
+  --sidebar-ring: #315bd6;
 }
 .dark {
   --background: oklch(0.145 0 0);
@@ -103,10 +107,13 @@ html, body {
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.205 0 0);
+  --workspace-background: color-mix(in srgb, var(--sidebar) 92%, #ffffff);
   --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-nav-foreground: var(--sidebar-foreground);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-hover: rgb(45 48 56 / var(--sidebar-hover-opacity));
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
@@ -143,9 +150,11 @@ html, body {
   --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-nav-foreground: var(--sidebar-nav-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-hover: var(--sidebar-hover);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -159,6 +168,16 @@ html, body {
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+}
+
+/* 隐藏轨道,保留滚轮、触控和键盘滚动。 */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
 

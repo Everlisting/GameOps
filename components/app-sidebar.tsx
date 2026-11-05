@@ -14,12 +14,12 @@ import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
+  SidebarCollapseButton,
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 
 /** 顶部品牌块:静态展示,不带切换。*/
@@ -33,7 +33,7 @@ function BrandHeader() {
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium">GameOps</span>
-            <span className="truncate text-xs">创作者工作台</span>
+            <span className="truncate text-xs text-sidebar-foreground/70">创作者工作台</span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -87,8 +87,8 @@ export function AppSidebar({
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
+        <SidebarCollapseButton />
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   );
 }

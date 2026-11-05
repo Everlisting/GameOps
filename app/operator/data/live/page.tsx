@@ -99,7 +99,7 @@ export default async function OperatorLiveDataPage({
   }));
 
   return (
-    <div className="flex h-[calc(100svh-4rem)] min-w-0 flex-col px-8 pb-8 pt-4">
+    <div className="flex h-[calc(100svh-var(--workspace-content-offset))] min-w-0 flex-col px-8 pb-8 pt-4">
       <header className="mb-3 flex shrink-0 items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">直播数据</h1>
