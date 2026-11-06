@@ -78,7 +78,7 @@ export const GET = route(async (req) => {
   await requireRole("OPERATOR");
 
   const sp = Object.fromEntries(new URL(req.url).searchParams) as AnchorSearchParams;
-  const { rosterWhere, aggJoin, liveAggJoin, orderSql, defaultMonth, publishedFrom, publishedTo } =
+  const { rosterWhere, aggJoin, liveAggJoin, orderSql, periodFrom, periodTo } =
     buildAnchorQuery(sp);
 
   const rows = await prisma.$queryRaw<RawAnchor[]>`
@@ -147,10 +147,8 @@ export const GET = route(async (req) => {
   // BOM + CRLF(Excel 友好)
   const body = "﻿" + lines.join("\r\n");
 
-  // 文件名范围:本月默认 / 自定义发布区间
-  const scope = defaultMonth
-    ? defaultMonth
-    : `${publishedFrom || "起"}_${publishedTo || "今"}`;
+  // 文件名展示指标统计范围,名单筛选已与页面共用同一查询。
+  const scope = `${periodFrom || "起"}_${periodTo || "今"}`;
   const stamp = fmtDateTime(new Date()).replace(/[\s:/]/g, "").slice(0, 12);
   const filename = `主播数据_${scope}_${stamp}.csv`;
 

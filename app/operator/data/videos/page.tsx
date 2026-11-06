@@ -2,11 +2,11 @@
  * 运营/管理员 · 项目数据 · 视频数据
  * 数据源:VideoStat(明细层,按 platform+externalId upsert 只留最新)
  * URL 参数:
- *   ?q=&groupNo=&publishedFrom=&publishedTo=
+ *   ?q=&groupNo=&creatorUid=&platform=&publishedFrom=&publishedTo=
  *   &page=&pageSize=&sortBy=&order=
  * 顶部统计(受当前 where 影响):作品条数 / 作品人数(去重 UID) / 总播放量 / 总推荐播放量
  *
- * 默认视图:仅显示「本月发布」的稿件(按 publishedAt);往月稿件通过发布日期筛选查询。
+ * 默认视图:仅显示「本月 1 日至当天发布」的稿件(按 publishedAt);往月稿件通过发布日期筛选查询。
  *   一旦用户指定了 publishedFrom / publishedTo,即以其区间为准,不再套用本月默认。
  */
 import { prisma } from "@/lib/db";
@@ -41,6 +41,8 @@ export default async function OperatorVideoDataPage({
 }: {
   searchParams?: {
     q?: string;
+    creatorUid?: string;
+    platform?: string;
     groupNo?: string;
     publishedFrom?: string;
     publishedTo?: string;
@@ -56,6 +58,8 @@ export default async function OperatorVideoDataPage({
   // 筛选口径(搜索/团号/发布日期/状态/排序 + 本月默认)与导出共用同一 helper
   const {
     q,
+    creatorUid,
+    platform,
     groupNo,
     publishedFrom,
     publishedTo,
@@ -148,6 +152,8 @@ export default async function OperatorVideoDataPage({
         sortBy={sortBy}
         order={order}
         q={q}
+        creatorUid={creatorUid}
+        platform={platform}
         groupNo={groupNo}
         publishedFrom={publishedFrom}
         publishedTo={publishedTo}

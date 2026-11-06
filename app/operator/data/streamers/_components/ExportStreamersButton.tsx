@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 「导出」按钮:把当前 URL 上的筛选(搜索/团号/发布日期/排序)原样带给
+ * 「导出」按钮:把当前 URL 上的筛选(搜索/团号/入会时间/排序)原样带给
  * /api/operator/data/streamers/export,下载与页面所见一致的 CSV。
  * 用 <a download> 触发浏览器下载,不跳转页面。
  */

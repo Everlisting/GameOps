@@ -6,14 +6,15 @@
  *   - 数值指标按 UID 聚合明细:作品数 / 作品播放量 / 作品推荐播放量 / 涨粉 ← 视频明细(hidden=false)。
  *   - 保证「本月没发作品的主播也在名单内」(聚合值为 0,不会因没作品而消失)。
  *
- * URL 参数:?q=&groupNo=&publishedFrom=&publishedTo=&page=&pageSize=&sortBy=&order=
+ * URL 参数:?q=&groupNo=&joinedFrom=&joinedTo=&page=&pageSize=&sortBy=&order=
  * 顶部统计(受名单筛选影响):名单主播数 / 总作品数 / 总作品播放量 / 总作品推荐播放量
  *
- * 直播维度指标(粉丝量 / 直播天数 / ACU / 直播时长 / 直播场次 / 曝光 / 进直播间 / 人均观看时长)
- * 待「直播明细表」落库后,在 _lib/query.ts 按同一 UID 再 LEFT JOIN 一段同构子查询接入。
+ * 入会时间筛选只约束名单;视频和直播指标默认统计北京时间本月 1 日至当天。
+ * 视频和直播明细按平台 + UID 聚合,无明细的主播仍保留并显示 0。
  */
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
+import { monthToDate } from "@/lib/data-period";
 
 import ExportStreamersButton from "./_components/ExportStreamersButton";
 import ImportStreamersButton from "./_components/ImportStreamersButton";
@@ -69,8 +70,8 @@ export default async function OperatorStreamerDataPage({
   searchParams?: {
     q?: string;
     groupNo?: string;
-    publishedFrom?: string;
-    publishedTo?: string;
+    joinedFrom?: string;
+    joinedTo?: string;
     page?: string;
     pageSize?: string;
     sortBy?: string;
@@ -79,19 +80,22 @@ export default async function OperatorStreamerDataPage({
 }) {
   await requireRole("OPERATOR");
 
+  const now = new Date();
+  const videoPeriod = monthToDate(now);
   const {
     q,
     groupNo,
-    publishedFrom,
-    publishedTo,
+    joinedFrom,
+    joinedTo,
+    periodFrom,
+    periodTo,
     sortBy,
     order,
     rosterWhere,
     aggJoin,
     liveAggJoin,
     orderSql,
-    defaultMonth,
-  } = buildAnchorQuery(searchParams);
+  } = buildAnchorQuery(searchParams, now);
   const page = clampInt(searchParams?.page, 1, 1, 1_000_000);
   const pageSize = clampPageSize(searchParams?.pageSize);
   const offset = (page - 1) * pageSize;
@@ -181,11 +185,7 @@ export default async function OperatorStreamerDataPage({
       <header className="mb-3 flex shrink-0 items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">主播数据</h1>
-          {/* <p className="mt-1 text-sm text-muted-foreground">
-            名单由导入维护(AnchorStat),数值按 UID 聚合明细:作品维度取自视频明细,
-            直播维度(直播天数 / ACU / 直播时长 / 曝光 / 进直播间 / 人均观看时长)取自直播明细;
-            率·均值类按开播天数平均。默认统计本月,往月用日期筛选。
-          </p> */}
+
         </div>
         <div className="flex items-center gap-2">
           <ExportStreamersButton />
@@ -203,9 +203,12 @@ export default async function OperatorStreamerDataPage({
         order={order}
         q={q}
         groupNo={groupNo}
-        publishedFrom={publishedFrom}
-        publishedTo={publishedTo}
-        defaultMonth={defaultMonth}
+        joinedFrom={joinedFrom}
+        joinedTo={joinedTo}
+        periodFrom={periodFrom}
+        periodTo={periodTo}
+        videoFrom={videoPeriod.from}
+        videoTo={videoPeriod.to}
       />
     </div>
   );

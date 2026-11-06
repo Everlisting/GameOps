@@ -96,6 +96,8 @@ type Props = {
   sortBy: SortField;
   order: "asc" | "desc";
   q: string;
+  creatorUid: string;
+  platform: string;
   groupNo: string;
   publishedFrom: string;
   publishedTo: string;
@@ -133,6 +135,8 @@ export default function VideosDataTable({
   sortBy,
   order,
   q,
+  creatorUid,
+  platform,
   groupNo,
   publishedFrom,
   publishedTo,
@@ -604,11 +608,19 @@ export default function VideosDataTable({
             </DropdownMenu>
           </div>
         </div>
+        {creatorUid && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">达人 UID:{creatorUid}{platform ? ` · ${platform}` : ""}</Badge>
+            <Button variant="ghost" size="sm" onClick={() => pushQuery({ creatorUid: null, platform: null, page: null })}>
+              <X /> 清除达人筛选
+            </Button>
+          </div>
+        )}
         <p className="mt-2 text-xs text-muted-foreground">
           共 {fmtNum(total)} 条 · 第 {page} / {totalPages} 页
           {q ? ` · 命中 "${q}"` : ""}
           {defaultMonth
-            ? ` · 默认仅显示本月(${defaultMonth})发布 · 查看往月请用「发布日期」筛选`
+            ? ` · 默认显示本月(${defaultMonth})1日至今天发布 · 查看往月请用「发布日期」筛选`
             : ""}
         </p>
       </Card>

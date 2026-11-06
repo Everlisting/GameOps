@@ -4,6 +4,7 @@
  * 运营端 Sidebar:品牌头 + 运营导航 + 管理员菜单 + 固定账户与收起入口。
  */
 import * as React from "react";
+import Image from "next/image";
 import {
   BarChart3,
   Bot,
@@ -20,7 +21,6 @@ import {
   MonitorSmartphone,
   Send,
   Server,
-  Shield,
   ShieldCheck,
   Users,
   Workflow,
@@ -217,13 +217,17 @@ function BrandHeader() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton size="lg" className="pointer-events-none">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Shield className="size-4" />
-          </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-medium">GameOps</span>
-            <span className="truncate text-xs text-sidebar-foreground/70">运营后台</span>
+        <SidebarMenuButton asChild size="lg" className="pointer-events-none p-0">
+          <div>
+            <Image
+              src="/brand/gameops-operations.png"
+              alt="GameOps 运营中台"
+              width={2172}
+              height={724}
+              priority
+              sizes="160px"
+              className="h-auto w-full max-w-40 shrink-0 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:object-cover group-data-[collapsible=icon]:object-left"
+            />
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>

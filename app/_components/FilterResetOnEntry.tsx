@@ -17,6 +17,9 @@ import { usePathname, useRouter } from "next/navigation";
 const FILTER_KEYS = [
   "q",
   "groupNo",
+  "creatorUid",
+  "joinedFrom",
+  "joinedTo",
   "status",
   "type",
   "category",

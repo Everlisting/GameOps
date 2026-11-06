@@ -8,16 +8,19 @@
  *     进直播间人数·次数(SUM)/ 人均观看时长(开播天数均值)。「率·均值」类按开播天数平均。
  *   无作品/无直播的主播照样在名单里(聚合值为 0)。
  *
- * 名单筛选(搜索 / 团号)作用于 AnchorStat;日期范围只收窄两段聚合子查询(不影响名单在列)。
- * 未指定日期时,数值指标默认只统计「本月」(与视频页口径一致)。hidden=true 的视频不参与聚合。
+ * 名单筛选(搜索 / 团号 / 入会时间)作用于 AnchorStat;入会筛选不改变指标统计窗口。
+ * 未指定统计日期时,数值指标默认统计北京时间「本月 1 日至当天」。hidden=true 的视频不参与聚合。
  */
 import { Prisma } from "@prisma/client";
+import { chinaDateTimeRange, dateValue, monthToDate, nextDateValue } from "@/lib/data-period";
 
 import { ALLOWED_SORT_BY, DEFAULT_SORT_BY, type SortField } from "../_components/config";
 
 export type AnchorSearchParams = {
   q?: string;
   groupNo?: string;
+  joinedFrom?: string;
+  joinedTo?: string;
   publishedFrom?: string;
   publishedTo?: string;
   sortBy?: string;
@@ -27,6 +30,10 @@ export type AnchorSearchParams = {
 export type AnchorQuery = {
   q: string;
   groupNo: string;
+  joinedFrom: string;
+  joinedTo: string;
+  periodFrom: string;
+  periodTo: string;
   publishedFrom: string;
   publishedTo: string;
   sortBy: SortField;
@@ -53,12 +60,6 @@ function clampOrder(raw: string | undefined): "asc" | "desc" {
   return raw === "asc" ? "asc" : "desc";
 }
 
-function parseISODate(s: string | undefined): Date | undefined {
-  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
-  const d = new Date(`${s}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? undefined : d;
-}
-
 /** 排序字段 → 表达式(白名单,固定字符串)。聚合列取 COALESCE(*,0),名单列取 a.* */
 const SORT_EXPR: Record<SortField, Prisma.Sql> = {
   worksViews: Prisma.sql`COALESCE(vs."views", 0)`,
@@ -75,11 +76,13 @@ const SORT_EXPR: Record<SortField, Prisma.Sql> = {
   enterRoomUsers: Prisma.sql`COALESCE(ls."enterRoomUsers", 0)`,
 };
 
-export function buildAnchorQuery(sp: AnchorSearchParams | undefined): AnchorQuery {
+export function buildAnchorQuery(sp: AnchorSearchParams | undefined, now: Date = new Date()): AnchorQuery {
   const q = sp?.q?.trim() ?? "";
   const groupNo = sp?.groupNo?.trim() ?? "";
-  const publishedFrom = sp?.publishedFrom?.trim() ?? "";
-  const publishedTo = sp?.publishedTo?.trim() ?? "";
+  const joinedFrom = dateValue(sp?.joinedFrom);
+  const joinedTo = dateValue(sp?.joinedTo);
+  const publishedFrom = dateValue(sp?.publishedFrom);
+  const publishedTo = dateValue(sp?.publishedTo);
   const sortBy = clampSortBy(sp?.sortBy);
   const order = clampOrder(sp?.order);
 
@@ -94,28 +97,18 @@ export function buildAnchorQuery(sp: AnchorSearchParams | undefined): AnchorQuer
   if (groupNo) {
     rosterConds.push(Prisma.sql`a."groupNo" ILIKE ${`%${groupNo}%`}`);
   }
+  const joinedRange = chinaDateTimeRange(joinedFrom, joinedTo);
+  if (joinedRange.gte) rosterConds.push(Prisma.sql`a."joinedAt" >= ${joinedRange.gte}`);
+  if (joinedRange.lt) rosterConds.push(Prisma.sql`a."joinedAt" < ${joinedRange.lt}`);
   const rosterWhere = rosterConds.length ? Prisma.join(rosterConds, " AND ") : Prisma.sql`TRUE`;
 
-  // ── 统计窗口:指定日期则按区间收窄;未指定则默认「本月」(与视频页一致)──
-  // 同一窗口同时约束视频(publishedAt)与直播(date)两段聚合。
-  const fromDate = parseISODate(publishedFrom);
-  const toDate = parseISODate(publishedTo);
-  let windowStart: Date | undefined;
-  let windowEnd: Date | undefined; // 排他上界
-  let defaultMonth: string | null = null;
-  if (fromDate || toDate) {
-    windowStart = fromDate;
-    if (toDate) {
-      const t = new Date(toDate);
-      t.setDate(t.getDate() + 1);
-      windowEnd = t;
-    }
-  } else {
-    const now = new Date();
-    windowStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    windowEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }
+  // 入会时间筛选只约束名单;历史统计窗口保留给数据工具和已有链接。
+  const defaultPeriod = monthToDate(now);
+  const customPeriod = !!(publishedFrom || publishedTo);
+  const periodFrom = customPeriod ? publishedFrom : defaultPeriod.from;
+  const periodTo = customPeriod ? publishedTo : defaultPeriod.to;
+  const { gte: windowStart, lt: windowEnd } = chinaDateTimeRange(periodFrom, periodTo);
+  const defaultMonth = customPeriod ? null : defaultPeriod.from.slice(0, 7);
 
   // ── 视频聚合子查询(VideoStat v)──────────────────
   const videoConds: Prisma.Sql[] = [
@@ -130,6 +123,7 @@ export function buildAnchorQuery(sp: AnchorSearchParams | undefined): AnchorQuer
   const aggJoin = Prisma.sql`
     LEFT JOIN (
       SELECT
+        v."platform"                                   AS platform,
         v."creatorUid"                                 AS uid,
         COUNT(*)                                       AS works,
         COALESCE(SUM(v."views"), 0)                    AS views,
@@ -137,19 +131,21 @@ export function buildAnchorQuery(sp: AnchorSearchParams | undefined): AnchorQuer
         COALESCE(SUM(v."fansGained"), 0)               AS "fansGained"
       FROM "VideoStat" v
       WHERE ${videoWhere}
-      GROUP BY v."creatorUid"
-    ) vs ON vs.uid = a."uid"`;
+      GROUP BY v."platform", v."creatorUid"
+    ) vs ON vs.uid = a."uid" AND vs.platform = a."platform"`;
 
   // ── 直播聚合子查询(LiveStat l)────────────────────
   // 只入库了开播时长>0 的行,故 COUNT(*) = 开播天数;率/均值按开播天数平均(AVG)。
   const liveConds: Prisma.Sql[] = [];
-  if (windowStart) liveConds.push(Prisma.sql`l."date" >= ${windowStart}`);
-  if (windowEnd) liveConds.push(Prisma.sql`l."date" < ${windowEnd}`);
+  // LiveStat.date 是 @db.Date,按日历值比较,不能复用 DateTime 的 UTC+8 时间戳。
+  if (periodFrom) liveConds.push(Prisma.sql`l."date" >= ${new Date(`${periodFrom}T00:00:00Z`)}`);
+  if (periodTo) liveConds.push(Prisma.sql`l."date" < ${new Date(`${nextDateValue(periodTo)}T00:00:00Z`)}`);
   const liveWhere = liveConds.length ? Prisma.join(liveConds, " AND ") : Prisma.sql`TRUE`;
 
   const liveAggJoin = Prisma.sql`
     LEFT JOIN (
       SELECT
+        l."platform"                                   AS platform,
         l."uid"                                        AS uid,
         COUNT(*)                                       AS "anchorDays",
         COALESCE(SUM(l."liveDuration"), 0)             AS "liveDuration",
@@ -161,14 +157,18 @@ export function buildAnchorQuery(sp: AnchorSearchParams | undefined): AnchorQuer
         AVG(l."avgWatchDuration")                      AS "avgWatchDuration"
       FROM "LiveStat" l
       WHERE ${liveWhere}
-      GROUP BY l."uid"
-    ) ls ON ls.uid = a."uid"`;
+      GROUP BY l."platform", l."uid"
+    ) ls ON ls.uid = a."uid" AND ls.platform = a."platform"`;
 
   const orderSql = Prisma.sql`${SORT_EXPR[sortBy]} ${order === "asc" ? Prisma.raw("ASC") : Prisma.raw("DESC")} NULLS LAST`;
 
   return {
     q,
     groupNo,
+    joinedFrom,
+    joinedTo,
+    periodFrom,
+    periodTo,
     publishedFrom,
     publishedTo,
     sortBy,

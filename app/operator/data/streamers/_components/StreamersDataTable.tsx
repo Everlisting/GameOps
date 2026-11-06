@@ -7,13 +7,15 @@
  *  - 表头点击 → 更新 URL(?sortBy=&order=)
  *  - 分页按钮 → 更新 URL(?page=&pageSize=)
  *  - 搜索 / 团号 debounce 300ms → 更新 URL
- *  - 作品发布日期范围 → 更新 URL
+ *  - 入会时间范围 → 更新 URL
  *  - 列显隐(纯客户端 state,不入 URL)
  *
  * 服务端可排序字段(白名单):
  *   worksViews / worksRecommendedViews / worksCount / fansGained / fans / joinedAt / updatedAt
  */
 import * as React from "react";
+import Link from "next/link";
+import { creatorMonthVideosHref } from "@/lib/data-period";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   type ColumnDef,
@@ -94,10 +96,12 @@ type Props = {
   order: "asc" | "desc";
   q: string;
   groupNo: string;
-  publishedFrom: string;
-  publishedTo: string;
-  /** 非空(如 "2026-07")= 作品指标处于「本月默认」范围,用于文案提示 */
-  defaultMonth: string | null;
+  joinedFrom: string;
+  joinedTo: string;
+  periodFrom: string;
+  periodTo: string;
+  videoFrom: string;
+  videoTo: string;
 };
 
 const NUM_FMT = new Intl.NumberFormat("en-US");
@@ -126,9 +130,12 @@ export default function StreamersDataTable({
   order,
   q,
   groupNo,
-  publishedFrom,
-  publishedTo,
-  defaultMonth,
+  joinedFrom,
+  joinedTo,
+  periodFrom,
+  periodTo,
+  videoFrom,
+  videoTo,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -230,7 +237,15 @@ export default function StreamersDataTable({
         enableSorting: false,
         cell: ({ row }) =>
           row.original.nickname ? (
-            <TruncatedName value={row.original.nickname} className="text-xs font-medium" />
+            <Link
+              href={creatorMonthVideosHref(row.original.platform, row.original.uid, videoFrom, videoTo)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              title="在新标签页查看该达人本月视频数据"
+            >
+              <TruncatedName value={row.original.nickname} className="cursor-pointer text-xs font-medium" />
+            </Link>
           ) : (
             <span className="text-muted-foreground">—</span>
           ),
@@ -240,11 +255,17 @@ export default function StreamersDataTable({
         header: "抖音号",
         size: 130,
         enableSorting: false,
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">
-            <DashIfEmpty value={row.original.account} />
-          </span>
-        ),
+        cell: ({ row }) => row.original.account ? (
+          <Link
+            href={creatorMonthVideosHref(row.original.platform, row.original.uid, videoFrom, videoTo)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            title="在新标签页查看该达人本月视频数据"
+          >
+            {row.original.account}
+          </Link>
+        ) : <DashIfEmpty value={row.original.account} />,
       },
       {
         accessorKey: "joinedAt",
@@ -329,7 +350,7 @@ export default function StreamersDataTable({
         ),
       },
     ],
-    [],
+    [videoFrom, videoTo],
   );
 
   const table = useReactTable({
@@ -374,7 +395,7 @@ export default function StreamersDataTable({
         />
       </div>
 
-      {/* 筛选栏:搜索 / 团号 / 作品发布日期范围 / 列显隐 */}
+      {/* 筛选栏:搜索 / 团号 / 入会时间范围 / 列显隐 */}
       <Card className="shrink-0 p-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="relative w-220">
@@ -397,13 +418,13 @@ export default function StreamersDataTable({
             {groupNoDraft && <InlineClearButton onClear={() => setGroupNoDraft("")} />}
           </div>
           <DateRangeField
-            from={publishedFrom}
-            to={publishedTo}
+            from={joinedFrom}
+            to={joinedTo}
             clearable
             width="w-64"
-            placeholder="作品发布范围"
+            placeholder="入会时间范围"
             onChange={(f, t) =>
-              pushQuery({ publishedFrom: f || null, publishedTo: t || null, page: null })
+              pushQuery({ joinedFrom: f || null, joinedTo: t || null, page: null })
             }
           />
           <DropdownMenu>
@@ -438,9 +459,7 @@ export default function StreamersDataTable({
           {q ? ` · 命中 "${q}"` : ""}
           <span className="ml-1 inline-flex items-center gap-1 text-muted-foreground/80">
             <Radio className="size-3" />
-            {defaultMonth
-              ? `作品指标默认仅统计本月(${defaultMonth})发布,不含删除/隐藏;往月/全时段用「作品发布」筛选`
-              : "作品指标按发布区间聚合视频明细(不含删除/隐藏)"}
+            统计范围:{periodFrom || "不限"} ~ {periodTo || "不限"}(北京时间),不含删除/隐藏视频;入会时间仅筛选主播名单
           </span>
         </p>
       </Card>
@@ -450,6 +469,8 @@ export default function StreamersDataTable({
         <Card className="shrink-0 border-dashed p-10 text-center text-sm text-muted-foreground">
           {q
             ? `没有匹配 "${q}" 的主播。`
+            : groupNo || joinedFrom || joinedTo
+              ? "没有符合当前筛选条件的主播,请调整入会时间或团号。"
             : "名单为空。点右上角「导入名单」上传主播花名册后,这里会按 UID 聚合出作品等指标。"}
         </Card>
       ) : (
