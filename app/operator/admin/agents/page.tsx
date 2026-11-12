@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Plus, Server } from "lucide-react";
 
 import { prisma } from "@/lib/db";
+import { requireRole } from "@/lib/rbac";
 import { fmtDateTime } from "@/lib/format";
 import { isOffline } from "@/lib/agent-offline";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ export default async function AdminAgentsPage({
 }: {
   searchParams?: { status?: string; q?: string };
 }) {
+  await requireRole("ADMIN");
   const status = STATUS_VALUES.includes(
     searchParams?.status as (typeof STATUS_VALUES)[number],
   )
@@ -50,7 +52,7 @@ export default async function AdminAgentsPage({
       lastSeenAt: true,
       lastSeenIp: true,
       createdAt: true,
-      createdBy: { select: { username: true } },
+      createdBy: { select: { username: true, displayName: true } },
       _count: { select: { tasks: true, jobs: true } },
     },
   });
@@ -148,7 +150,7 @@ export default async function AdminAgentsPage({
                     </td>
                     <td className="px-3 py-2.5 align-top text-xs text-muted-foreground">
                       <div>{fmtDateTime(a.createdAt)}</div>
-                      <div className="text-[10px]">{a.createdBy?.username ?? "—"}</div>
+                      <div className="text-[10px]">{a.createdBy?.displayName ?? a.createdBy?.username ?? "—"}</div>
                     </td>
                   </tr>
                 );

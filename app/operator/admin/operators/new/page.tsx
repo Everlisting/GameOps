@@ -3,9 +3,11 @@
  */
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { requireRole } from "@/lib/rbac";
 import OperatorUserCreateForm from "../_components/OperatorUserCreateForm";
 
-export default function NewOperatorUserPage() {
+export default async function NewOperatorUserPage() {
+  await requireRole("ADMIN");
   return (
     <div className="p-8">
       <div className="mb-4">
@@ -18,7 +20,7 @@ export default function NewOperatorUserPage() {
         </Link>
       </div>
       <header className="mb-6">
-        <h1 className="text-lg font-semibold">新建运营 / 管理员账户</h1>
+        <h1 className="text-lg font-semibold">新建后台账户</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           创建后立即可登录使用,无需再走审核。
         </p>

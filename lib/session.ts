@@ -16,6 +16,7 @@ export const MAX_AGE = 60 * 60 * 24 * 7; // 7 天
 export interface SessionPayload {
   sub: string;
   username: string;
+  displayName?: string;
   role: Role;
 }
 

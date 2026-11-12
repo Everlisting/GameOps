@@ -12,6 +12,7 @@ datasource db {
 
 enum Role {
   CREATOR
+  REVIEWER
   OPERATOR
   ADMIN
 }
@@ -89,7 +90,8 @@ enum CrawlerJobParamType {
 
 model User {
   id           String   @id @default(cuid())
-  username     String   @unique
+  username     String   @unique // 登录账号名称,创建后不可修改;创作者端语义不变
+  displayName  String?  // 后台角色的显示用户名,可修改、可重复;旧账户回退到 username
   email        String?  @unique // 可选,创作者注册时必填;管理员 seed 可不填
   passwordHash String
   role         Role     @default(CREATOR)

@@ -5,12 +5,13 @@
  * 顶部:新建账户 按钮
  */
 import type { Prisma, Role } from "@prisma/client";
-type OperatorRole = Extract<Role, "OPERATOR" | "ADMIN">;
+type OperatorRole = Extract<Role, "REVIEWER" | "OPERATOR" | "ADMIN">;
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
+import { STAFF_ROLES } from "@/lib/roles";
 import { fmtDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { AccountStatusBadge } from "@/app/operator/creators/_components/AccountS
 import { RoleBadge } from "./_components/RoleBadge";
 import OperatorUserFilters from "./_components/OperatorUserFilters";
 
-const ROLE_VALUES: readonly OperatorRole[] = ["OPERATOR", "ADMIN"];
+const ROLE_VALUES: readonly OperatorRole[] = STAFF_ROLES;
 const STATUS_VALUES = ["active", "disabled"] as const;
 
 export default async function AdminOperatorsPage({
@@ -27,7 +28,7 @@ export default async function AdminOperatorsPage({
 }: {
   searchParams?: { role?: string; status?: string; q?: string };
 }) {
-  const session = await getSession();
+  const session = await requireRole("ADMIN");
 
   const role = ROLE_VALUES.includes(searchParams?.role as OperatorRole)
     ? (searchParams!.role as OperatorRole)
@@ -40,10 +41,13 @@ export default async function AdminOperatorsPage({
   const q = searchParams?.q?.trim() ?? "";
 
   const where: Prisma.UserWhereInput = {
-    role: role ? role : { in: ["OPERATOR", "ADMIN"] },
+    role: role ? role : { in: [...STAFF_ROLES] },
   };
   if (status) where.status = status;
-  if (q) where.username = { contains: q, mode: "insensitive" };
+  if (q) where.OR = [
+    { username: { contains: q, mode: "insensitive" } },
+    { displayName: { contains: q, mode: "insensitive" } },
+  ];
 
   const items = await prisma.user.findMany({
     where,
@@ -51,6 +55,7 @@ export default async function AdminOperatorsPage({
     select: {
       id: true,
       username: true,
+      displayName: true,
       email: true,
       role: true,
       status: true,
@@ -64,7 +69,7 @@ export default async function AdminOperatorsPage({
         <div>
           <h1 className="text-lg font-semibold">运营账户管理</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            创建、调整运营 / 管理员账户。创作者账户由「创作者管理」处理,不在这里。
+            创建、调整审核 / 运营 / 管理员账户。创作者账户由「创作者管理」处理。
           </p>
         </div>
         <Button asChild>
@@ -82,7 +87,7 @@ export default async function AdminOperatorsPage({
 
       {items.length === 0 ? (
         <Card className="border-dashed p-10 text-center text-sm text-muted-foreground">
-          {q ? `没有匹配 "${q}" 的账户。` : "还没有运营 / 管理员账户。"}
+          {q ? `没有匹配 "${q}" 的账户。` : "还没有后台账户。"}
         </Card>
       ) : (
         <Card className="overflow-hidden">
@@ -90,6 +95,7 @@ export default async function AdminOperatorsPage({
             <thead className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-2.5 font-medium">用户名</th>
+                <th className="px-4 py-2.5 font-medium">账号名称</th>
                 <th className="px-4 py-2.5 font-medium">角色</th>
                 <th className="px-4 py-2.5 font-medium">状态</th>
                 <th className="px-4 py-2.5 font-medium">创建时间</th>
@@ -103,7 +109,7 @@ export default async function AdminOperatorsPage({
                       href={`/operator/admin/operators/${u.id}`}
                       className="font-medium hover:text-primary"
                     >
-                      {u.username}
+                      {u.displayName ?? u.username}
                     </Link>
                     {u.id === session?.sub && (
                       <Badge variant="outline" className="ml-2">
@@ -116,6 +122,7 @@ export default async function AdminOperatorsPage({
                       </div>
                     )}
                   </td>
+                  <td className="px-4 py-3 font-mono text-xs">{u.username}</td>
                   <td className="px-4 py-3">
                     <RoleBadge role={u.role} />
                   </td>

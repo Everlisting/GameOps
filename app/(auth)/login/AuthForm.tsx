@@ -2,10 +2,11 @@
 
 /**
  * 登录/注册表单(模态卡片主体)。接 /api/auth/login | /api/auth/register。
- * 成功后按 role 跳转:CREATOR → /dashboard,OPERATOR/ADMIN → /operator/dashboard。
+ * 成功后按 role 跳转:创作者 → 创作者工作台,审核 → 稿件页,运营/管理员 → 概览。
  */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { homePathForRole } from "@/lib/roles";
 import styles from "./login.module.css";
 import {
   ArrowRight,
@@ -265,7 +266,7 @@ export default function AuthForm({ initialTab = "login" }: { initialTab?: Tab })
         setTerms(false);
         return;
       }
-      const dest = data.role === "CREATOR" ? "/dashboard" : "/operator/dashboard";
+      const dest = homePathForRole(data.role);
       router.push(dest);
       router.refresh();
     } catch {
@@ -366,6 +367,7 @@ export default function AuthForm({ initialTab = "login" }: { initialTab?: Tab })
                 onChange={setLoginUser}
                 autoComplete="username"
               />
+              <p className="mt-2 text-xs text-muted-foreground">后台账户请使用账号名称登录。</p>
               <div style={{ marginTop: 16 }}>
                 <PasswordField
                   id="login-pw"

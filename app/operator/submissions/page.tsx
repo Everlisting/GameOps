@@ -71,7 +71,7 @@ export default async function OperatorSubmissionsPage({
     pageSize?: string;
   };
 }) {
-  await requireRole("OPERATOR");
+  const session = await requireRole("REVIEWER");
 
   const status = STATUS_VALUES.includes(searchParams?.status as SubmissionStatus)
     ? (searchParams!.status as SubmissionStatus)
@@ -93,16 +93,17 @@ export default async function OperatorSubmissionsPage({
             按活动汇总;点击卡片进入对应活动的审核工作台。
           </p>
         </div>
-        <Button asChild variant="secondary">
+        {session.role !== "REVIEWER" && <Button asChild variant="secondary">
           <Link href="/operator/submissions/import-yishan">
             <Upload className="size-4" />
             导入易闪结果
           </Link>
-        </Button>
+        </Button>}
       </header>
 
       {activityId ? (
         <TableView
+          reviewOnly={session.role === "REVIEWER"}
           activityId={activityId}
           status={status}
           q={q}
@@ -326,6 +327,7 @@ function buildDrillHref(
 
 // ── 视图二:某活动的稿件表格(沿用 SubmissionsTable + 批量审核) ──
 async function TableView({
+  reviewOnly,
   activityId,
   status,
   q,
@@ -336,6 +338,7 @@ async function TableView({
   pageSize,
   searchParams,
 }: {
+  reviewOnly: boolean;
   activityId: string;
   status: SubmissionStatus | undefined;
   q: string;
@@ -478,7 +481,7 @@ async function TableView({
         </p>
       </Card>
 
-      <SubmissionsTable rows={rows} />
+      <SubmissionsTable rows={rows} reviewOnly={reviewOnly} />
 
       {totalPages > 1 && (
         <Pagination

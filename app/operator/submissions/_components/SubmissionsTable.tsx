@@ -54,7 +54,7 @@ export type SubmissionRow = {
 
 type Field = "title" | "content" | "yishan";
 
-export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
+export default function SubmissionsTable({ rows, reviewOnly = false }: { rows: SubmissionRow[]; reviewOnly?: boolean }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [field, setField] = useState<Field>("title");
@@ -169,6 +169,7 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
       )}
 
       <ReviewDialog
+        reviewOnly={reviewOnly}
         row={activeRow}
         open={!!activeRow}
         onOpenChange={(o) => {
@@ -261,7 +262,7 @@ export default function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
                   <td className="px-3 py-2.5 align-top text-xs text-muted-foreground">
                     {r.activity ? (
                       <Link
-                        href={`/operator/activities/${r.activity.id}`}
+                        href={reviewOnly ? `/operator/submissions?activityId=${r.activity.id}&keepFilters=1` : `/operator/activities/${r.activity.id}`}
                         className="hover:text-primary"
                       >
                         {r.activity.name}

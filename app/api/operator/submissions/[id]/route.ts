@@ -10,7 +10,7 @@ import { submissionReviewSchema } from "@/lib/validation/submission";
 import { deriveSubmissionStatus } from "@/lib/submission-review";
 
 export const GET = route(async (_req, { params }) => {
-  await requireRole("OPERATOR");
+  await requireRole("REVIEWER");
   const id = params?.id ?? "";
 
   const s = await prisma.submission.findUnique({
@@ -50,7 +50,7 @@ export const GET = route(async (_req, { params }) => {
 });
 
 export const PATCH = route(async (req, { params }) => {
-  await requireRole("OPERATOR");
+  await requireRole("REVIEWER");
   const id = params?.id ?? "";
   const patch = await parseJson(req, submissionReviewSchema);
 

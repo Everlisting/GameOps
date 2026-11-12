@@ -81,7 +81,7 @@ export async function getUsageStats(
 
   // 各用户明细表:始终全量(便于横向对比),不受 userId 影响
   const perUserRaw = await prisma.$queryRaw<Omit<UsagePerUser, "totalTokens">[]>(Prisma.sql`
-    SELECT u.id AS "userId", u.username,
+    SELECT u.id AS "userId", COALESCE(u."displayName", u.username) AS username,
            COUNT(*)::int                          AS requests,
            COALESCE(SUM(r."inputTokens"), 0)::float8  AS "inputTokens",
            COALESCE(SUM(r."outputTokens"), 0)::float8 AS "outputTokens"
@@ -89,15 +89,15 @@ export async function getUsageStats(
     JOIN "ai_conversation" c ON c.id = r."conversationId"
     JOIN "User" u ON u.id = c."userId"
     WHERE r."createdAt" >= ${fromTs} AND r."createdAt" < ${toTs}
-    GROUP BY u.id, u.username
+    GROUP BY u.id, u.username, u."displayName"
     ORDER BY (COALESCE(SUM(r."inputTokens"), 0) + COALESCE(SUM(r."outputTokens"), 0)) DESC`);
 
   // 下拉选项:所有用过助手的用户(与日期区间无关,选择更稳定)
   const userOptions = await prisma.$queryRaw<UsageUserOption[]>(Prisma.sql`
-    SELECT DISTINCT u.id, u.username
+    SELECT DISTINCT u.id, COALESCE(u."displayName", u.username) AS username
     FROM "ai_conversation" c
     JOIN "User" u ON u.id = c."userId"
-    ORDER BY u.username`);
+    ORDER BY username`);
 
   const map = new Map(rawDaily.map((d) => [d.date, d]));
   const daily = eachDay(from, to).map(

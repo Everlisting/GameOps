@@ -7,7 +7,8 @@
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { fmtDateTime } from "@/lib/format";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import OperatorProfileForm from "./OperatorProfileForm";
 import { Separator } from "@/components/ui/separator";
 import { AccountStatusBadge } from "@/app/operator/creators/_components/AccountStatusBadge";
 import { RoleBadge } from "@/app/operator/admin/operators/_components/RoleBadge";
@@ -17,12 +18,13 @@ import {
 } from "@/app/(creator)/dashboard/account/AccountSecurityForm";
 
 export default async function OperatorAccountPage() {
-  const session = await requireRole("OPERATOR");
+  const session = await requireRole("REVIEWER");
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: session.sub },
     select: {
       username: true,
+      displayName: true,
       email: true,
       role: true,
       status: true,
@@ -40,7 +42,7 @@ export default async function OperatorAccountPage() {
       <header className="mb-6">
         <h1 className="text-lg font-semibold">账户设置</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          修改自己的邮箱与登录密码。账号的角色、状态由管理员维护。
+          修改自己的用户名、邮箱与登录密码。账号的角色、状态由管理员维护。
         </p>
       </header>
 
@@ -48,7 +50,7 @@ export default async function OperatorAccountPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate text-base font-semibold">
-              {user.username}
+              {user.displayName ?? user.username}
             </div>
             <div className="mt-0.5 text-xs text-muted-foreground">
               {user.email ?? "尚未设置邮箱"}
@@ -68,6 +70,16 @@ export default async function OperatorAccountPage() {
               : `最近更新 ${fmtDateTime(user.updatedAt)}`}
           </div>
         </div>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>账户资料</CardTitle>
+          <CardDescription>用户名用于显示，账号名称用于登录。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OperatorProfileForm accountName={user.username} initialDisplayName={user.displayName ?? user.username} />
+        </CardContent>
       </Card>
 
       <Card className="p-5">

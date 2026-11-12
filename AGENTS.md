@@ -13,7 +13,8 @@
 - 部署:中台→阿里云;爬虫机→本地 Windows 内网(单向出站)
 
 ## 架构要点(详见 docs/architecture.md)
-- 三类角色层级:ADMIN ⊃ OPERATOR,CREATOR 独立对外。共用登录入口,按 role 跳转。
+- 四类角色层级:ADMIN ⊃ OPERATOR ⊃ REVIEWER,CREATOR 独立对外。共用登录入口,按 role 跳转。审核角色(REVIEWER)仅可查看稿件、单条/批量审核和修改自己的账户资料,首页 `/operator/submissions`;易闪导入仍需 OPERATOR。角色定义与页面范围在 `lib/roles.ts`;页面及接口各自 `requireRole` 兜底,布局用 middleware 覆盖的路径头与数据库最新角色检查审核页面范围。
+- **后台身份(审核/运营/管理员)**:`User.username` 为固定账号名称(3–32 位字母/数字/`_ . -`,唯一、创建后不可修改),`User.displayName` 为可自助修改的显示用户名(1–32 字符,支持中文、可重复);旧账户显示回退到 `username`。登录和审计 `actorUsername` 继续使用固定账号名称。创作者端维持原有 `User.username + Creator.nickname` 语义。
 - 爬虫 Agent 拉模型:爬虫机轮询中台领任务、回传 CSV,中台不主动连爬虫机。
 - **Jenkins 风格 Job/Task**:Job 是模板(绑 Agent + repo + 命令模板 + 参数 schema + 产物清单 + 可选 cron),Task 是一次执行。Task 创建时冻结 `jobRevision + jobSnapshot`,Agent 执行前再冻结实际 `sourceRevision + executionSnapshot`;排队后编辑模板不改变本次执行,重跑克隆原配置与源码 revision。同一 Agent 上相同 `repoType + repoUrl` 的 Job 共用一个本地仓库副本,`workdir` 选择仓库内执行目录。Agent 并发=1;失败不自动重试。详见 `docs/agent-protocol.md`。
 - **关键动作走审计**:`task.trigger / cancel / requeue / rerun / priority` 都写 `AuditLog`(actorId + actorUsername 快照 + targetType/targetId + details JSON)。

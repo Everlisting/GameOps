@@ -11,7 +11,7 @@ import { badRequest } from "@/lib/errors";
 import { fetchDouyinEmbedUrl, fallbackDouyinPlayerUrl } from "@/lib/douyin";
 
 export const GET = route(async (req) => {
-  await requireRole("OPERATOR");
+  await requireRole("REVIEWER");
   const url = new URL(req.url);
   const vid = url.searchParams.get("vid")?.trim() ?? "";
   if (!/^\d{6,}$/.test(vid)) throw badRequest("vid 缺失或非法");

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -49,13 +50,13 @@ export default function OperatorUserFilters() {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] md:items-end">
       <Field>
-        <FieldLabel htmlFor="op-q">用户名</FieldLabel>
+        <FieldLabel htmlFor="op-q">用户名 / 账号名称</FieldLabel>
         <div className="relative">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="op-q"
             value={q}
-            placeholder="按用户名搜索…"
+            placeholder="按用户名或账号名称搜索…"
             className="pl-7"
             onChange={(e) => setQ(e.target.value)}
             onBlur={() => {
@@ -81,9 +82,12 @@ export default function OperatorUserFilters() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>全部角色</SelectItem>
-            <SelectItem value="OPERATOR">运营</SelectItem>
-            <SelectItem value="ADMIN">管理员</SelectItem>
+            <SelectGroup>
+              <SelectItem value={ALL}>全部角色</SelectItem>
+              <SelectItem value="REVIEWER">审核</SelectItem>
+              <SelectItem value="OPERATOR">运营</SelectItem>
+              <SelectItem value="ADMIN">管理员</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
       </Field>
@@ -98,9 +102,11 @@ export default function OperatorUserFilters() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>全部状态</SelectItem>
-            <SelectItem value="active">已启用</SelectItem>
-            <SelectItem value="disabled">已停用</SelectItem>
+            <SelectGroup>
+              <SelectItem value={ALL}>全部状态</SelectItem>
+              <SelectItem value="active">已启用</SelectItem>
+              <SelectItem value="disabled">已停用</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
       </Field>

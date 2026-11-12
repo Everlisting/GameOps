@@ -3,10 +3,12 @@
  */
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { requireRole } from "@/lib/rbac";
 
 import AgentCreateForm from "../_components/AgentCreateForm";
 
-export default function NewAgentPage() {
+export default async function NewAgentPage() {
+  await requireRole("ADMIN");
   return (
     <div className="p-8">
       <div className="mb-4">

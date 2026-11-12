@@ -28,7 +28,7 @@ export default async function AdminCsvTypesPage() {
       columns: true,
       createdAt: true,
       updatedAt: true,
-      createdBy: { select: { username: true } },
+      createdBy: { select: { username: true, displayName: true } },
     },
   });
 
@@ -126,7 +126,7 @@ export default async function AdminCsvTypesPage() {
                       {fmtDateTime(c.updatedAt)}
                     </td>
                     <td className="px-4 text-center align-middle text-[11px] text-muted-foreground">
-                      <div>{c.createdBy?.username ?? "—"}</div>
+                      <div>{c.createdBy?.displayName ?? c.createdBy?.username ?? "—"}</div>
                       <div className="tabular-nums">{fmtDateTime(c.createdAt)}</div>
                     </td>
                   </tr>

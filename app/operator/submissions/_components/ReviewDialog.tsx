@@ -64,24 +64,26 @@ function resolveSource(row: {
 }
 
 export default function ReviewDialog({
+  reviewOnly = false,
   row,
   open,
   onOpenChange,
 }: {
   row: SubmissionRow | null;
+  reviewOnly?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl gap-0 p-0">
-        {row && <DialogBody row={row} />}
+        {row && <DialogBody row={row} reviewOnly={reviewOnly} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function DialogBody({ row }: { row: SubmissionRow }) {
+function DialogBody({ row, reviewOnly }: { row: SubmissionRow; reviewOnly: boolean }) {
   const router = useRouter();
   const [iframeKey, setIframeKey] = useState(0);
   const { vid, isDouyin } = resolveSource(row);
@@ -204,7 +206,7 @@ function DialogBody({ row }: { row: SubmissionRow }) {
               <span>@{row.creator.nickname}</span>
               {row.activity && (
                 <Link
-                  href={`/operator/activities/${row.activity.id}`}
+                  href={reviewOnly ? `/operator/submissions?activityId=${row.activity.id}&keepFilters=1` : `/operator/activities/${row.activity.id}`}
                   className="hover:text-primary"
                 >
                   {row.activity.name}

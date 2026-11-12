@@ -37,7 +37,7 @@ import { useTheme } from "@/hooks/use-theme";
 export function OperatorNavUser({
   user,
 }: {
-  user: { name: string; handle: string; isAdmin: boolean };
+  user: { name: string; handle: string; isAdmin: boolean; isReviewer: boolean };
 }) {
   const router = useRouter();
   const { isMobile } = useSidebar();
@@ -50,7 +50,7 @@ export function OperatorNavUser({
   }
 
   const initial = user.name.trim().charAt(0).toUpperCase() || "O";
-  const roleLabel = user.isAdmin ? "管理员" : "运营";
+  const roleLabel = user.isAdmin ? "管理员" : user.isReviewer ? "审核" : "运营";
 
   return (
     <SidebarMenu>

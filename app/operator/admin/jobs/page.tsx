@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Plus, Workflow } from "lucide-react";
 
 import { prisma } from "@/lib/db";
+import { requireRole } from "@/lib/rbac";
 import { fmtDateTime } from "@/lib/format";
 import { describeCron } from "@/lib/cron-describe";
 import { isOffline } from "@/lib/agent-offline";
@@ -24,6 +25,7 @@ export default async function AdminJobsPage({
 }: {
   searchParams?: { agentId?: string; active?: string; enabled?: string; q?: string };
 }) {
+  await requireRole("ADMIN");
   const where: Prisma.CrawlerJobWhereInput = {};
   if (searchParams?.agentId) where.agentId = searchParams.agentId;
   if (searchParams?.active === "true") where.active = true;

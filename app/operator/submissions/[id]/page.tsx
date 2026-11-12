@@ -19,7 +19,7 @@ export default async function SubmissionDetailPage({
 }: {
   params: { id: string };
 }) {
-  await requireRole("OPERATOR");
+  const session = await requireRole("REVIEWER");
 
   const s = await prisma.submission.findUnique({
     where: { id: params.id },
@@ -121,12 +121,12 @@ export default async function SubmissionDetailPage({
               {s.creator.dyAccount && ` (${s.creator.dyAccount})`}
             </div>
           )}
-          <Link
+          {session.role !== "REVIEWER" && <Link
             href={`/operator/creators/${s.creator.id}`}
             className="mt-2 inline-block text-xs text-primary hover:underline"
           >
             查看创作者详情 →
-          </Link>
+          </Link>}
         </Card>
 
         <Card className="p-4">
@@ -134,7 +134,7 @@ export default async function SubmissionDetailPage({
           {s.activity ? (
             <>
               <Link
-                href={`/operator/activities/${s.activity.id}`}
+                href={session.role === "REVIEWER" ? `/operator/submissions?activityId=${s.activity.id}&keepFilters=1` : `/operator/activities/${s.activity.id}`}
                 className="text-sm font-medium hover:text-primary"
               >
                 {s.activity.name}

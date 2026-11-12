@@ -8,6 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { notFound as nextNotFound } from "next/navigation";
 
 import { prisma } from "@/lib/db";
+import { requireRole } from "@/lib/rbac";
 import { fmtDateTime } from "@/lib/format";
 import { isOffline } from "@/lib/agent-offline";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ export default async function EditAgentPage({
 }: {
   params: { id: string };
 }) {
+  await requireRole("ADMIN");
   const a = await prisma.crawlerAgent.findUnique({
     where: { id: params.id },
     select: {
@@ -41,7 +43,7 @@ export default async function EditAgentPage({
       gitVersion: true,
       executorStatus: true,
       createdAt: true,
-      createdBy: { select: { username: true } },
+      createdBy: { select: { username: true, displayName: true } },
       _count: { select: { jobs: true, tasks: true } },
     },
   });
@@ -76,7 +78,7 @@ export default async function EditAgentPage({
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
           创建于 {fmtDateTime(a.createdAt)}
-          {a.createdBy && ` · ${a.createdBy.username}`} ·{" "}
+          {a.createdBy && ` · ${a.createdBy.displayName ?? a.createdBy.username}`} ·{" "}
           {a.lastSeenAt
             ? `最近心跳 ${fmtDateTime(a.lastSeenAt)}${a.lastSeenIp ? ` (${a.lastSeenIp})` : ""}`
             : "从未上报"}

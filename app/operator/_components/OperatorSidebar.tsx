@@ -237,7 +237,7 @@ export function OperatorSidebar({
   user,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
-  user: { name: string; handle: string; isAdmin: boolean };
+  user: { name: string; handle: string; isAdmin: boolean; isReviewer: boolean };
 }) {
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -245,7 +245,10 @@ export function OperatorSidebar({
         <BrandHeader />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={buildNavItems(user.isAdmin)} label="运营工作区" />
+        <NavMain
+          items={user.isReviewer ? NAV_ITEMS.filter((item) => item.url === "/operator/submissions") : buildNavItems(user.isAdmin)}
+          label={user.isReviewer ? "审核工作区" : "运营工作区"}
+        />
         {user.isAdmin && (
           <NavMain items={ADMIN_NAV_ITEMS} label="管理面板" />
         )}

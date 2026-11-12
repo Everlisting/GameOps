@@ -46,7 +46,7 @@ async function propose(
       preview: draft.preview as Prisma.InputJsonValue,
       status: "pending",
       createdById: session.sub,
-      createdByName: session.username,
+      createdByName: session.displayName ?? session.username,
     },
   });
 

@@ -6,6 +6,7 @@ const MAP: Record<
   { label: string; variant: "default" | "secondary" | "muted" }
 > = {
   CREATOR: { label: "创作者", variant: "muted" },
+  REVIEWER: { label: "审核", variant: "secondary" },
   OPERATOR: { label: "运营", variant: "secondary" },
   ADMIN: { label: "管理员", variant: "default" },
 };

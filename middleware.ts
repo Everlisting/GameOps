@@ -12,9 +12,9 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { verifySession, COOKIE_NAME } from "@/lib/session";
+import { homePathForRole } from "@/lib/roles";
 
 const CREATOR_HOME = "/dashboard";
-const OPERATOR_HOME = "/operator/dashboard";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -27,7 +27,7 @@ export async function middleware(req: NextRequest) {
 
   // 已登录还去登录页 → 回各自首页
   if (isLoginPage && session) {
-    const dest = session.role === "CREATOR" ? CREATOR_HOME : OPERATOR_HOME;
+    const dest = homePathForRole(session.role);
     return NextResponse.redirect(new URL(dest, req.url));
   }
 
@@ -44,11 +44,14 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL(CREATOR_HOME, req.url));
     }
     if (isCreatorArea && session.role !== "CREATOR") {
-      return NextResponse.redirect(new URL(OPERATOR_HOME, req.url));
+      return NextResponse.redirect(new URL(homePathForRole(session.role), req.url));
     }
   }
 
-  return NextResponse.next();
+  // 覆盖客户端同名头,布局用数据库中的最新角色检查页面范围(兼容旧 JWT)。
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-operator-pathname", pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

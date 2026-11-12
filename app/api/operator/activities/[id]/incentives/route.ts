@@ -51,12 +51,12 @@ export const GET = route(async (_req, { params }) => {
     adjusterIds.length
       ? prisma.user.findMany({
           where: { id: { in: adjusterIds } },
-          select: { id: true, username: true },
+          select: { id: true, username: true, displayName: true },
         })
       : Promise.resolve([]),
   ]);
   const creatorMap = new Map(creators.map((c) => [c.id, c]));
-  const adjusterMap = new Map(adjusters.map((u) => [u.id, u.username]));
+  const adjusterMap = new Map(adjusters.map((u) => [u.id, u.displayName ?? u.username]));
 
   let totalEstimated = 0;
   let totalAdjusted = 0;

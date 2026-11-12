@@ -19,7 +19,7 @@ export const GET = route(async () => {
   const userIds = [...new Set(rows.map((r) => r.userId))];
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
-    select: { id: true, username: true, role: true },
+    select: { id: true, username: true, displayName: true, role: true },
   });
   const umap = new Map(users.map((u) => [u.id, u]));
   const feedback = rows.map((r) => ({
@@ -28,7 +28,7 @@ export const GET = route(async () => {
     note: r.note,
     conversationId: r.conversationId,
     createdAt: r.createdAt,
-    username: umap.get(r.userId)?.username ?? r.userId,
+    username: umap.get(r.userId)?.displayName ?? umap.get(r.userId)?.username ?? r.userId,
     role: umap.get(r.userId)?.role ?? null,
   }));
   return Response.json({ feedback });

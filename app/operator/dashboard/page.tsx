@@ -106,7 +106,7 @@ export default async function OperatorOverview() {
       <header className="mb-6">
         <h1 className="text-lg font-semibold">概览</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          欢迎,{session.username}。这里是当前需要跟进的关键指标。
+          欢迎,{session.displayName ?? session.username}。这里是当前需要跟进的关键指标。
         </p>
       </header>
 

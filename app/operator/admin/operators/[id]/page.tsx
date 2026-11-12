@@ -27,6 +27,7 @@ export default async function OperatorUserDetailPage({
     select: {
       id: true,
       username: true,
+      displayName: true,
       email: true,
       role: true,
       status: true,
@@ -56,7 +57,7 @@ export default async function OperatorUserDetailPage({
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">
-            {u.username}
+            {u.displayName ?? u.username}
             {isSelf && (
               <span className="ml-2 align-middle text-xs font-normal text-muted-foreground">
                 (当前登录)
@@ -75,7 +76,8 @@ export default async function OperatorUserDetailPage({
       </header>
 
       <Card className="mb-6 grid gap-3 p-4 text-sm sm:grid-cols-3">
-        <Field label="用户名" value={u.username} mono />
+        <Field label="用户名" value={u.displayName ?? u.username} />
+        <Field label="账号名称（创建后不可修改）" value={u.username} mono />
         <Field label="邮箱" value={u.email ?? "—"} />
         <Field label="账号 ID" value={u.id} mono />
       </Card>

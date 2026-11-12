@@ -1,8 +1,11 @@
 /**
  * 运营端布局:Sidebar + Inset 主区。
- * 所有 /operator/* 页面进入前要求会话角色 >= OPERATOR(ADMIN 自动包含)。
+ * 后台角色门槛为 REVIEWER;审核角色按当前路径受限,各页面/接口再单独校验权限。
  */
 import { requireRole } from "@/lib/rbac";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { canAccessStaffPage, homePathForRole } from "@/lib/roles";
 import {
   SidebarInset,
   SidebarPageContent,
@@ -18,16 +21,20 @@ export default async function OperatorLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireRole("OPERATOR");
+  const session = await requireRole("REVIEWER");
+  if (!canAccessStaffPage(session.role, headers().get("x-operator-pathname") ?? "")) {
+    redirect(homePathForRole(session.role));
+  }
 
   return (
     <TooltipProvider delayDuration={0}>
       <SidebarProvider>
         <OperatorSidebar
           user={{
-            name: session.username,
+            name: session.displayName ?? session.username,
             handle: session.username,
             isAdmin: session.role === "ADMIN",
+            isReviewer: session.role === "REVIEWER",
           }}
         />
         <SidebarInset>

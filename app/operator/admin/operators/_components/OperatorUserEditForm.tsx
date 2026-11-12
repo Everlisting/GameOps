@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -107,8 +108,11 @@ function RoleStatusCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="OPERATOR">运营</SelectItem>
-              <SelectItem value="ADMIN">管理员</SelectItem>
+              <SelectGroup>
+                <SelectItem value="REVIEWER">审核</SelectItem>
+                <SelectItem value="OPERATOR">运营</SelectItem>
+                <SelectItem value="ADMIN">管理员</SelectItem>
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -125,8 +129,10 @@ function RoleStatusCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">已启用</SelectItem>
-              <SelectItem value="disabled">已停用</SelectItem>
+              <SelectGroup>
+                <SelectItem value="active">已启用</SelectItem>
+                <SelectItem value="disabled">已停用</SelectItem>
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>

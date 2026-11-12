@@ -8,6 +8,7 @@
  */
 import argon2 from "argon2";
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/db";
 import { env } from "@/lib/validation/env";
 import {
   signSession,
@@ -46,5 +47,14 @@ export function clearSessionCookie() {
 export async function getSession(): Promise<SessionPayload | null> {
   const token = cookies().get(COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifySession(token);
+  const session = await verifySession(token);
+  if (!session || session.role === "CREATOR") return session;
+  // 从数据库读取运营身份,改名即时生效,兼容未携带显示用户名的旧 JWT。
+  const user = await prisma.user.findUnique({
+    where: { id: session.sub },
+    select: { username: true, displayName: true, role: true, status: true },
+  });
+  if (!user || user.status !== "active" || user.role === "CREATOR") return null;
+  return { sub: session.sub, username: user.username, role: user.role,
+    displayName: user.displayName ?? user.username };
 }

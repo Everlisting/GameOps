@@ -38,7 +38,7 @@ export const POST = route(async (req, { params }) => {
     data: {
       status: nextStatus,
       decidedById: session.sub,
-      decidedByName: session.username,
+      decidedByName: session.displayName ?? session.username,
       decidedAt: new Date(),
     },
   });

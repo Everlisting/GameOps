@@ -45,7 +45,7 @@ export default async function OperatorDatasetsPage({
           sequenceNumber: true,
           status: true,
           job: { select: { id: true, name: true } },
-          createdBy: { select: { username: true } },
+          createdBy: { select: { username: true, displayName: true } },
         },
       },
     },
@@ -119,7 +119,7 @@ export default async function OperatorDatasetsPage({
                     )}
                     {d.task?.createdBy && (
                       <div className="text-[10px] text-muted-foreground">
-                        {d.task.createdBy.username}
+                        {d.task.createdBy.displayName ?? d.task.createdBy.username}
                       </div>
                     )}
                   </td>

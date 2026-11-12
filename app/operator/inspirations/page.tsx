@@ -77,7 +77,7 @@ export default async function OperatorInspirationsPage({
       tags: true,
       published: true,
       createdAt: true,
-      createdBy: { select: { username: true } },
+      createdBy: { select: { username: true, displayName: true } },
     },
   });
 
@@ -177,7 +177,7 @@ export default async function OperatorInspirationsPage({
                     )}
                     <div className="mt-1 flex items-baseline justify-between text-[11px] text-muted-foreground">
                       <span>
-                        {i.createdBy?.username ?? "—"}
+                        {i.createdBy?.displayName ?? i.createdBy?.username ?? "—"}
                       </span>
                       <span>{fmtDate(i.createdAt)}</span>
                     </div>

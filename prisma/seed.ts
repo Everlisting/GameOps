@@ -21,6 +21,7 @@ async function seedAdmin() {
   await prisma.user.create({
     data: {
       username,
+      displayName: "管理员",
       passwordHash: await argon2.hash(password),
       role: "ADMIN",
       status: "active", // seed 出来的管理员直接可登录,绕过新默认 pending

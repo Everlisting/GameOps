@@ -100,7 +100,7 @@ export default async function JobDetailPage({
       finishedAt: true,
       createdAt: true,
       exitCode: true,
-      createdBy: { select: { username: true } },
+      createdBy: { select: { username: true, displayName: true } },
     },
   });
 
@@ -318,7 +318,7 @@ export default async function JobDetailPage({
                       </div>
                     </td>
                     <td className="px-3 text-center align-middle text-xs">
-                      {r.createdBy?.username ?? (
+                      {r.createdBy?.displayName ?? r.createdBy?.username ?? (
                         <span className="text-muted-foreground">系统</span>
                       )}
                     </td>

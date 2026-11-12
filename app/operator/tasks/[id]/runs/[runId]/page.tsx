@@ -47,7 +47,7 @@ export default async function RunDetailPage({
     include: {
       job: { select: { id: true, name: true } },
       agent: { select: { id: true, name: true } },
-      createdBy: { select: { username: true } },
+      createdBy: { select: { username: true, displayName: true } },
       datasets: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -115,7 +115,7 @@ export default async function RunDetailPage({
         <Card className="space-y-2 p-5">
           <h2 className="text-sm font-medium">执行信息</h2>
           <KV label="启动人">
-            {t.createdBy?.username ?? (
+            {t.createdBy?.displayName ?? t.createdBy?.username ?? (
               <span className="text-muted-foreground">系统(cron)</span>
             )}
           </KV>

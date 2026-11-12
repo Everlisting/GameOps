@@ -9,12 +9,13 @@ import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel, FieldDescription, FieldGroup, FieldError } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -23,6 +24,7 @@ import {
 export default function OperatorUserCreateForm() {
   const router = useRouter();
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("OPERATOR");
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +37,7 @@ export default function OperatorUserCreateForm() {
       const res = await fetch("/api/admin/operators", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, role }),
+        body: JSON.stringify({ username, displayName, password, role }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -54,74 +56,85 @@ export default function OperatorUserCreateForm() {
   }
 
   return (
-    <Card className="space-y-4 p-5">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <Label htmlFor="cu-username" className="mb-1.5 block text-xs">
-            用户名 *
-          </Label>
-          <Input
-            id="cu-username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="字母 / 数字 / _ . -"
-            autoComplete="off"
-          />
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            创建后不可修改,作为登录唯一标识。
-          </p>
-        </div>
-        <div>
-          <Label htmlFor="cu-role" className="mb-1.5 block text-xs">
-            角色 *
-          </Label>
-          <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-            <SelectTrigger id="cu-role">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="OPERATOR">运营</SelectItem>
-              <SelectItem value="ADMIN">管理员</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="md:col-span-2">
-          <Label htmlFor="cu-password" className="mb-1.5 block text-xs">
-            初始密码 *
-          </Label>
-          <Input
-            id="cu-password"
-            type="text"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="6 个字符以上"
-            autoComplete="new-password"
-          />
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            建议告知本人后,立刻登录修改。
-          </p>
-        </div>
-      </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>新建账户</CardTitle>
+        <CardDescription>用户名用于显示，账号名称用于登录。</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <FieldGroup className="grid gap-4 md:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="cu-display-name">用户名 *</FieldLabel>
+            <Input id="cu-display-name" value={displayName} maxLength={32}
+              onChange={(e) => setDisplayName(e.target.value)} placeholder="例如：运营小王" autoComplete="off" />
+            <FieldDescription>显示昵称，支持中文，1–32 个字符，本人可随时修改。</FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="cu-username">账号名称 *</FieldLabel>
+            <Input
+              id="cu-username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="字母 / 数字 / _ . -"
+              minLength={3}
+              maxLength={32}
+              autoComplete="off"
+            />
+            <FieldDescription>3–32 个字符，创建后不可修改，作为登录唯一标识。</FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="cu-role">
+              角色 *
+            </FieldLabel>
+            <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+              <SelectTrigger id="cu-role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="REVIEWER">审核</SelectItem>
+                  <SelectItem value="OPERATOR">运营</SelectItem>
+                  <SelectItem value="ADMIN">管理员</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="cu-password">
+              初始密码 *
+            </FieldLabel>
+            <Input
+              id="cu-password"
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="6 个字符以上"
+              autoComplete="new-password"
+            />
+            <FieldDescription>
+              建议告知本人后,立刻登录修改。
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
 
-      {error && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </div>
-      )}
+        {error && (
+          <FieldError>{error}</FieldError>
+        )}
 
-      <div className="flex items-center justify-end gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.back()}
-          disabled={submitting}
-        >
-          取消
-        </Button>
-        <Button onClick={submit} disabled={submitting || !username || !password}>
-          {submitting ? "创建中…" : "创建账户"}
-        </Button>
-      </div>
+        <div className="flex items-center justify-end gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            disabled={submitting}
+          >
+            取消
+          </Button>
+          <Button onClick={submit} disabled={submitting || !username.trim() || !displayName.trim() || !password}>
+            {submitting ? "创建中…" : "创建账户"}
+          </Button>
+        </div>
+      </CardContent>
     </Card>
   );
 }

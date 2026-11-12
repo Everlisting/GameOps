@@ -16,7 +16,7 @@ const FIELD_MAP = {
 } as const;
 
 export const POST = route(async (req) => {
-  await requireRole("OPERATOR");
+  await requireRole("REVIEWER");
   const { ids, field, status, note } = await parseJson(
     req,
     submissionBatchReviewSchema,

@@ -10,7 +10,7 @@ import { requireRole } from "@/lib/rbac";
 import { operatorSubmissionListQuerySchema } from "@/lib/validation/submission";
 
 export const GET = route(async (req) => {
-  await requireRole("OPERATOR");
+  await requireRole("REVIEWER");
   const url = new URL(req.url);
   const { status, q, platform, activityId, creatorId, page, pageSize } =
     operatorSubmissionListQuerySchema.parse(

@@ -32,7 +32,7 @@ export default async function EditInspirationPage({
       published: true,
       createdAt: true,
       updatedAt: true,
-      createdBy: { select: { username: true } },
+      createdBy: { select: { username: true, displayName: true } },
     },
   });
   if (!i) nextNotFound();
@@ -53,7 +53,7 @@ export default async function EditInspirationPage({
         <h1 className="text-lg font-semibold">{i.title}</h1>
         <p className="mt-1 text-xs text-muted-foreground">
           创建于 {fmtDateTime(i.createdAt)}
-          {i.createdBy && ` · ${i.createdBy.username}`} · 上次更新{" "}
+          {i.createdBy && ` · ${i.createdBy.displayName ?? i.createdBy.username}`} · 上次更新{" "}
           {fmtDateTime(i.updatedAt)}
         </p>
       </header>
