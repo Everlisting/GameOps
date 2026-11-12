@@ -57,10 +57,8 @@ const NAV_ITEMS: NavItem[] = [
     url: "/operator/activities",
     icon: CalendarRange,
     items: [
-      { title: "全部活动", url: "/operator/activities" },
-      { title: "进行中", url: "/operator/activities?status=ONGOING" },
-      { title: "草稿", url: "/operator/activities?status=DRAFT" },
-      { title: "已结束", url: "/operator/activities?status=ENDED" },
+      { title: "专题活动", url: "/operator/special-activities" },
+      { title: "征稿活动", url: "/operator/activities" },
     ],
   },
   {

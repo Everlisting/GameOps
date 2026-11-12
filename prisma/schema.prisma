@@ -186,6 +186,30 @@ model Activity {
   @@index([status, publishAt])
 }
 
+enum SpecialSettlementMode {
+  CONFIRMATION
+  CUTOFF
+}
+
+model SpecialActivity {
+  id             String                @id @default(cuid())
+  title          String
+  description    String
+  startDate      DateTime              @db.Date
+  endDate        DateTime              @db.Date
+  filters        Json
+  pools          Json
+  settlementMode SpecialSettlementMode
+  cutoffAt       DateTime?
+  settlement     Json?
+  settledAt      DateTime?
+  revision       Int                   @default(1)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([startDate])
+}
+
 model ActivityEnrollment {
   id         String   @id @default(cuid())
   creatorId  String

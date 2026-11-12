@@ -192,3 +192,10 @@ export default function MyFilters() {
 - DateTime 表单字段:`app/operator/activities/_components/ActivityForm.tsx`
 
 照着这些抄,避免另起炉灶。
+
+## 8. 活动管理页面
+
+- 侧栏「活动管理」下的「征稿活动」指向 `/operator/activities`，保留原有征稿、报名投稿与激励业务；「专题活动」指向 `/operator/special-activities`。
+- 两页共享 `app/operator/activities/_components/ActivitiesListFilters.tsx`，用 URL 同步名称、状态及活动开始日期范围。征稿活动支持草稿，专题活动支持未开始、进行中和已结束。
+- 专题活动保留无阴影的紧凑横卡，简介最多两行，右侧「查看详情」进入独立页面。创建与编辑采用单页分区；详情顶部展示活动概览，下方通过「结算预估／结算结果」与「稿件明细」标签切换，`tab` 参数保存当前标签，分页保留各自页码与标签。
+- 专题活动横卡突出活动标题，并展示稿件数、去重达人数、推荐播放量与预估／结算金额；窄屏将统计调整为两列。完整数据口径与规则边界见 [专题活动说明](special-activities.md)。

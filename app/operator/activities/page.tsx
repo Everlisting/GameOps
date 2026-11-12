@@ -1,6 +1,6 @@
 /**
  * 运营端 · 活动管理 · 列表
- * sidebar 二级菜单通过 ?status= 过滤;按月分组,封面卡片网格。
+ * 征稿活动统一入口,筛选条通过 ?status= 过滤;按月分组,封面卡片网格。
  * 支持 ?q= ?from= ?to= 与创作者端一致(过滤 startAt)。
  */
 import Link from "next/link";
@@ -112,28 +112,19 @@ export default async function OperatorActivitiesPage({
 
   const groups = groupByMonth(activities);
 
-  const heading =
-    status === "DRAFT"
-      ? "草稿活动"
-      : status === "ONGOING"
-        ? "进行中的活动"
-        : status === "ENDED"
-          ? "已结束的活动"
-          : "全部活动";
-
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold">{heading}</h1>
+          <h1 className="text-lg font-semibold">征稿活动</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            创建活动、配置激励规则、推动活动状态流转。
+            管理创作者征稿、报名投稿与激励规则。
           </p>
         </div>
         <Button asChild>
           <Link href="/operator/activities/new">
-            <Plus className="size-4" />
-            新建活动
+            <Plus data-icon="inline-start" />
+            新建征稿活动
           </Link>
         </Button>
       </header>
@@ -147,7 +138,7 @@ export default async function OperatorActivitiesPage({
 
       {activities.length === 0 ? (
         <Card className="border-dashed p-10 text-center text-sm text-muted-foreground">
-          {q ? `没有匹配 "${q}" 的活动。` : "暂无活动,点右上角新建一个。"}
+          {q || status || fromDate || toDate ? "没有符合筛选条件的征稿活动，请调整或清除筛选。" : "暂无征稿活动，点击右上角新建一个。"}
         </Card>
       ) : (
         <div className="space-y-8">
