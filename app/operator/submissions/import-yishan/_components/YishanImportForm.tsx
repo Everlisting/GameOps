@@ -225,7 +225,7 @@ export default function YishanImportForm() {
 
           <div className="flex justify-end">
             <Button asChild variant="outline" size="sm">
-              <Link href="/operator/submissions">回到稿件列表</Link>
+                <Link href="/operator/submissions/review">回到稿件审核</Link>
             </Button>
           </div>
         </Card>

@@ -2,6 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
+    // 动态页面在正常导航时读取最新数据，免去进入页面后的全局 refresh。
+    staleTimes: { dynamic: 0 },
     // 启用 instrumentation.ts 钩子(Next 14 需要显式开启;Next 15+ 默认开)
     instrumentationHook: true,
     // 服务端组件 / route handler 用到的 Node-only 包,让 Next 直接走运行时 require

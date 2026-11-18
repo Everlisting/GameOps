@@ -5,7 +5,7 @@
  *   - 报名人数 + 投稿数 卡片可点 → 弹窗显示具体内容
  *   - 激励规则 卡片是静态展示
  * 数据由父级 server component 预拉(各 200 上限),弹窗只做展示;
- * 投稿弹窗带「去稿件审核」CTA,跳到 /operator/submissions?activityId=... 走完整工作台。
+ * 投稿弹窗带「去稿件审核」CTA，进入以视频库为口径的审核工作台。
  */
 import { forwardRef } from "react";
 import Link from "next/link";
@@ -183,7 +183,7 @@ export default function ActivityStats({
           )}
           <div className="mt-2 flex items-center justify-end">
             <Link
-              href={`/operator/submissions?activityId=${activityId}`}
+              href="/operator/submissions/review"
               className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
             >
               去稿件审核工作台

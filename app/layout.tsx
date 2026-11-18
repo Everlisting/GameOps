@@ -1,4 +1,5 @@
 import "./globals.css";
+import { Suspense } from "react";
 import type { Metadata } from "next";
 
 import FilterResetOnEntry from "./_components/FilterResetOnEntry";
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       
       <body>
-        <FilterResetOnEntry />
+        <Suspense fallback={null}><FilterResetOnEntry /></Suspense>
         <ClientErrorReporter />
         {children}
       </body>

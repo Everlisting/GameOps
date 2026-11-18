@@ -5,7 +5,7 @@ import type { RewardPool } from "./rules";
 
 function video(id: string, recommendedViews: number): ActivityVideo {
   return {
-    id, title: `稿件 ${id}`, platform: "douyin", url: `https://www.douyin.com/video/${id}`,
+    id, reviewStatus: "APPROVED", title: `稿件 ${id}`, platform: "douyin", url: `https://www.douyin.com/video/${id}`,
     creatorUid: "uid-123", creatorName: "率土作者", creatorAccount: "Douyin_Account",
     recommendedViews, views: recommendedViews, likes: 0, comments: 0, shares: 0, fansGained: 0,
     publishedAt: "2026-07-01T00:00:00Z", dataAt: "2026-08-01T00:00:00Z", datasetId: "snapshot",

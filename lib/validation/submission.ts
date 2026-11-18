@@ -38,8 +38,9 @@ export const submissionReviewSchema = z
     title: subReviewPatchSchema.optional(),
     content: subReviewPatchSchema.optional(),
     yishan: subReviewPatchSchema.optional(),
+    tagIds: z.array(z.string().min(1)).max(30).optional(),
   })
-  .refine((d) => d.title || d.content || d.yishan, {
+  .refine((d) => d.title || d.content || d.yishan || d.tagIds !== undefined, {
     message: "未指定要更新的审核项",
   });
 

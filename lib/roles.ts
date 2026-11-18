@@ -21,7 +21,7 @@ export function homePathForRole(role: Role): string {
 export function canAccessStaffPage(role: Role, pathname: string): boolean {
   if (!hasRole(role, "REVIEWER")) return false;
   if (role !== "REVIEWER") return true;
-  if (pathname === "/operator/account" || pathname === "/operator/submissions") return true;
-  return /^\/operator\/submissions\/[^/]+$/.test(pathname)
-    && pathname !== "/operator/submissions/import-yishan";
+  if (["/operator/account", "/operator/submissions", "/operator/submissions/review", "/operator/submissions/periods"].includes(pathname)) return true;
+  return /^\/operator\/submissions\/periods\/[^/]+$/.test(pathname)
+    && pathname !== "/operator/submissions/periods/new";
 }

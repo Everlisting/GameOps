@@ -4,7 +4,7 @@ import { specialActivitySchema, type RewardPool, type SpecialActivityInput } fro
 
 function video(id: string, recommendedViews: number, uid = "a"): ActivityVideo {
   return {
-    id, title: `率土之滨 ${id}`, url: "https://example.com", platform: "douyin", creatorUid: uid, creatorName: uid,
+    id, reviewStatus: "APPROVED", title: `率土之滨 ${id}`, url: "https://example.com", platform: "douyin", creatorUid: uid, creatorName: uid,
     publishedAt: "2026-07-01T02:00:00Z", dataAt: "2026-08-03T12:00:00Z", datasetId: "data",
     recommendedViews, views: recommendedViews, likes: 0, comments: 0, shares: 0, fansGained: 0,
   };
@@ -29,6 +29,33 @@ const input: SpecialActivityInput = {
 };
 
 describe("专题活动规则组合", () => {
+  it("计奖前排除待审核、不合格及缺失审核结果，排名只由通过稿件竞争", () => {
+    const approved = video("approved", 1000);
+    const pending = { ...video("pending", 999999, "b"), reviewStatus: "PENDING" as const };
+    const rejected = { ...video("rejected", 888888, "c"), reviewStatus: "REJECTED" as const };
+    const unknown = { ...video("unknown", 777777, "d"), reviewStatus: undefined };
+    const pool: RewardPool = { name: "排名奖", exclusiveGroup: "", steps: [
+      { kind: "RANK", metric: "recommendedViews", ranges: [{ from: 1, to: 1, amount: 100 }] },
+    ] };
+    const result = calculateRewards([pending, rejected, unknown, approved], [pool]);
+    expect(result.totalCents).toBe(10000);
+    expect(result.pools[0].recipients[0].videoIds).toEqual(["approved"]);
+    expect(result.pools[0].excluded).toEqual({
+      pending: "待审核，不参与结算", rejected: "审核不合格，不参与结算", unknown: "缺少审核结果，不参与结算",
+    });
+  });
+
+  it("同一达人未通过稿件的播放量和稿件数不进入汇总门槛", () => {
+    const pool: RewardPool = { name: "汇总奖", exclusiveGroup: "", steps: [
+      { kind: "GROUP" },
+      { kind: "FILTER", match: "ALL", conditions: [{ field: "count", op: "gte", value: 2 }] },
+      { kind: "FIXED", amount: 50 },
+    ] };
+    const source = [video("approved", 1000), { ...video("pending", 999999), reviewStatus: "PENDING" as const }];
+    expect(calculateRewards(source, [pool]).totalCents).toBe(0);
+    expect(calculateRewards(source.map((item) => ({ ...item, reviewStatus: "APPROVED" as const })), [pool]).totalCents).toBe(5000);
+  });
+
   it("爆款豁免放开达人条数门槛，其他合格稿件共同累计，互斥组保留高优先级正金额", () => {
     const videos = [video("one", 120000), video("two", 20000), video("three", 10000), video("low", 999)];
     const result = calculateRewards(videos, specialActivitySchema.parse(input).pools);

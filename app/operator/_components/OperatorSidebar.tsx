@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { NavMain, type NavItem } from "@/components/nav-main";
+import { SUBMISSION_NAV_ITEMS } from "@/lib/submission-navigation";
 import {
   Sidebar,
   SidebarContent,
@@ -65,12 +66,7 @@ const NAV_ITEMS: NavItem[] = [
     title: "稿件管理",
     url: "/operator/submissions",
     icon: ClipboardCheck,
-    items: [
-      { title: "全部稿件", url: "/operator/submissions" },
-      { title: "待审核", url: "/operator/submissions?status=PENDING" },
-      { title: "已通过", url: "/operator/submissions?status=APPROVED" },
-      { title: "未通过", url: "/operator/submissions?status=REJECTED" },
-    ],
+    items: SUBMISSION_NAV_ITEMS,
   },
   {
     title: "创作者管理",
@@ -246,7 +242,7 @@ export function OperatorSidebar({
       </SidebarHeader>
       <SidebarContent>
         <NavMain
-          items={user.isReviewer ? NAV_ITEMS.filter((item) => item.url === "/operator/submissions") : buildNavItems(user.isAdmin)}
+          items={user.isReviewer ? NAV_ITEMS.filter((item) => item.url === "/operator/submissions").map((item) => ({ ...item, items: item.items?.filter((sub) => sub.url !== "/operator/submissions/tags") })) : buildNavItems(user.isAdmin)}
           label={user.isReviewer ? "审核工作区" : "运营工作区"}
         />
         {user.isAdmin && (

@@ -21,6 +21,14 @@ export const ACTION_LABEL: Record<string, string> = {
   "agent.rotateToken": "轮换 Token",
   "incentive.compute": "重算激励",
   "incentive.adjust": "调整激励",
+  "reviewTag.create": "新增审核标签",
+  "reviewTag.update": "修改审核标签",
+  "reviewTag.delete": "删除审核标签",
+  "video.review": "视频审核",
+  "video.review.batch": "批量视频审核",
+  "video.assignment": "稿件审核分配",
+  "submissionPeriod.create": "新建稿件统计",
+  "submissionPeriod.update": "修改稿件统计",
   "feishu.report.update": "修改飞书日报配置",
 };
 
@@ -32,6 +40,9 @@ export const TARGET_TYPE_LABEL: Record<string, string> = {
   user: "用户",
   activity: "活动",
   incentive: "激励",
+  review_tag: "审核标签",
+  video: "视频",
+  submission_period: "稿件统计",
   feishu_report_config: "飞书日报配置",
 };
 

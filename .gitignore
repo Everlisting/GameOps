@@ -4,6 +4,9 @@ node_modules/
 .env.local
 *.log
 
+# 本地界面验收截图与临时浏览器状态
+.impeccable/review/
+
 # 运行时上传产物(保留目录占位)
 public/uploads/**/*
 !public/uploads/**/.gitkeep

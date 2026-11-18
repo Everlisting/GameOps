@@ -143,9 +143,10 @@ export interface AnalysisTaskCounts {
 }
 
 /** 计数(4 态桶),用于列表页顶部卡片。 */
-export async function getTaskCounts(scope?: string): Promise<AnalysisTaskCounts> {
+export async function getTaskCounts(scope?: string, options: { signal?: AbortSignal } = {}): Promise<AnalysisTaskCounts> {
   const q = scope ? `?scope=${encodeURIComponent(scope)}` : "";
   const res = await loggedFetch("analysis", "tasks.counts", `${BASE}/tasks/counts${q}`, {
+    signal: options.signal,
     headers: { Authorization: bearer() },
     cache: "no-store",
   }).catch((err) => {
@@ -158,13 +159,14 @@ export async function getTaskCounts(scope?: string): Promise<AnalysisTaskCounts>
 /** 列表。 */
 export async function listTasks(params: {
   scope?: string; status?: string; limit?: number; offset?: number;
-}): Promise<{ items: AnalysisTaskInfo[]; total: number }> {
+}, options: { signal?: AbortSignal } = {}): Promise<{ items: AnalysisTaskInfo[]; total: number }> {
   const q = new URLSearchParams();
   if (params.scope) q.set("scope", params.scope);
   if (params.status) q.set("status", params.status);
   if (params.limit) q.set("limit", String(params.limit));
   if (params.offset) q.set("offset", String(params.offset));
   const res = await loggedFetch("analysis", "tasks.list", `${BASE}/tasks?${q.toString()}`, {
+    signal: options.signal,
     headers: { Authorization: bearer() },
     cache: "no-store",
   }).catch((err) => {

@@ -13,6 +13,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifySession, COOKIE_NAME } from "@/lib/session";
 import { homePathForRole } from "@/lib/roles";
+import { resetEntryFilters } from "@/lib/filter-entry";
 
 const CREATOR_HOME = "/dashboard";
 
@@ -46,6 +47,14 @@ export async function middleware(req: NextRequest) {
     if (isCreatorArea && session.role !== "CREATOR") {
       return NextResponse.redirect(new URL(homePathForRole(session.role), req.url));
     }
+  }
+
+  // 直接打开或刷新列表时先规范地址，避免先按旧筛选查一次数据库。
+  // 站内导航使用目标链接自身的参数；筛选器的 RSC 请求也沿用所选条件。
+  if ((isOperatorArea || isCreatorArea) && req.method === "GET" &&
+      req.headers.get("accept")?.includes("text/html") && !req.headers.has("rsc")) {
+    const url = new URL(req.url);
+    if (resetEntryFilters(url)) return NextResponse.redirect(url);
   }
 
   // 覆盖客户端同名头,布局用数据库中的最新角色检查页面范围(兼容旧 JWT)。

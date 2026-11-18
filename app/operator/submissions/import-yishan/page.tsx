@@ -12,11 +12,11 @@ export default async function YishanImportPage() {
     <div className="p-8">
       <div className="mb-4">
         <Link
-          href="/operator/submissions"
+          href="/operator/submissions/review"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="size-3.5" />
-          返回稿件列表
+          返回稿件审核
         </Link>
       </div>
       <header className="mb-6">

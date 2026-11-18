@@ -63,7 +63,7 @@ export async function activityVideos(input: VideoQuery, now = new Date(), db?: D
       take: VIDEO_BATCH_SIZE,
       select: {
         id: true, url: true, externalId: true, title: true, platform: true, creatorUid: true, creatorName: true, creatorAccount: true, publishedAt: true,
-        updatedAt: true, lastDatasetId: true, ...metrics,
+        updatedAt: true, lastDatasetId: true, reviewStatus: true, reviewedAt: true, ...metrics,
         dailyStats: {
           where: cutoff ? { snapshotDate: { lte: chinaDateStart(cutoff) }, updatedAt: { lte: cutoff } } : { id: { in: [] } },
           orderBy: [{ snapshotDate: "desc" }, { updatedAt: "desc" }], take: 1,
@@ -77,6 +77,7 @@ export async function activityVideos(input: VideoQuery, now = new Date(), db?: D
       videos.push({
         id: row.id, externalId: row.externalId, title: row.title, url: row.url, platform: row.platform, creatorUid: row.creatorUid,
         creatorName: row.creatorName, creatorAccount: row.creatorAccount, publishedAt: row.publishedAt!.toISOString(),
+        reviewStatus: row.reviewStatus, reviewedAt: row.reviewedAt?.toISOString() ?? null,
         dataAt: source?.updatedAt.toISOString() ?? null, datasetId: source?.datasetId ?? null,
         views: source?.views ?? 0, recommendedViews: source?.recommendedViews ?? 0,
         likes: source?.likes ?? 0, comments: source?.comments ?? 0, shares: source?.shares ?? 0, fansGained: source?.fansGained ?? 0,
@@ -95,12 +96,17 @@ export async function estimateActivity(input: SpecialActivityInput, now = new Da
   let missingData = 0;
   let missingUid = 0;
   let dataAt: string | null = null;
+  const reviewCounts = { approved: 0, pending: 0, rejected: 0 };
   for (const video of videos) {
-    if (!video.dataAt) missingData++;
-    else if (!dataAt || video.dataAt > dataAt) dataAt = video.dataAt;
+    if (video.reviewStatus === "APPROVED") {
+      reviewCounts.approved++;
+      if (!video.dataAt) missingData++;
+      else if (!dataAt || video.dataAt > dataAt) dataAt = video.dataAt;
+    } else if (video.reviewStatus === "REJECTED") reviewCounts.rejected++;
+    else reviewCounts.pending++;
     const key = authorKey(video);
     if (!key || !video.creatorUid) {
-      missingUid++;
+      if (video.reviewStatus === "APPROVED") missingUid++;
       continue;
     }
     const author = authors.get(key);
@@ -109,6 +115,7 @@ export async function estimateActivity(input: SpecialActivityInput, now = new Da
   }
   return {
     videos, result, authors: [...authors.values()], missingData, missingUid, dataAt,
+    reviewPolicy: "APPROVED_ONLY" as const, reviewCounts,
     recommendedViews: videos.reduce((sum, video) => sum + video.recommendedViews, 0),
     fingerprint: createHash("sha256").update(JSON.stringify({ input, videos })).digest("hex"),
   };

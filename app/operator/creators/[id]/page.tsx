@@ -141,10 +141,10 @@ export default async function CreatorDetailPage({
               badge={<SubmissionBadge status="REJECTED" />}
             />
             <Link
-              href={`/operator/submissions?creatorId=${c.id}`}
+              href="/operator/submissions"
               className="block pt-1 text-xs text-primary hover:underline"
             >
-              查看 TA 的全部稿件 →
+              查看稿件统计 →
             </Link>
           </Card>
         </div>

@@ -12,6 +12,10 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+        review:
+          "border-sidebar-primary/20 bg-card text-sidebar-primary shadow-xs transition-[color,background-color,border-color,box-shadow,transform,translate,scale] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:border-sidebar-primary/40 hover:bg-sidebar-accent/60 hover:shadow-sm focus-visible:border-sidebar-primary/50 focus-visible:ring-sidebar-primary/20 motion-safe:active:scale-[0.97] motion-reduce:translate-y-0 motion-reduce:scale-100 motion-reduce:duration-100",
+        "review-primary":
+          "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary/90 focus-visible:border-sidebar-primary focus-visible:ring-sidebar-primary/25 duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-safe:active:scale-[0.98] motion-reduce:translate-y-0 motion-reduce:scale-100 motion-reduce:duration-100",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:

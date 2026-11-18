@@ -55,7 +55,7 @@ export default async function SpecialActivityDetail({ params, searchParams }: {
   const ended = today > input.endDate;
   const pending = today < input.startDate;
   const cutoffPending = activity.cutoffAt && activity.cutoffAt > now;
-  const frozen = activity.settlement as { version: 1; estimate: ActivityEstimate } | null;
+  const frozen = activity.settlement as { version: 1 | 2; estimate: ActivityEstimate } | null;
   let estimate: ActivityEstimate;
   try {
     estimate = frozen?.estimate ?? await estimateActivity(input, now);
@@ -84,7 +84,7 @@ export default async function SpecialActivityDetail({ params, searchParams }: {
   const videoPoolMatches = estimate.result.pools.map((pool) => new Map(pool.recipients.flatMap((recipient) => recipient.videoIds.map((id) => [id, recipient] as const))));
   const visibleAuthors = filteredAuthors.sort((a, b) => (estimate.result.authorTotals[b.key] ?? 0) - (estimate.result.authorTotals[a.key] ?? 0) || a.uid.localeCompare(b.uid)).slice((authorPage - 1) * PAGE_SIZE, authorPage * PAGE_SIZE);
   const visibleVideos = filteredVideos.slice((videoPage - 1) * PAGE_SIZE, videoPage * PAGE_SIZE);
-  const blocker = !ended ? "活动结束后可确认结算" : cutoffPending ? "等待数据截止时间" : estimate.missingData ? `有 ${estimate.missingData} 条稿件缺少截止指标` : !videoCount ? "暂无匹配稿件" : "";
+  const blocker = !ended ? "活动结束后可确认结算" : cutoffPending ? "等待数据截止时间" : estimate.reviewCounts?.pending ? `当前活动仍有 ${estimate.reviewCounts.pending} 条稿件待审核，请全部完成审核后再确认结算` : estimate.missingData ? `有 ${estimate.missingData} 条审核通过的稿件缺少截止指标` : !videoCount ? "暂无匹配稿件" : !estimate.reviewCounts?.approved ? "暂无审核通过的稿件" : "";
 
   return <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
     <header className="flex flex-col gap-3">
@@ -104,6 +104,9 @@ export default async function SpecialActivityDetail({ params, searchParams }: {
         {[{ label: "匹配稿件", value: videoCount }, { label: "可识别达人", value: authorCount }, { label: "推荐播放量", value: estimate.recommendedViews }, { label: frozen ? "确认金额" : "预估金额", value: yuan(estimate.result.totalCents) }].map(({ label, value }) => <div key={label} className="flex flex-col gap-1"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="text-base font-semibold tabular-nums">{value.toLocaleString()}</dd></div>)}
       </dl>
       <p className="break-words text-sm text-muted-foreground">稿件筛选：{filterSummary(input.filters)}</p>
+      <p className="text-sm text-muted-foreground">{estimate.reviewPolicy === "APPROVED_ONLY"
+        ? `结算仅计入审核通过的稿件。合格 ${estimate.reviewCounts.approved} 条 · 待审核 ${estimate.reviewCounts.pending} 条 · 不合格 ${estimate.reviewCounts.rejected} 条。`
+        : "本活动为历史冻结结算，按确认时保存的稿件与金额展示。"}</p>
     </section>
     <DetailTabs settled={!!frozen} authorCount={authorCount} videoCount={videoCount} settlement={
     <section id="settlement" className="flex scroll-mt-4 flex-col gap-3" aria-labelledby="settlement-title">

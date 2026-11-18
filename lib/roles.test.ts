@@ -24,10 +24,11 @@ describe("角色权限边界", () => {
   });
 
   it("审核页面只开放稿件列表、详情和个人账户", () => {
-    for (const path of ["/operator/submissions", "/operator/submissions/submission-id", "/operator/account"]) {
+    for (const path of ["/operator/submissions", "/operator/submissions/review", "/operator/submissions/periods/test-period", "/operator/account"]) {
       expect(canAccessStaffPage("REVIEWER", path)).toBe(true);
     }
-    for (const path of ["", "/operator/dashboard", "/operator/submissions/import-yishan", "/operator/submissions-extra",
+    for (const path of ["/operator/submissions/submission-id", "", "/operator/dashboard", "/operator/submissions/tags", "/operator/submissions/import-yishan", "/operator/submissions-extra",
+      "/operator/submissions/periods/new", "/operator/submissions/periods/test-period/edit",
       "/operator/creators", "/operator/activities", "/operator/assistant", "/operator/tasks", "/operator/admin/operators"]) {
       expect(canAccessStaffPage("REVIEWER", path)).toBe(false);
     }

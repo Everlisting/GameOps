@@ -15,7 +15,7 @@ export async function activityCardSummary(id: string, revision: number, settledA
   return unstable_cache(async () => {
     const activity = await prisma.specialActivity.findUnique({ where: { id } });
     if (!activity) throw notFound("专题活动不存在");
-    const frozen = activity.settlement as { version: 1; estimate: ActivityEstimate } | null;
+    const frozen = activity.settlement as { version: 1 | 2; estimate: ActivityEstimate } | null;
     const estimate = frozen?.estimate ?? await estimateActivity(activityInput(activity));
     return {
       videoCount: estimate.videos.length,
@@ -23,7 +23,8 @@ export async function activityCardSummary(id: string, revision: number, settledA
       recommendedViews: estimate.recommendedViews,
       totalCents: estimate.result.totalCents,
     };
-  }, ["special-activity-card-summary", id, String(revision), settledAt ?? "unsettled"], {
+  }, ["special-activity-card-summary-approved-v2", id, String(revision), settledAt ?? "unsettled"], {
     revalidate: settledAt ? false : 60,
+    tags: settledAt ? [] : ["special-activity-estimates"],
   })();
 }

@@ -34,7 +34,7 @@ export default function ConfirmSettlement({ id, fingerprint, totalCents, disable
   return <Dialog open={open} onOpenChange={(value) => { if (!busy) { setOpen(value); setError(""); } }}>
     <DialogTrigger asChild><Button disabled={disabled}>确认结算</Button></DialogTrigger>
     <DialogContent className="max-w-[calc(100%-2rem)] shadow-none sm:max-w-lg">
-      <DialogHeader><DialogTitle>确认并冻结结算</DialogTitle><DialogDescription>本次税前合计 ¥{(totalCents / 100).toFixed(2)}。确认后保存规则、稿件数据和金额，后续采集更新不影响结果。</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>确认并冻结结算</DialogTitle><DialogDescription>活动匹配稿件须全部完成审核，仅审核通过的稿件参与结算，本次税前合计 ¥{(totalCents / 100).toFixed(2)}。确认时校验最新审核结果，并保存规则、审核状态、稿件数据和金额。确认后的结果按快照保留。</DialogDescription></DialogHeader>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <DialogFooter>
         <DialogClose asChild><Button variant="outline" disabled={busy}>取消</Button></DialogClose>

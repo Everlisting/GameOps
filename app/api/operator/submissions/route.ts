@@ -1,7 +1,7 @@
 /**
  * GET /api/operator/submissions — 运营端稿件列表
- * 过滤:status / platform / activityId / creatorId / q(稿件标题或创作者昵称)
- * 分页:page / pageSize(默认 1 / 50)
+ * 过滤:status / platform / activityId / creatorId / q(稿件标题、ID 或活动)
+ * 分页:page / pageSize(默认 1 / 50);审核响应只包含稿件信息。
  */
 import type { Prisma } from "@prisma/client";
 import { route } from "@/lib/api";
@@ -10,7 +10,7 @@ import { requireRole } from "@/lib/rbac";
 import { operatorSubmissionListQuerySchema } from "@/lib/validation/submission";
 
 export const GET = route(async (req) => {
-  await requireRole("REVIEWER");
+  await requireRole("OPERATOR");
   const url = new URL(req.url);
   const { status, q, platform, activityId, creatorId, page, pageSize } =
     operatorSubmissionListQuerySchema.parse(
@@ -25,7 +25,8 @@ export const GET = route(async (req) => {
   if (q) {
     where.OR = [
       { title: { contains: q, mode: "insensitive" } },
-      { creator: { nickname: { contains: q, mode: "insensitive" } } },
+      { id: q },
+      { externalId: { contains: q, mode: "insensitive" } },
       { activity: { name: { contains: q, mode: "insensitive" } } },
     ];
   }
@@ -49,7 +50,7 @@ export const GET = route(async (req) => {
         yishanStatus: true,
         createdAt: true,
         updatedAt: true,
-        creator: { select: { id: true, nickname: true } },
+        reviewTags: { select: { id: true, name: true } },
         activity: { select: { id: true, name: true, status: true } },
       },
     }),

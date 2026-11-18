@@ -1,4 +1,5 @@
 import { badRequest } from "@/lib/errors";
+import type { ReviewStatus } from "@prisma/client";
 import { metricLabels, stepLabels, videoMetrics, type NumberField, type RewardPool, type RuleCondition } from "./rules";
 
 type VideoMetrics = Record<(typeof videoMetrics)[number], number>;
@@ -6,6 +7,9 @@ export type ActivityVideo = VideoMetrics & {
   id: string; externalId?: string; title: string; url: string; platform: string; creatorUid: string | null;
   creatorName: string | null; creatorAccount?: string | null;
   publishedAt: string; dataAt: string | null; datasetId: string | null;
+  // 历史结算快照可能没有审核字段；新预估必须明确审核通过才能计奖。
+  reviewStatus?: ReviewStatus;
+  reviewedAt?: string | null;
 };
 
 export function authorKey(video: ActivityVideo): string | null {
@@ -79,6 +83,11 @@ export function calculateRewards(videos: ActivityVideo[], pools: RewardPool[]) {
   const outcomes = pools.map((pool) => {
     const excluded: Record<string, string> = {};
     let rows: Row[] = videos.flatMap((video) => {
+      if (video.reviewStatus !== "APPROVED") {
+        excluded[video.id] = video.reviewStatus === "REJECTED" ? "审核不合格，不参与结算"
+          : video.reviewStatus === "PENDING" ? "待审核，不参与结算" : "缺少审核结果，不参与结算";
+        return [];
+      }
       const author = authorKey(video);
       if (!author || !video.dataAt) {
         excluded[video.id] = author ? "缺少可用指标" : "缺少达人 UID";

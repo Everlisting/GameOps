@@ -110,7 +110,7 @@ export default function ActivityEditor({ initial, editing }: { initial: SpecialA
           {matched.sample.length > 0 && <ul className="flex flex-col gap-1 text-muted-foreground">{matched.sample.map((video) => <li key={video.id} className="break-words">{video.title}</li>)}</ul>}
         </div>}
       </Section>
-      <Section id="pools" title="奖池规则" description="每个奖池从活动稿件出发，按步骤执行。可以先逐稿计奖，也可以先汇总达人再计奖。">
+      <Section id="pools" title="奖池规则" description="每个奖池仅使用审核通过的稿件，按步骤执行。可以先逐稿计奖，也可以先汇总达人再计奖。">
         <RuleEditor pools={input.pools} change={(pools) => change({ pools })} />
       </Section>
       <Section id="preview" title="试算" description="用当前配置试算并查看奖励依据。">

@@ -1,0 +1,58 @@
+/* 局部审核工作台色阶；下拉浮层使用相同令牌，避免 Portal 脱离弹窗后变色。 */
+.dialog,
+.selectContent {
+  --card: #ffffff;
+  --card-foreground: #172338;
+  --background: #f7f9fc;
+  --foreground: #172338;
+  --popover: #ffffff;
+  --popover-foreground: #172338;
+  --muted-bg: #edf1f7;
+  --muted-foreground: #5b6a80;
+  --border-color: #dce3ed;
+  --color-border: var(--border-color);
+  --input: #7f8fa6;
+  --ring: #315bd6;
+  --accent-bg: #edf2fb;
+  --accent-foreground: #20479e;
+}
+
+.control {
+  background-color: var(--background);
+}
+
+.control:disabled,
+.secondaryAction:hover {
+  background-color: var(--muted-bg);
+}
+
+.secondaryAction {
+  background-color: var(--card);
+}
+
+.dialog [data-review-scroll] {
+  scrollbar-color: var(--input) var(--background);
+  scrollbar-width: thin;
+}
+
+.dialog [data-save-next]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+:global(.dark) .dialog,
+:global(.dark) .selectContent {
+  --card: #182231;
+  --card-foreground: #edf2fa;
+  --background: #202d3f;
+  --foreground: #edf2fa;
+  --popover: #182231;
+  --popover-foreground: #edf2fa;
+  --muted-bg: #243247;
+  --muted-foreground: #adbad0;
+  --border-color: #35445b;
+  --input: #7086a4;
+  --ring: #9ab6ff;
+  --accent-bg: #293d63;
+  --accent-foreground: #d6e3ff;
+}

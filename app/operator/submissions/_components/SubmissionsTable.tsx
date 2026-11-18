@@ -1,30 +1,41 @@
 "use client";
 
-/**
- * 运营端稿件列表表格(含勾选 + 批量审核栏)。
- * 单条详情通过点击标题进入,不在表格内做内联编辑。
- */
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ExternalLink, FileSearch } from "lucide-react";
 import type { ReviewStatus, SubmissionStatus } from "@prisma/client";
-import { ExternalLink } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { SubmissionBadge } from "@/app/(creator)/_components/StatusBadge";
-import { cn } from "@/lib/utils";
 import { fmtDateTime } from "@/lib/format";
-import { ReviewPill } from "./StatusPill";
+import type { flattenReviewTags } from "@/lib/review-tags";
+import { cn } from "@/lib/utils";
 import ReviewDialog from "./ReviewDialog";
 
 export type SubmissionRow = {
@@ -40,278 +51,321 @@ export type SubmissionRow = {
   contentNote: string | null;
   yishanStatus: ReviewStatus;
   yishanNote: string | null;
-  createdAt: string; // ISO,因从 server 序列化过来
-  creator: {
-    id: string;
-    nickname: string;
-    dyName: string | null;
-    dyAccount: string | null;
-    ysId: string | null;
-    groupNo: string | null;
-  };
+  createdAt: string;
+  views: number | null;
   activity: { id: string; name: string } | null;
+  reviewTags: { id: string; name: string }[];
 };
+export type TagOption = ReturnType<typeof flattenReviewTags>[number];
+const fields = { title: "标题", content: "内容", yishan: "易闪" } as const;
+export const reviewLabels = {
+  PENDING: "待审核",
+  APPROVED: "通过",
+  REJECTED: "未通过",
+} as const;
+export const reviewVariants = {
+  PENDING: "warning",
+  APPROVED: "success",
+  REJECTED: "destructive",
+} as const;
+export function platformLabel(platform: string) {
+  return (
+    (
+      { douyin: "抖音", bilibili: "哔哩哔哩", xiaohongshu: "小红书" } as Record<
+        string,
+        string
+      >
+    )[platform] ?? platform
+  );
+}
 
-type Field = "title" | "content" | "yishan";
-
-export default function SubmissionsTable({ rows, reviewOnly = false }: { rows: SubmissionRow[]; reviewOnly?: boolean }) {
+export default function SubmissionsTable({
+  rows,
+  review = false,
+  tags = [],
+  initialId,
+}: {
+  rows: SubmissionRow[];
+  review?: boolean;
+  tags?: TagOption[];
+  initialId?: string;
+}) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [field, setField] = useState<Field>("title");
+  const [activeId, setActiveId] = useState<string | null>(initialId ?? null);
+  const [field, setField] = useState<keyof typeof fields>("title");
   const [status, setStatus] = useState<ReviewStatus>("APPROVED");
   const [note, setNote] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // 当前打开审核弹窗的稿件 id;null = 关闭
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const activeRow = useMemo(
-    () => (activeId ? rows.find((r) => r.id === activeId) ?? null : null),
-    [activeId, rows],
-  );
-
-  const allChecked = useMemo(
-    () => rows.length > 0 && rows.every((r) => selected.has(r.id)),
-    [rows, selected],
-  );
-  const indeterminate = selected.size > 0 && !allChecked;
-
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const all = rows.length > 0 && rows.every((row) => selected.has(row.id));
   function toggle(id: string) {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelected(next);
+    setSelected((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
-  function toggleAll() {
-    if (allChecked) setSelected(new Set());
-    else setSelected(new Set(rows.map((r) => r.id)));
-  }
-
-  async function submitBatch() {
-    setError(null);
-    setSubmitting(true);
+  async function batch() {
+    setBusy(true);
+    setError("");
     try {
-      const res = await fetch("/api/operator/submissions/batch", {
+      const response = await fetch("/api/operator/submissions/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ids: Array.from(selected),
+          ids: [...selected],
           field,
           status,
           note: note.trim() || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error?.message ?? "批量审核失败");
-        return;
-      }
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result?.error?.message ?? "批量审核失败");
       setSelected(new Set());
       setNote("");
       router.refresh();
-    } catch {
-      setError("网络错误,请重试");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "网络错误，请重试");
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   }
-
   return (
-    <div className="space-y-3">
-      {selected.size > 0 && (
-        <Card className="sticky top-2 z-10 flex flex-wrap items-center gap-3 p-3">
-          <span className="text-sm">
-            已选 <strong className="text-primary">{selected.size}</strong> 条
-          </span>
-          <span className="text-xs text-muted-foreground">改</span>
-          <Select value={field} onValueChange={(v) => setField(v as Field)}>
-            <SelectTrigger size="sm" className="w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="title">标题审核</SelectItem>
-              <SelectItem value="content">内容审核</SelectItem>
-              <SelectItem value="yishan">易闪审核</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">为</span>
-          <Select
-            value={status}
-            onValueChange={(v) => setStatus(v as ReviewStatus)}
-          >
-            <SelectTrigger size="sm" className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="APPROVED">通过</SelectItem>
-              <SelectItem value="REJECTED">未通过</SelectItem>
-              <SelectItem value="PENDING">待审核</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="备注(可选)"
-            className="h-8 min-w-[180px] flex-1 text-xs"
-          />
-          <Button size="sm" onClick={submitBatch} disabled={submitting}>
-            {submitting ? "提交中…" : "批量提交"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelected(new Set())}
-          >
-            清空
-          </Button>
-          {error && <span className="text-xs text-destructive">{error}</span>}
-        </Card>
+    <>
+      {review && selected.size > 0 && (
+        <div className="flex flex-col gap-3 border-y bg-muted/40 px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">已选择 {selected.size} 条稿件</p>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setSelected(new Set())}
+            >
+              取消选择
+            </Button>
+          </div>
+          <FieldGroup className="gap-3 sm:flex-row sm:items-end">
+            <Field className="sm:w-36">
+              <FieldLabel htmlFor="batch-field">审核环节</FieldLabel>
+              <Select
+                value={field}
+                disabled={busy}
+                onValueChange={(value) =>
+                  setField(value as keyof typeof fields)
+                }
+              >
+                <SelectTrigger id="batch-field">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {Object.entries(fields).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}审核
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field className="sm:w-32">
+              <FieldLabel htmlFor="batch-status">审核结果</FieldLabel>
+              <Select
+                value={status}
+                disabled={busy}
+                onValueChange={(value) => setStatus(value as ReviewStatus)}
+              >
+                <SelectTrigger id="batch-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {Object.entries(reviewLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field className="flex-1">
+              <FieldLabel htmlFor="batch-note">审核备注（可选）</FieldLabel>
+              <Input
+                id="batch-note"
+                value={note}
+                disabled={busy}
+                maxLength={1000}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="填写本次批量审核的说明"
+              />
+            </Field>
+            <Button disabled={busy} onClick={batch}>
+              {busy ? "正在提交…" : "提交批量审核"}
+            </Button>
+          </FieldGroup>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
       )}
-
-      <ReviewDialog
-        reviewOnly={reviewOnly}
-        row={activeRow}
-        open={!!activeRow}
-        onOpenChange={(o) => {
-          if (!o) setActiveId(null);
-        }}
-      />
-
-      <Card className="overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="w-10 px-3 py-2.5">
+      <Table className={review ? "min-w-[880px]" : "min-w-[720px]"}>
+        <TableHeader>
+          <TableRow>
+            {review && (
+              <TableHead className="w-12 pl-5">
                 <Checkbox
-                  checked={indeterminate ? "indeterminate" : allChecked}
-                  onCheckedChange={toggleAll}
-                  aria-label="全选"
+                  disabled={busy || !rows.length}
+                  checked={all ? true : selected.size ? "indeterminate" : false}
+                  onCheckedChange={() =>
+                    setSelected(
+                      all ? new Set() : new Set(rows.map((row) => row.id)),
+                    )
+                  }
+                  aria-label="选择本页全部稿件"
                 />
-              </th>
-              <th className="px-3 py-2.5 font-medium">稿件 / 创作者</th>
-              <th className="px-3 py-2.5 font-medium">活动</th>
-              <th className="px-3 py-2.5 font-medium">平台</th>
-              <th className="px-3 py-2.5 font-medium">三子审核</th>
-              <th className="px-3 py-2.5 font-medium">最终</th>
-              <th className="px-3 py-2.5 font-medium">提交时间</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-3 py-10 text-center text-sm text-muted-foreground"
-                >
-                  没有符合条件的稿件。
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => (
-                <tr
-                  key={r.id}
-                  className={cn(
-                    "transition-colors hover:bg-muted/40",
-                    selected.has(r.id) && "bg-primary/5",
-                  )}
-                >
-                  <td className="px-3 py-2.5 align-top">
-                    <Checkbox
-                      checked={selected.has(r.id)}
-                      onCheckedChange={() => toggle(r.id)}
-                      aria-label="选择此行"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <button
-                          type="button"
-                          onClick={() => setActiveId(r.id)}
-                          className="text-left font-medium hover:text-primary"
-                          title="打开审核弹窗"
-                        >
-                          <span className="line-clamp-1">{r.title}</span>
-                        </button>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          @{r.creator.nickname}
-                          {r.externalId && (
-                            <span className="ml-2 font-mono text-[10px] opacity-70">
-                              #{r.externalId}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground/80">
-                          <CreatorInfo label="抖音昵称" value={r.creator.dyName} />
-                          <CreatorInfo label="抖音号" value={r.creator.dyAccount} mono />
-                          <CreatorInfo label="易闪" value={r.creator.ysId} mono />
-                          <CreatorInfo label="团号" value={r.creator.groupNo} mono />
-                        </div>
-                      </div>
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="shrink-0 text-muted-foreground hover:text-foreground"
-                        title="打开原链接"
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 align-top text-xs text-muted-foreground">
-                    {r.activity ? (
-                      <Link
-                        href={reviewOnly ? `/operator/submissions?activityId=${r.activity.id}&keepFilters=1` : `/operator/activities/${r.activity.id}`}
-                        className="hover:text-primary"
-                      >
-                        {r.activity.name}
-                      </Link>
-                    ) : (
-                      <span className="opacity-50">未挂活动</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 align-top text-xs">{r.platform}</td>
-                  <td className="px-3 py-2.5 align-top">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <ReviewPill status={r.titleStatus} label="标" />
-                      <ReviewPill status={r.contentStatus} label="内" />
-                      <ReviewPill status={r.yishanStatus} label="易" />
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 align-top">
-                    <SubmissionBadge status={r.status} />
-                  </td>
-                  <td className="px-3 py-2.5 align-top text-xs text-muted-foreground">
-                    {fmtDateTime(new Date(r.createdAt))}
-                  </td>
-                </tr>
-              ))
+              </TableHead>
             )}
-          </tbody>
-        </table>
-      </Card>
-    </div>
-  );
-}
-
-/** 创作者基础信息条目;空值不渲染,避免拥挤 */
-function CreatorInfo({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string | null;
-  mono?: boolean;
-}) {
-  if (!value) return null;
-  return (
-    <span>
-      {label}:
-      <span className={cn("ml-0.5 text-foreground/70", mono && "font-mono")}>
-        {value}
-      </span>
-    </span>
+            <TableHead className={cn("w-[38%]", !review && "pl-5")}>
+              稿件信息
+            </TableHead>
+            <TableHead>所属活动</TableHead>
+            {!review && <TableHead className="text-right">播放量</TableHead>}
+            {review && <TableHead>审核进度</TableHead>}
+            <TableHead>审核结果</TableHead>
+            <TableHead className="pr-5">投稿时间</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow
+              key={row.id}
+              data-state={selected.has(row.id) ? "selected" : undefined}
+            >
+              {review && (
+                <TableCell className="pl-5">
+                  <Checkbox
+                    disabled={busy}
+                    checked={selected.has(row.id)}
+                    onCheckedChange={() => toggle(row.id)}
+                    aria-label={`选择稿件：${row.title}`}
+                  />
+                </TableCell>
+              )}
+              <TableCell className={cn("py-5", !review && "pl-5")}>
+                <div className="flex flex-col gap-2">
+                  {review ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveId(row.id)}
+                      className="line-clamp-2 text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {row.title}
+                    </button>
+                  ) : (
+                    <a
+                      href={row.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="line-clamp-2 font-medium underline-offset-4 hover:underline"
+                    >
+                      {row.title}
+                    </a>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="secondary">
+                      {platformLabel(row.platform)}
+                    </Badge>
+                    {row.externalId && (
+                      <span className="break-all tabular-nums">
+                        ID {row.externalId}
+                      </span>
+                    )}
+                    <a
+                      href={row.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`打开原稿：${row.title}`}
+                      className="rounded-sm p-1 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <ExternalLink className="size-3.5" />
+                    </a>
+                  </div>
+                  {review && !!row.reviewTags.length && (
+                    <div className="flex flex-wrap gap-1">
+                      {row.reviewTags.map((tag) => (
+                        <Badge key={tag.id} variant="outline">
+                          {tag.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="max-w-48 whitespace-normal text-xs text-muted-foreground">
+                {row.activity?.name ?? "未关联活动"}
+              </TableCell>
+              {!review && (
+                <TableCell className="text-right font-medium tabular-nums">
+                  {row.views === null ? "—" : row.views.toLocaleString("zh-CN")}
+                </TableCell>
+              )}
+              {review && (
+                <TableCell>
+                  <div className="flex flex-col items-start gap-1.5">
+                    {Object.entries(fields).map(([key, label]) => {
+                      const value =
+                        row[
+                          `${key}Status` as
+                            "titleStatus" | "contentStatus" | "yishanStatus"
+                        ];
+                      return (
+                        <Badge key={key} variant={reviewVariants[value]}>
+                          {label} · {reviewLabels[value]}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </TableCell>
+              )}
+              <TableCell>
+                <SubmissionBadge status={row.status} />
+              </TableCell>
+              <TableCell className="pr-5 text-xs text-muted-foreground tabular-nums">
+                {fmtDateTime(row.createdAt)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {!rows.length && (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia>
+              <FileSearch />
+            </EmptyMedia>
+            <EmptyTitle>没有找到符合条件的稿件</EmptyTitle>
+            <EmptyDescription>
+              {review
+                ? "可以切换审核结果查看已处理稿件，或调整活动与日期范围。"
+                : "试试其他关键词，或重置筛选查看全部稿件。"}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+      {review && (
+        <ReviewDialog
+          row={rows.find((row) => row.id === activeId) ?? null}
+          tags={tags}
+          onClose={() => setActiveId(null)}
+        />
+      )}
+    </>
   );
 }

@@ -113,6 +113,9 @@ model User {
 
   // 审计:作为操作人留下的痕迹
   auditLogs AuditLog[]
+  reviewedVideos VideoStat[] @relation("VideoReviewer")
+  assignedReviews VideoReviewAssignment[] @relation("AssignedVideoReviewer")
+  reviewAllocations VideoReviewAssignment[] @relation("VideoAssignmentActor")
 }
 
 /// 操作审计日志:trigger / cancel / rerun / 改模板 / 改 agent 等关键动作都落一条
@@ -193,6 +196,25 @@ enum SpecialSettlementMode {
   CUTOFF
 }
 
+enum SubmissionPeriodStatus {
+  REVIEWING
+  FROZEN
+}
+
+// 全部稿件的命名统计周期；按视频库的发布时间动态汇总，不关联征稿或结算活动。
+model SubmissionPeriod {
+  id        String   @id @default(cuid())
+  title     String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  status    SubmissionPeriodStatus @default(REVIEWING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  assignments VideoReviewAssignment[]
+
+  @@index([startDate])
+}
+
 model SpecialActivity {
   id             String                @id @default(cuid())
   title          String
@@ -251,10 +273,30 @@ model Submission {
 
   creator  Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   activity Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  reviewTags ReviewTag[] @relation("SubmissionReviewTags")
 
   @@unique([platform, externalId])
   @@index([creatorId, createdAt])
   @@index([activityId, status])
+}
+
+// 审核标签树；停用父级后整条分支不可用于新的审核，历史关联保留。
+model ReviewTag {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  parentId    String?
+  sortOrder   Int      @default(0)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent      ReviewTag?  @relation("ReviewTagTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    ReviewTag[] @relation("ReviewTagTree")
+  submissions Submission[] @relation("SubmissionReviewTags")
+  videos      VideoStat[] @relation("VideoReviewTags")
+
+  @@index([parentId, sortOrder])
 }
 
 // 创作灵感:运营/管理员维护,创作者只读浏览。
@@ -460,18 +502,46 @@ model VideoStat {
   hidden   Boolean   @default(false)
   hiddenAt DateTime? // 首次判定为删除/隐藏的时间(重新出现则清空)
 
+  // 视频库审核独立于征稿活动；采集 upsert 不覆盖人工审核字段。
+  reviewStatus ReviewStatus @default(PENDING)
+  reviewNote   String?
+  reviewerId   String?
+  reviewerName String? // 审核时显示名称快照，删除账户后仍保留
+  reviewedAt   DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   creator     Creator?         @relation(fields: [creatorId], references: [id], onDelete: SetNull)
   lastDataset RawDataset?      @relation(fields: [lastDatasetId], references: [id], onDelete: SetNull)
   dailyStats  DailyVideoStat[]
+  reviewer    User? @relation("VideoReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewTags  ReviewTag[] @relation("VideoReviewTags")
+  reviewAssignment VideoReviewAssignment?
 
   @@unique([platform, externalId])
   @@index([creatorId, updatedAt])
   @@index([creatorUid])
   @@index([publishedAt])
   @@index([platform, hidden])
+  @@index([reviewStatus, publishedAt])
+}
+
+// 每条视频的唯一分配归属，区别于VideoStat.reviewerId记录的实际审核操作人。
+model VideoReviewAssignment {
+  videoId      String @id
+  periodId     String
+  reviewerId   String
+  assignedById String?
+  assignedAt   DateTime @default(now())
+
+  video      VideoStat @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  period     SubmissionPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  reviewer   User @relation("AssignedVideoReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  assignedBy User? @relation("VideoAssignmentActor", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([reviewerId, periodId])
+  @@index([periodId])
 }
 
 // 每日汇总层:Detail 写入后立刻按"北京时间今日"upsert 一份当日快照。
