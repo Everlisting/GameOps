@@ -1,360 +1,191 @@
-/**
- * BI 大屏 · 数据聚合层。
- *
- * 一次性把大屏所有指标拉齐,server component 直接 await。
- * 命中现有索引(submissions.createdAt / dailyVideoStat.snapshotDate)。
- *
- * 时区:DB 存 UTC,日聚合按"自然日(UTC)"切桶,前端用 lib/format 锁 Asia/Shanghai 显示。
- * 大屏指标按天的聚合接受 ±8h 的边界漂移,后续如需精确北京时区再加 AT TIME ZONE 偏移。
- */
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { chinaDateStart } from "@/lib/time";
-
-const DAY_MS = 86_400_000;
-const TREND_MAX_DAYS = 366; // 趋势窗口硬顶,防止超大区间拖垮查询
+import { dateValue } from "@/lib/data-period";
+import { chinaDateString } from "@/lib/time";
+import { biRange, buildBiTrend, type SnapshotDay } from "./series";
 
 export type DashboardData = Awaited<ReturnType<typeof aggregateDashboard>>;
+export type Distribution = { label: string; count: number }[];
 
-/** 解析 "YYYY-MM-DD" → UTC 零点 Date;非法返回 undefined。 */
-function parseYmd(s: string | undefined): Date | undefined {
-  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
-  const [y, m, d] = s.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return Number.isNaN(dt.getTime()) ? undefined : dt;
-}
-
-// 单个核心指标的时序:value=当月最新一日的值,increment=最新一日 − 前一快照日
-// (当月不足两个快照日时为 null,即无可比基线),spark=当月各快照日的取值序列。
-export type KpiMetric = { value: number; increment: number | null; spark: number[] };
-
-/** 把「按快照日升序」的行序列压成一个 KpiMetric。pick 取每行的度量值。 */
-function metricFromDays<T>(rows: T[], pick: (r: T) => number): KpiMetric {
-  const spark = rows.map(pick);
-  const value = spark.length ? spark[spark.length - 1] : 0;
-  const increment =
-    spark.length >= 2 ? value - spark[spark.length - 2] : null;
-  return { value, increment, spark };
-}
-
+/** All content panels use the same current, visible publication cohort (Beijing dates). */
 export async function aggregateDashboard(opts?: {
   trendFrom?: string;
   trendTo?: string;
 }) {
   const now = new Date();
-
-  // 「本月」按北京时间自然月切;snapshotDate 存的是 UTC 零点 = 北京自然日。
-  const beijing = new Date(now.getTime() + 8 * 3_600_000);
-  const monthStart = new Date(
-    Date.UTC(beijing.getUTCFullYear(), beijing.getUTCMonth(), 1),
+  const currentRange = biRange({}, now);
+  const requestedEnd = dateValue(opts?.trendTo);
+  // Open dormant datasets on useful data, with the actual historical dates visible.
+  const latest = requestedEnd
+    ? null
+    : await prisma.videoStat.findFirst({
+        where: {
+          hidden: false,
+          publishedAt: { lt: currentRange.publishedAt.lt },
+        },
+        orderBy: { publishedAt: { sort: "desc", nulls: "last" } },
+        select: { publishedAt: true },
+      });
+  const range = biRange(
+    opts,
+    now,
+    latest?.publishedAt ? chinaDateString(latest.publishedAt) : undefined,
   );
-  const nextMonthStart = new Date(
-    Date.UTC(beijing.getUTCFullYear(), beijing.getUTCMonth() + 1, 1),
-  );
+  const { gte, lt } = range.publishedAt;
+  const where = { hidden: false, publishedAt: range.publishedAt };
+  const cohort = Prisma.sql`v.hidden = false AND v."publishedAt" >= ${gte} AND v."publishedAt" < ${lt}`;
 
-  // ── 趋势窗口:默认结束日 = 昨天(T-1,数据最新只到前一日),向前 30 天 ──
-  // 单位为北京自然日(UTC 零点),与 snapshotDate 同口径。可由 trendFrom/trendTo 覆盖。
-  const trendEndDay =
-    parseYmd(opts?.trendTo) ?? new Date(chinaDateStart(now).getTime() - DAY_MS);
-  let trendStartDay =
-    parseYmd(opts?.trendFrom) ?? new Date(trendEndDay.getTime() - 29 * DAY_MS);
-  if (trendStartDay.getTime() > trendEndDay.getTime()) {
-    trendStartDay = new Date(trendEndDay.getTime() - 29 * DAY_MS);
-  }
-  // 区间过大则从末尾回夹到硬顶
-  if (trendEndDay.getTime() - trendStartDay.getTime() > TREND_MAX_DAYS * DAY_MS) {
-    trendStartDay = new Date(trendEndDay.getTime() - (TREND_MAX_DAYS - 1) * DAY_MS);
-  }
-
-  const [
-    // 核心指标 · 视频维度(按快照日):累计播放 / 作品数 / 优质作品(>10w)
-    videoDays,
-    // 核心指标 · 作者维度(按快照日):创作者数 / 优质作者(月播放>30w)
-    authorDays,
-
-    // 趋势(窗口内每快照日):累计播放 + 作品数(相邻日相减 → 当日增量)
-    trendRows,
-    trendSeedRows,
-
-    // 右侧榜单:主播 TOP30(总播放) + 作品 TOP30(单作品播放)
-    topAnchorsRaw,
-    topVideosRaw,
-
-    // 饼 1 · 作者分层(本月按播放总量)
-    authorTierRaw,
-    // 饼 2 · 作品分层(本月按单作品播放量)
-    workTierRaw,
-    // 饼 3 · 平台分布
-    platformGroups,
-    // 饼 4 · 创作者分组
-    groupNoGroups,
-  ] = await Promise.all([
-    // 视频维度:每快照日一行。views 是「截至该日的累计播放」,
-    // 故 SUM=当日全站累计播放;qworks=当日累计播放>10w 的作品数。
-    // 排除 hidden(删除/隐藏)作品。
-    prisma.$queryRaw<
-      { day: Date; views: bigint; works: bigint; qworks: bigint }[]
-    >`
-      SELECT d."snapshotDate" AS day,
-             COALESCE(SUM(d."views"), 0)::bigint AS views,
-             COUNT(*)::bigint AS works,
-             COUNT(*) FILTER (WHERE d."views" > 100000)::bigint AS qworks
-      FROM "DailyVideoStat" d
-      LEFT JOIN "VideoStat" v
-        ON v."platform" = d."platform" AND v."externalId" = d."externalId"
-      WHERE d."snapshotDate" >= ${monthStart} AND d."snapshotDate" < ${nextMonthStart}
-        AND COALESCE(v."hidden", false) = false
-      GROUP BY d."snapshotDate"
-      ORDER BY d."snapshotDate"`,
-
-    // 作者维度:先按 (快照日, 作者) 汇总累计播放,再数作者。
-    // 作者身份取 CSV 的 creatorUid(未匹配系统 Creator 也算),回退 creatorId。
-    prisma.$queryRaw<{ day: Date; creators: bigint; qcreators: bigint }[]>`
-      SELECT day,
-             COUNT(*)::bigint AS creators,
-             COUNT(*) FILTER (WHERE author_views > 300000)::bigint AS qcreators
-      FROM (
-        SELECT d."snapshotDate" AS day,
-               COALESCE(v."creatorUid", d."creatorId") AS author,
-               SUM(d."views") AS author_views
+  const [summary, authors, publications, snapshots, topVideos, platforms] =
+    await Promise.all([
+      prisma.$queryRaw<
+        {
+          works: number;
+          views: bigint;
+          recommended: bigint;
+          highPlayWorks: number;
+          approved: number;
+          rejected: number;
+          pending: number;
+          unassigned: number;
+          million: number;
+          threeHundred: number;
+          hundred: number;
+          twelve: number;
+          below: number;
+        }[]
+      >(Prisma.sql`
+      SELECT COUNT(*)::int AS works, COALESCE(SUM(v.views), 0)::bigint AS views,
+        COALESCE(SUM(v."recommendedViews"), 0)::bigint AS recommended,
+        COUNT(*) FILTER (WHERE v.views >= 100000)::int AS "highPlayWorks",
+        COUNT(*) FILTER (WHERE v."reviewStatus" = 'APPROVED')::int AS approved,
+        COUNT(*) FILTER (WHERE v."reviewStatus" = 'REJECTED')::int AS rejected,
+        COUNT(*) FILTER (WHERE v."reviewStatus" = 'PENDING')::int AS pending,
+        COUNT(*) FILTER (WHERE v."reviewStatus" = 'PENDING' AND NOT EXISTS (
+          SELECT 1 FROM "VideoReviewAssignment" a WHERE a."videoId" = v.id
+        ))::int AS unassigned,
+        COUNT(*) FILTER (WHERE v.views >= 1000000)::int AS million,
+        COUNT(*) FILTER (WHERE v.views >= 300000 AND v.views < 1000000)::int AS "threeHundred",
+        COUNT(*) FILTER (WHERE v.views >= 100000 AND v.views < 300000)::int AS hundred,
+        COUNT(*) FILTER (WHERE v.views >= 12000 AND v.views < 100000)::int AS twelve,
+        COUNT(*) FILTER (WHERE v.views < 12000)::int AS below
+      FROM "VideoStat" v WHERE ${cohort}
+    `),
+      prisma.$queryRaw<
+        {
+          platform: string;
+          uid: string;
+          name: string | null;
+          views: bigint;
+          works: number;
+        }[]
+      >(Prisma.sql`
+      SELECT v.platform, v."creatorUid" AS uid, MAX(NULLIF(v."creatorName", '')) AS name,
+        SUM(v.views)::bigint AS views, COUNT(*)::int AS works
+      FROM "VideoStat" v WHERE ${cohort} AND NULLIF(BTRIM(v."creatorUid"), '') IS NOT NULL
+      GROUP BY v.platform, v."creatorUid" ORDER BY views DESC, v.platform, v."creatorUid"
+    `),
+      prisma.$queryRaw<{ date: string; works: number }[]>(Prisma.sql`
+      SELECT TO_CHAR(v."publishedAt" + INTERVAL '8 hours', 'YYYY-MM-DD') AS date, COUNT(*)::int AS works
+      FROM "VideoStat" v WHERE ${cohort} GROUP BY date ORDER BY date
+    `),
+      // One windowed scan, including the preceding day for the baseline. Avoid a
+      // full-table self hash join, which exhausts default Docker /dev/shm on large ranges.
+      prisma.$queryRaw<SnapshotDay[]>(Prisma.sql`
+      WITH samples AS (
+        SELECT d."snapshotDate" AS day, d.views,
+          LAG(d.views) OVER video AS previous_views,
+          LAG(d."snapshotDate") OVER video AS previous_day
         FROM "DailyVideoStat" d
-        LEFT JOIN "VideoStat" v
-          ON v."platform" = d."platform" AND v."externalId" = d."externalId"
-        WHERE d."snapshotDate" >= ${monthStart} AND d."snapshotDate" < ${nextMonthStart}
-          AND COALESCE(v."hidden", false) = false
-          AND COALESCE(v."creatorUid", d."creatorId") IS NOT NULL
-        GROUP BY d."snapshotDate", COALESCE(v."creatorUid", d."creatorId")
-      ) pa
-      GROUP BY day
-      ORDER BY day`,
+        JOIN "VideoStat" v ON v.platform = d.platform AND v."externalId" = d."externalId"
+        WHERE ${cohort}
+          AND d."snapshotDate" >= ${new Date(new Date(`${range.from}T00:00:00Z`).getTime() - 86400000)}
+          AND d."snapshotDate" <= ${new Date(`${range.to}T00:00:00Z`)}
+        WINDOW video AS (PARTITION BY d.platform, d."externalId" ORDER BY d."snapshotDate")
+      )
+      SELECT day, COUNT(*)::int AS recorded,
+        COUNT(*) FILTER (WHERE previous_day = day - 1)::int AS matched,
+        (SUM(views::bigint - previous_views::bigint) FILTER (WHERE previous_day = day - 1))::bigint AS change
+      FROM samples WHERE day >= ${new Date(`${range.from}T00:00:00Z`)}
+      GROUP BY day ORDER BY day
+    `),
+      prisma.videoStat.findMany({
+        where,
+        orderBy: [{ views: "desc" }, { id: "asc" }],
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          views: true,
+          externalId: true,
+          platform: true,
+        },
+      }),
+      prisma.videoStat.groupBy({
+        by: ["platform"],
+        where,
+        _count: { _all: true },
+        orderBy: { _count: { platform: "desc" } },
+      }),
+    ]);
 
-    // 窗口内每快照日:累计播放之和 + 在库作品数(相邻两日相减 → 当日增量)
-    prisma.$queryRaw<{ day: Date; views: bigint; works: bigint }[]>`
-      SELECT d."snapshotDate" AS day,
-             COALESCE(SUM(d."views"), 0)::bigint AS views,
-             COUNT(*)::bigint AS works
-      FROM "DailyVideoStat" d
-      LEFT JOIN "VideoStat" v
-        ON v."platform" = d."platform" AND v."externalId" = d."externalId"
-      WHERE d."snapshotDate" >= ${trendStartDay} AND d."snapshotDate" <= ${trendEndDay}
-        AND COALESCE(v."hidden", false) = false
-      GROUP BY d."snapshotDate" ORDER BY d."snapshotDate"`,
-    // 种子:窗口开始前最近一个快照日的累计播放 / 作品数(算窗口第一天的增量)。
-    // hasPrev 标记窗口前是否存在任何快照——无基线(数据首日)时首点增量置 0,不画尖峰。
-    prisma.$queryRaw<{ views: bigint; works: bigint; hasPrev: boolean }[]>`
-      SELECT COALESCE(SUM(d."views"), 0)::bigint AS views,
-             COUNT(*)::bigint AS works,
-             EXISTS(
-               SELECT 1 FROM "DailyVideoStat" WHERE "snapshotDate" < ${trendStartDay}
-             ) AS "hasPrev"
-      FROM "DailyVideoStat" d
-      LEFT JOIN "VideoStat" v
-        ON v."platform" = d."platform" AND v."externalId" = d."externalId"
-      WHERE d."snapshotDate" = (
-        SELECT MAX("snapshotDate") FROM "DailyVideoStat" WHERE "snapshotDate" < ${trendStartDay}
-      ) AND COALESCE(v."hidden", false) = false`,
-
-    // 主播 TOP30:按作者(creatorUid,回退 creatorName)聚合总播放,取昵称
-    prisma.$queryRaw<{ author: string; name: string | null; views: bigint }[]>`
-      SELECT COALESCE("creatorUid", "creatorName") AS author,
-             MAX("creatorName") AS name,
-             COALESCE(SUM("views"), 0)::bigint AS views
-      FROM "VideoStat"
-      WHERE "hidden" = false AND COALESCE("creatorUid", "creatorName") IS NOT NULL
-      GROUP BY COALESCE("creatorUid", "creatorName")
-      ORDER BY views DESC
-      LIMIT 30`,
-
-    // 作品 TOP30:按单作品播放量排序(带 url 用于跳抖音)
-    prisma.$queryRaw<
-      { externalId: string; title: string; url: string; views: number }[]
-    >`
-      SELECT "externalId", "title", "url", "views"
-      FROM "VideoStat"
-      WHERE "hidden" = false
-      ORDER BY "views" DESC
-      LIMIT 30`,
-
-    // 作者分层:本月最新快照日,每作者累计播放分桶计数(与「优质作者」同口径)
-    prisma.$queryRaw<
-      { top: bigint; head: bigint; mid: bigint; waist: bigint; tail: bigint }[]
-    >`
-      SELECT
-        COUNT(*) FILTER (WHERE av >= 3000000)::bigint AS top,
-        COUNT(*) FILTER (WHERE av >= 1000000 AND av < 3000000)::bigint AS head,
-        COUNT(*) FILTER (WHERE av >= 300000 AND av < 1000000)::bigint AS mid,
-        COUNT(*) FILTER (WHERE av >= 100000 AND av < 300000)::bigint AS waist,
-        COUNT(*) FILTER (WHERE av >  0 AND av < 100000)::bigint AS tail
-      FROM (
-        SELECT COALESCE(v."creatorUid", d."creatorId") AS author, SUM(d."views") AS av
-        FROM "DailyVideoStat" d
-        LEFT JOIN "VideoStat" v
-          ON v."platform" = d."platform" AND v."externalId" = d."externalId"
-        WHERE d."snapshotDate" = (
-          SELECT MAX("snapshotDate") FROM "DailyVideoStat"
-          WHERE "snapshotDate" >= ${monthStart} AND "snapshotDate" < ${nextMonthStart}
-        )
-          AND COALESCE(v."hidden", false) = false
-          AND COALESCE(v."creatorUid", d."creatorId") IS NOT NULL
-        GROUP BY COALESCE(v."creatorUid", d."creatorId")
-      ) pa`,
-    // 作品分层:本月最新快照日,按单作品累计播放分桶计数
-    prisma.$queryRaw<
-      { top: bigint; head: bigint; mid: bigint; waist: bigint; tail: bigint }[]
-    >`
-      SELECT
-        COUNT(*) FILTER (WHERE av >= 1000000)::bigint AS top,
-        COUNT(*) FILTER (WHERE av >= 300000 AND av < 1000000)::bigint AS head,
-        COUNT(*) FILTER (WHERE av >= 100000 AND av < 300000)::bigint AS mid,
-        COUNT(*) FILTER (WHERE av >= 12000 AND av < 100000)::bigint AS waist,
-        COUNT(*) FILTER (WHERE av >= 0 AND av < 12000)::bigint AS tail
-      FROM (
-        SELECT d."views" AS av
-        FROM "DailyVideoStat" d
-        LEFT JOIN "VideoStat" v
-          ON v."platform" = d."platform" AND v."externalId" = d."externalId"
-        WHERE d."snapshotDate" = (
-          SELECT MAX("snapshotDate") FROM "DailyVideoStat"
-          WHERE "snapshotDate" >= ${monthStart} AND "snapshotDate" < ${nextMonthStart}
-        )
-          AND COALESCE(v."hidden", false) = false
-      ) pw`,
-    prisma.submission.groupBy({
-      by: ["platform"],
-      _count: { _all: true },
-      orderBy: { _count: { platform: "desc" } },
-    }),
-    prisma.creator.groupBy({
-      by: ["groupNo"],
-      _count: { _all: true },
-      orderBy: { _count: { groupNo: "desc" } },
-    }),
-  ]);
-
-  // ── 趋势:窗口内每日「作品增量」+「播放量增量」────────────────
-  // 两者都是累计快照,相邻两个快照日相减 = 当日新增;无快照的日增量记 0。
-  const trendDays = buildDayRange(trendStartDay, trendEndDay);
-  const trendMap = new Map(
-    trendRows.map((r) => [
-      new Date(r.day).toISOString().slice(0, 10),
-      { views: Number(r.views), works: Number(r.works) },
-    ]),
-  );
-  let prevViews = Number(trendSeedRows[0]?.views ?? 0);
-  let prevWorks = Number(trendSeedRows[0]?.works ?? 0);
-  // 窗口前无任何快照 = 数据首日,首个快照点只作基线,增量置 0(不画整段累计的尖峰)
-  let seeded = trendSeedRows[0]?.hasPrev ?? false;
-  const trend = trendDays.map((d) => {
-    const key = d.toISOString().slice(0, 10);
-    const cur = trendMap.get(key);
-    let viewsDelta = 0;
-    let worksDelta = 0;
-    if (cur) {
-      if (seeded) {
-        viewsDelta = cur.views - prevViews;
-        worksDelta = cur.works - prevWorks;
-      }
-      prevViews = cur.views;
-      prevWorks = cur.works;
-      seeded = true;
-    }
-    return { date: key, worksDelta, viewsDelta };
-  });
-
-  // 核心指标(当月,按快照日)——每项 { value, increment, spark }
-  const kpi = {
-    playTotal: metricFromDays(videoDays, (r) => Number(r.views)), // 播放总量(累计)
-    workTotal: metricFromDays(videoDays, (r) => Number(r.works)), // 作品(稿件)总量
-    qualityCreators: metricFromDays(authorDays, (r) => Number(r.qcreators)), // 优质作者 >30w
-    qualityWorks: metricFromDays(videoDays, (r) => Number(r.qworks)), // 优质作品 >10w
-    creators: metricFromDays(authorDays, (r) => Number(r.creators)), // 当月发布作品的作者数
+  const totals = {
+    works: summary[0].works,
+    views: Number(summary[0].views),
+    recommended: Number(summary[0].recommended),
+    authors: authors.length,
+    highPlayWorks: summary[0].highPlayWorks,
+    approved: summary[0].approved,
+    rejected: summary[0].rejected,
+    pending: summary[0].pending,
+    unassigned: summary[0].unassigned,
   };
-
-  // 饼数据 — 颜色由组件按 index 注入 var(--chart-N),这里只产生 name/value/key
-  const t = authorTierRaw[0] ?? {
-    top: 0n,
-    head: 0n,
-    mid: 0n,
-    waist: 0n,
-    tail: 0n,
-  };
-  const authorTierPie = [
-    { name: "顶部(≥300w)", value: Number(t.top), key: "top" },
-    { name: "头部(≥100w)", value: Number(t.head), key: "head" },
-    { name: "中部(≥30w)", value: Number(t.mid), key: "mid" },
-    { name: "腰部(≥10w)", value: Number(t.waist), key: "waist" },
-    { name: "尾部(<10w)", value: Number(t.tail), key: "tail" },
+  const authorTiers: Distribution = [
+    { label: "300 万及以上", count: 0 },
+    { label: "100 万–不足 300 万", count: 0 },
+    { label: "30 万–不足 100 万", count: 0 },
+    { label: "10 万–不足 30 万", count: 0 },
+    { label: "不足 10 万", count: 0 },
   ];
-  const tw = workTierRaw[0] ?? {
-    top: 0n,
-    head: 0n,
-    mid: 0n,
-    waist: 0n,
-    tail: 0n,
-  };
-  const workTierPie = [
-    { name: "顶部(≥100w)", value: Number(tw.top), key: "top" },
-    { name: "头部(≥30w)", value: Number(tw.head), key: "head" },
-    { name: "中部(≥10w)", value: Number(tw.mid), key: "mid" },
-    { name: "腰部(≥1.2w)", value: Number(tw.waist), key: "waist" },
-    { name: "尾部(<1.2w)", value: Number(tw.tail), key: "tail" },
-  ];
-  const platformPie = platformGroups.slice(0, 5).map((g) => ({
-    name: g.platform || "其他",
-    value: g._count._all,
-    key: g.platform || "_",
-  }));
-  const groupNoPie = groupNoGroups.slice(0, 5).map((g) => ({
-    name: g.groupNo ? `团 ${g.groupNo}` : "未分组",
-    value: g._count._all,
-    key: g.groupNo ?? "_",
-  }));
-
-  // 右侧榜单
-  const topAnchors = topAnchorsRaw.map((r, i) => ({
-    rank: i + 1,
-    name: r.name ?? r.author,
-    search: r.author, // 跳视频页搜索用(优先 uid)
-    views: Number(r.views),
-  }));
-  const topVideos = topVideosRaw.map((r, i) => ({
-    rank: i + 1,
-    externalId: r.externalId,
-    title: r.title,
-    url: r.url,
-    views: Number(r.views),
-  }));
-
+  for (const author of authors) {
+    const views = Number(author.views);
+    authorTiers[
+      views >= 3000000
+        ? 0
+        : views >= 1000000
+          ? 1
+          : views >= 300000
+            ? 2
+            : views >= 100000
+              ? 3
+              : 4
+    ].count++;
+  }
+  const trend = buildBiTrend(range, snapshots, publications);
   return {
-    kpi,
+    range: { from: range.from, to: range.to },
+    historicalDefault: !requestedEnd && range.to < currentRange.to,
+    totals,
     trend,
-    // 回传解析后的窗口(YYYY-MM-DD),供日期控件回显
-    trendRange: {
-      from: trendStartDay.toISOString().slice(0, 10),
-      to: trendEndDay.toISOString().slice(0, 10),
-    },
-    topAnchors,
+    comparableDays: trend.filter((day) => day.viewsChange !== null).length,
+    topAuthors: authors
+      .slice(0, 10)
+      .map((author) => ({ ...author, views: Number(author.views) })),
     topVideos,
-    pies: {
-      authorTier: authorTierPie,
-      workTier: workTierPie,
-      platform: platformPie,
-      groupNo: groupNoPie,
+    structure: {
+      authors: authorTiers,
+      works: [
+        { label: "100 万及以上", count: summary[0].million },
+        { label: "30 万–不足 100 万", count: summary[0].threeHundred },
+        { label: "10 万–不足 30 万", count: summary[0].hundred },
+        { label: "1.2 万–不足 10 万", count: summary[0].twelve },
+        { label: "不足 1.2 万", count: summary[0].below },
+      ],
+      platforms: platforms.map((row) => ({
+        label: row.platform === "douyin" ? "抖音" : row.platform,
+        count: row._count._all,
+      })),
     },
+    loadedAt: new Date().toISOString(),
   };
 }
-
-// ── 工具 ────────────────────────────────────────────────────
-
-/** 生成 [start, end] 闭区间内每一天(UTC 零点)的序列。 */
-function buildDayRange(start: Date, end: Date): Date[] {
-  const out: Date[] = [];
-  const s = new Date(start);
-  s.setUTCHours(0, 0, 0, 0);
-  const e = new Date(end);
-  e.setUTCHours(0, 0, 0, 0);
-  for (let t = s.getTime(); t <= e.getTime(); t += DAY_MS) {
-    out.push(new Date(t));
-  }
-  return out;
-}
-

@@ -1,233 +1,235 @@
 "use client";
 
-/**
- * 趋势 · 交互式双轴折线。
- * 一图两线:每日「投稿量增量」(左轴,稿件口径) + 每日「播放量增量」(右轴,播放口径)。
- * 两者量级差异大,故左右各一条纵轴。右上角日期控件调整窗口(URL 同步),默认近 30 天。
- */
-import * as React from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
-
+import { ChartNoAxesCombined } from "lucide-react";
 import {
   Card,
-  CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  type ChartConfig,
 } from "@/components/ui/chart";
-import { cn } from "@/lib/utils";
-import DateRangeField from "@/app/operator/_components/DateRangeField";
-
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
+import { Badge } from "@/components/ui/badge";
 import type { DashboardData } from "../_lib/aggregate";
+import { compact } from "../_lib/format";
 
-const chartConfig = {
-  worksDelta: { label: "投稿量", color: "var(--chart-1)" },
-  viewsDelta: { label: "播放量", color: "var(--chart-2)" },
-} satisfies ChartConfig;
-
-/** 播放量压缩成 w(万)/亿。 */
-function fmtViews(n: number): string {
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`;
-  if (n >= 10_000) return `${(n / 10_000).toFixed(1)}w`;
-  return `${n}`;
-}
+const config = {
+  viewsChange: { label: "可比视频播放变化", color: "var(--bi-views)" },
+  works: { label: "发布作品", color: "var(--bi-output)" },
+};
+const dayLabel = (value: string) =>
+  `${Number(value.slice(5, 7))}/${Number(value.slice(8))}`;
 
 export function TrendCard({
   trend,
-  range,
-  className,
+  comparableDays,
+  works,
 }: {
   trend: DashboardData["trend"];
-  range: DashboardData["trendRange"];
-  className?: string;
+  comparableDays: number;
+  works: number;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const search = useSearchParams();
-
-  // 图例点击切换某条曲线的显隐
-  const [hidden, setHidden] = React.useState<Record<string, boolean>>({});
-  const toggle = (key: string) =>
-    setHidden((h) => ({ ...h, [key]: !h[key] }));
-
-  // 日期控件最大可选 = 昨天(T-1),禁用今天及未来
-  const maxDate = React.useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - 1);
-    return d;
-  }, []);
-
-  function commitRange(from: string, to: string) {
-    const params = new URLSearchParams(search.toString());
-    if (from) params.set("trendFrom", from);
-    else params.delete("trendFrom");
-    if (to) params.set("trendTo", to);
-    else params.delete("trendTo");
-    const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }
-
   return (
-    <Card className={cn("flex flex-col py-0", className)}>
-      <CardHeader className="flex flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:py-5">
-        <div className="flex flex-col gap-1">
-          <CardTitle>播放 / 投稿趋势</CardTitle>
+    <Card className="flex h-full min-w-0 flex-col">
+      <CardHeader className="flex-row items-start justify-between gap-3 p-4 pb-2">
+        <div className="flex flex-col gap-2">
+          <CardTitle>传播与产出趋势</CardTitle>
           <CardDescription>
-            每日「投稿量增量」与「播放量增量」（{range.from} ~ {range.to}）
+            播放变化与发布数量分轴展示，避免量级干扰
           </CardDescription>
         </div>
-        <DateRangeField
-          from={range.from}
-          to={range.to}
-          width="w-50"
-          clearable={false}
-          disabled={{ after: maxDate }}
-          onChange={commitRange}
-        />
+        <Badge variant="secondary" className="shrink-0 tabular-nums">
+          {trend.length} 天
+        </Badge>
       </CardHeader>
-      <CardContent className="px-2 pt-4 sm:p-6">
-        {/* 图例:顶部居中,两个小圆圈居中靠拢,标签分居两侧;点击切换曲线显隐。
-            隐藏态 = 整体变灰(文字+圆变淡),无横线。 */}
-        <div className="mb-2 flex items-center justify-center gap-2">
-          {/* 左侧:投稿量 文字 + 圆 */}
-          <button
-            type="button"
-            onClick={() => toggle("worksDelta")}
-            className={cn(
-              "flex items-center gap-1.5 text-xs text-muted-foreground transition-opacity",
-              hidden.worksDelta && "opacity-40",
-            )}
-          >
-            {chartConfig.worksDelta.label}
+      <CardContent className="flex flex-1 flex-col gap-2 px-4 pb-3 pt-0">
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <h2 className="flex items-center gap-2">
             <span
-              className="inline-block size-2.5 shrink-0 rounded-full"
-              style={{ background: chartConfig.worksDelta.color }}
+              className="size-2 rounded-full bg-[var(--bi-views)]"
+              aria-hidden="true"
             />
-          </button>
-          {/* 右侧:圆 + 播放量 文字 */}
-          <button
-            type="button"
-            onClick={() => toggle("viewsDelta")}
-            className={cn(
-              "flex items-center gap-1.5 text-xs text-muted-foreground transition-opacity",
-              hidden.viewsDelta && "opacity-40",
-            )}
+            可比视频播放变化
+          </h2>
+          <span className="text-muted-foreground">单位 / 次</span>
+        </div>
+        {comparableDays ? (
+          <ChartContainer
+            config={config}
+            className="h-32 w-full aspect-auto"
+            role="img"
+            aria-label="每日可比视频播放变化折线图，可通过下方查看趋势数据读取数值"
           >
+            <LineChart
+              data={trend}
+              margin={{ left: 0, right: 8, top: 10, bottom: 0 }}
+              accessibilityLayer
+            >
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={dayLabel}
+                tick={{ fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={35}
+              />
+              <YAxis
+                tickFormatter={compact}
+                tick={{ fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                width={68}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    labelFormatter={(_, payload) =>
+                      payload[0]?.payload.date ?? ""
+                    }
+                    formatter={(value, _, item) => (
+                      <div className="flex flex-col gap-1">
+                        <span>
+                          播放变化：{Number(value).toLocaleString("zh-CN")} 次
+                        </span>
+                        <span className="text-muted-foreground">
+                          可比{" "}
+                          {Number(item.payload.matched).toLocaleString("zh-CN")}{" "}
+                          条 / 当日有快照{" "}
+                          {Number(item.payload.recorded).toLocaleString(
+                            "zh-CN",
+                          )}{" "}
+                          条
+                        </span>
+                      </div>
+                    )}
+                  />
+                }
+              />
+              <Line
+                type="linear"
+                dataKey="viewsChange"
+                stroke="var(--color-viewsChange)"
+                strokeWidth={2}
+                dot={{ r: 2, strokeWidth: 0 }}
+                activeDot={{ r: 4 }}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ChartContainer>
+        ) : (
+          <Empty className="h-32 gap-2 py-4">
+            <EmptyHeader className="gap-2">
+              <EmptyMedia>
+                <ChartNoAxesCombined aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle>暂无连续日快照</EmptyTitle>
+              <EmptyDescription>
+                缺少可比数据，播放变化暂不绘制。
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <h2 className="flex items-center gap-2">
             <span
-              className="inline-block size-2.5 shrink-0 rounded-full"
-              style={{ background: chartConfig.viewsDelta.color }}
+              className="size-2 rounded-full bg-[var(--bi-output)]"
+              aria-hidden="true"
             />
-            {chartConfig.viewsDelta.label}
-          </button>
+            每日发布作品
+          </h2>
+          <span className="text-muted-foreground">
+            合计 {works.toLocaleString("zh-CN")} 条
+          </span>
         </div>
         <ChartContainer
-          config={chartConfig}
-          className="aspect-auto h-[260px] w-full"
+          config={config}
+          className="h-20 w-full aspect-auto"
+          role="img"
+          aria-label="每日发布作品数量折线图，可通过下方查看趋势数据读取数值"
         >
           <LineChart
-            accessibilityLayer
             data={trend}
-            margin={{ top: 16, left: 12, right: 12 }}
+            margin={{ left: 0, right: 8, top: 5, bottom: 0 }}
+            accessibilityLayer
           >
-            <CartesianGrid vertical={false} />
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
+              tickFormatter={dayLabel}
+              tick={{ fill: "var(--muted-foreground)" }}
               tickLine={false}
               axisLine={false}
-              tickMargin={8}
-              minTickGap={32}
-              tickFormatter={(v) => {
-                const d = new Date(v as string);
-                return `${d.getMonth() + 1}/${d.getDate()}`;
-              }}
+              minTickGap={35}
             />
-            {/* 左轴:稿件(投稿量)。固定刻度 750~4500(步长 750),锁死量程等分 */}
             <YAxis
-              yAxisId="left"
-              orientation="left"
+              tickFormatter={compact}
+              tick={{ fill: "var(--muted-foreground)" }}
               tickLine={false}
               axisLine={false}
-              width={40}
-              domain={[0, 4500]}
-              ticks={[750, 1500, 2250, 3000, 3750, 4500]}
-              allowDataOverflow
-              tickFormatter={(v) => `${v}`}
-            />
-            {/* 右轴:播放量。固定刻度 500w~3000w(步长 500w),与左轴同为 6 个刻度对齐 */}
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tickLine={false}
-              axisLine={false}
-              width={52}
-              domain={[0, 30_000_000]}
-              ticks={[
-                5_000_000, 10_000_000, 15_000_000, 20_000_000, 25_000_000,
-                30_000_000,
-              ]}
-              allowDataOverflow
-              tickFormatter={(v) => (v === 0 ? "0" : `${Number(v) / 10_000}w`)}
+              width={68}
+              allowDecimals={false}
             />
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  className="w-[180px]"
-                  labelFormatter={(value) =>
-                    new Date(value as string).toLocaleDateString("zh-CN", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })
+                  labelFormatter={(_, payload) =>
+                    payload[0]?.payload.date ?? ""
                   }
-                  formatter={(val, name) => {
-                    const label = chartConfig[name as keyof typeof chartConfig]?.label ?? name;
-                    const num = Number(val);
-                    const text = name === "viewsDelta" ? fmtViews(num) : num.toLocaleString();
-                    return (
-                      <div className="flex w-full items-center justify-between gap-2">
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            className="size-2 rounded-[2px]"
-                            style={{ background: `var(--color-${name})` }}
-                          />
-                          {label}
-                        </span>
-                        <span className="font-mono font-medium tabular-nums">{text}</span>
-                      </div>
-                    );
-                  }}
+                  formatter={(value) => (
+                    <span>
+                      发布作品：{Number(value).toLocaleString("zh-CN")} 条
+                    </span>
+                  )}
                 />
               }
             />
             <Line
-              yAxisId="left"
-              dataKey="worksDelta"
               type="monotone"
-              stroke="var(--color-worksDelta)"
+              dataKey="works"
+              stroke="var(--color-works)"
               strokeWidth={2}
-              dot={false}
-              hide={hidden.worksDelta}
-            />
-            <Line
-              yAxisId="right"
-              dataKey="viewsDelta"
-              type="monotone"
-              stroke="var(--color-viewsDelta)"
-              strokeWidth={2}
-              dot={false}
-              hide={hidden.viewsDelta}
+              dot={trend.length === 1 ? { r: 3 } : false}
+              activeDot={{ r: 4 }}
+              isAnimationActive={false}
             />
           </LineChart>
         </ChartContainer>
       </CardContent>
+      <CardFooter className="flex-col items-start gap-1 px-4 pb-4 pt-0">
+        <p className="text-xs leading-5 text-muted-foreground">
+          {comparableDays} / {trend.length}{" "}
+          天有可比快照。仅比较同一视频的相邻日累计值，缺失处留空；负值表示数据回调。
+        </p>
+        <details className="sr-only focus-within:not-sr-only">
+          <summary>查看趋势数据</summary>
+          <ul>
+            {trend.map((day) => (
+              <li key={day.date}>
+                {day.date}，发布 {day.works} 条，播放变化{" "}
+                {day.viewsChange === null
+                  ? "无可比快照"
+                  : `${day.viewsChange} 次`}
+                ，可比 {day.matched} 条，当日快照 {day.recorded} 条。
+              </li>
+            ))}
+          </ul>
+        </details>
+      </CardFooter>
     </Card>
   );
 }

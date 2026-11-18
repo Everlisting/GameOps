@@ -30,6 +30,7 @@ const toValue = (d: Date) => format(d, "yyyy-MM-dd");
 const toLabel = (d: Date) => format(d, "yyyy/M/d");
 
 export default function DateRangeField({
+  id,
   from,
   to,
   onChange,
@@ -38,6 +39,7 @@ export default function DateRangeField({
   clearable = true,
   disabled,
 }: {
+  id?: string;
   from: string;
   to: string;
   /** 回传起止(YYYY-MM-DD;清空为 "");仅在起止都确定后触发 */
@@ -58,7 +60,11 @@ export default function DateRangeField({
   // 选择过程中的暂存值;props 变化(外部提交/清空)时同步
   const [draft, setDraft] = useState<DateRange | undefined>(committed);
   useEffect(() => {
-    setDraft(parseISODate(from) ? { from: parseISODate(from), to: parseISODate(to) } : undefined);
+    setDraft(
+      parseISODate(from)
+        ? { from: parseISODate(from), to: parseISODate(to) }
+        : undefined,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to]);
 
@@ -72,6 +78,7 @@ export default function DateRangeField({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           variant="outline"
           data-empty={!hasValue}
           className={cn(

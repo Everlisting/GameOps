@@ -1,216 +1,174 @@
 "use client";
 
-/**
- * 右侧榜单:顶部一个分段开关切换「主播 TOP30」(按总播放)/「作品 TOP30」(按单作品播放),
- * 一次只显示一份。榜单纵向循环滚动(内容复制两份 + CSS translateY(-50%) 无缝循环),悬停暂停。
- * 主播只显示 名称 + 播放量;作品显示 标题(过长截断)+ 播放量。
- */
-import * as React from "react";
-import { useRouter } from "next/navigation";
-
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-
+import Link from "next/link";
+import { ArrowUpRight, Trophy } from "lucide-react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
+import { Badge } from "@/components/ui/badge";
+import { creatorMonthVideosHref } from "@/lib/data-period";
 import type { DashboardData } from "../_lib/aggregate";
-
-type Tab = "anchor" | "video";
+import { compact } from "../_lib/format";
 
 export function TopCard({
-  anchors,
+  authors,
   videos,
-  className,
+  range,
 }: {
-  anchors: DashboardData["topAnchors"];
+  authors: DashboardData["topAuthors"];
   videos: DashboardData["topVideos"];
-  className?: string;
+  range: DashboardData["range"];
 }) {
-  const [tab, setTab] = React.useState<Tab>("anchor");
-  const router = useRouter();
-
-  // 点击主播 → 视频数据页,按该主播搜索(沿用视频页「本月默认」);
-  // keepFilters 让全局重置组件放行这次带来的筛选
-  const gotoAnchor = (search: string) => {
-    const params = new URLSearchParams({ q: search, keepFilters: "1" });
-    router.push(`/operator/data/videos?${params.toString()}`);
-  };
-
   return (
-    <Card className={cn("flex flex-col", className)}>
-      <CardHeader>
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-xs">
-          {(
-            [
-              ["anchor", "主播 TOP30"],
-              ["video", "作品 TOP30"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              data-active={tab === key}
-              className="rounded-md px-2 py-1.5 font-medium text-muted-foreground transition-colors data-[active=true]:bg-background data-[active=true]:text-foreground data-[active=true]:shadow-sm"
-            >
-              {label}
-            </button>
-          ))}
+    <Card className="h-full min-w-0">
+      <CardHeader className="flex-row items-start justify-between gap-3 p-4 pb-2">
+        <div className="flex flex-col gap-2">
+          <CardTitle>传播排行榜</CardTitle>
+          <CardDescription>按所选作品的最新累计播放量排序</CardDescription>
         </div>
+        <Badge variant="secondary">
+          <Trophy className="size-3" aria-hidden="true" />
+          TOP 10
+        </Badge>
       </CardHeader>
-      {/* flex-1 让卡片高度沿用同行趋势卡(不被榜单内容撑高);
-          滚动内容绝对定位脱离流,填满后由 overflow-hidden 裁剪 */}
-      <CardContent className="relative flex-1 p-0">
-        <div className="absolute inset-0 overflow-hidden px-6 pb-6">
-          {tab === "anchor" ? (
-            <LoopList
-              key="anchor"
-              items={anchors}
-              emptyText="暂无主播数据"
-              renderItem={(a) => (
-                <Row
-                  rank={a.rank}
-                  label={a.name}
-                  views={a.views}
-                  onClick={() => gotoAnchor(a.search)}
-                />
+      <CardContent className="px-4 pb-4 pt-0">
+        <Tabs defaultValue="authors" className="gap-3">
+          <TabsList className="w-full min-h-11 sm:w-64" aria-label="排行类型">
+            <TabsTrigger value="authors">达人榜</TabsTrigger>
+            <TabsTrigger value="videos">作品榜</TabsTrigger>
+          </TabsList>
+          <TabsContent value="authors">
+            <div className="flex items-center justify-between px-2 pb-2 text-xs text-muted-foreground">
+              <span>排名 / 达人</span>
+              <span>作品数 · 累计播放</span>
+            </div>
+            <div
+              className="max-h-40 overflow-y-auto overscroll-contain"
+              tabIndex={0}
+              role="region"
+              aria-label="达人播放量前十名"
+            >
+              {authors.length ? (
+                authors.map((author, index) => (
+                  <Link
+                    key={`${author.platform}:${author.uid}`}
+                    href={creatorMonthVideosHref(
+                      author.platform,
+                      author.uid,
+                      range.from,
+                      range.to,
+                    )}
+                    prefetch={false}
+                    className="group flex min-h-12 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
+                    <span className="w-5 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span
+                        className="truncate text-sm font-medium"
+                        title={author.name || author.uid}
+                      >
+                        {author.name || author.uid}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {author.platform === "douyin"
+                          ? "抖音"
+                          : author.platform}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {author.works.toLocaleString("zh-CN")} 条
+                    </span>
+                    <span
+                      className="w-20 shrink-0 text-right text-sm font-medium tabular-nums"
+                      title={author.views.toLocaleString("zh-CN")}
+                    >
+                      {compact(author.views)}
+                    </span>
+                    <ArrowUpRight
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  </Link>
+                ))
+              ) : (
+                <RankingEmpty />
               )}
-            />
-          ) : (
-            <LoopList
-              key="video"
-              items={videos}
-              emptyText="暂无作品数据"
-              renderItem={(v) => (
-                <Row rank={v.rank} label={v.title} views={v.views} href={v.url} />
+            </div>
+          </TabsContent>
+          <TabsContent value="videos">
+            <div className="flex items-center justify-between px-2 pb-2 text-xs text-muted-foreground">
+              <span>排名 / 作品</span>
+              <span>累计播放</span>
+            </div>
+            <div
+              className="max-h-40 overflow-y-auto overscroll-contain"
+              tabIndex={0}
+              role="region"
+              aria-label="作品播放量前十名"
+            >
+              {videos.length ? (
+                videos.map((video, index) => (
+                  <a
+                    key={video.id}
+                    href={
+                      /^https?:\/\//i.test(video.url) ? video.url : undefined
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex min-h-12 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    aria-label={`${video.title || video.externalId}，新窗口打开原视频`}
+                  >
+                    <span className="w-5 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span
+                      className="min-w-0 flex-1 truncate text-sm"
+                      title={video.title}
+                    >
+                      {video.title || video.externalId}
+                    </span>
+                    <span
+                      className="w-20 shrink-0 text-right text-sm font-medium tabular-nums"
+                      title={video.views.toLocaleString("zh-CN")}
+                    >
+                      {compact(video.views)}
+                    </span>
+                    <ArrowUpRight
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  </a>
+                ))
+              ) : (
+                <RankingEmpty />
               )}
-            />
-          )}
-        </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
 }
-
-/**
- * 纵向循环滚动:items 复制两份,用 rAF 递增 scrollTop 匀速上移,过一份高度即归位,无缝循环。
- * 悬停时暂停自动滚动,此时可用鼠标滚轮手动滚动列表(原生 overflow 滚动,隐藏滚动条)。
- */
-function LoopList<T>({
-  items,
-  renderItem,
-  emptyText,
-}: {
-  items: T[];
-  renderItem: (item: T) => React.ReactNode;
-  emptyText: string;
-}) {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const pausedRef = React.useRef(false);
-
-  React.useEffect(() => {
-    const el = ref.current;
-    if (!el || items.length === 0) return;
-    let raf = 0;
-    // scrollTop 会被浏览器取整,<1px/帧 的增量直接累加到 scrollTop 会被舍掉而卡住;
-    // 用浮点累加器保存精确位置,scrollTop 只作显示。
-    let offset = 0;
-    const SPEED = 0.5; // px/帧 ≈ 30px/s
-    const tick = () => {
-      const half = el.scrollHeight / 2; // 一份内容的高度
-      if (half > 0) {
-        if (pausedRef.current) {
-          offset = el.scrollTop; // 悬停:跟随用户滚轮手动滚动的位置
-        } else {
-          offset += SPEED;
-          if (offset >= half) offset -= half; // 过一份即归位,无缝
-          el.scrollTop = offset;
-        }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [items.length]);
-
-  if (items.length === 0) {
-    return (
-      <div className="grid h-full place-items-center text-xs text-muted-foreground">
-        {emptyText}
-      </div>
-    );
-  }
+function RankingEmpty() {
   return (
-    <div
-      ref={ref}
-      onMouseEnter={() => (pausedRef.current = true)}
-      onMouseLeave={() => (pausedRef.current = false)}
-      className="h-full overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {items.map((it, i) => (
-        <div key={i} className="mb-1.5">
-          {renderItem(it)}
-        </div>
-      ))}
-      {items.map((it, i) => (
-        <div key={`dup-${i}`} className="mb-1.5" aria-hidden>
-          {renderItem(it)}
-        </div>
-      ))}
-    </div>
+    <Empty className="h-64 py-6">
+      <EmptyHeader>
+        <EmptyTitle>该时段暂无排行</EmptyTitle>
+        <EmptyDescription>调整作品发布时间查看其他时段。</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
-}
-
-function Row({
-  rank,
-  label,
-  views,
-  onClick,
-  href,
-}: {
-  rank: number;
-  label: string;
-  views: number;
-  onClick?: () => void;
-  /** 外链(作品跳抖音);为空则不可点 */
-  href?: string;
-}) {
-  const cls =
-    "grid grid-cols-[1.75rem_1fr_auto] items-center gap-2 rounded-md border bg-muted/30 px-2.5 py-1.5 text-xs transition-colors hover:bg-muted hover:shadow-sm";
-  const inner = (
-    <>
-      <span className="font-mono text-muted-foreground">
-        {String(rank).padStart(2, "0")}
-      </span>
-      <span className="min-w-0 truncate">{label}</span>
-      <span className="font-mono tabular-nums text-muted-foreground">
-        {formatViews(views)}
-      </span>
-    </>
-  );
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(cls, "cursor-pointer")}
-      >
-        {inner}
-      </a>
-    );
-  }
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className={cn(cls, "w-full cursor-pointer text-left")}>
-        {inner}
-      </button>
-    );
-  }
-  return <div className={cls}>{inner}</div>;
-}
-
-function formatViews(v: number): string {
-  if (v >= 100_000_000) return (v / 100_000_000).toFixed(2) + "亿";
-  if (v >= 10_000) return (v / 10_000).toFixed(1) + "万";
-  return v.toLocaleString();
 }
