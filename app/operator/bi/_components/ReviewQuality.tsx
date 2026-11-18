@@ -23,7 +23,7 @@ import { compact, percent, percentageText, reviewHref } from "../_lib/format";
 import { cn } from "@/lib/utils";
 
 const config = {
-  approved: { label: "合格", color: "var(--bi-output)" },
+  approved: { label: "合格", color: "var(--chart-2)" },
   rejected: { label: "不合格", color: "var(--destructive)" },
   pending: { label: "待审核", color: "var(--muted)" },
 };
