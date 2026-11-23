@@ -1,0 +1,100 @@
+.hero {
+  --terrain-accent: var(--color-brand-primary);
+  --terrain-ink: color-mix(in oklab, var(--terrain-accent) 48%, var(--muted-foreground));
+  container-type: inline-size;
+}
+
+.lighting,
+.terrain {
+  position: absolute;
+  pointer-events: none;
+}
+
+.lighting {
+  display: none;
+  inset: 0;
+  mask-image: linear-gradient(90deg, transparent 52%, #000 77%);
+}
+
+.spotlight {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 65%;
+  height: 152%;
+  background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--terrain-accent) 23%, transparent), transparent);
+  transform: translate3d(calc(var(--terrain-x, 80%) - 50%), calc(var(--terrain-y, 42%) - 50%), 0);
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.terrain {
+  inset: 0 0 0 57%;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--terrain-ink) 14%, transparent) 1px, transparent 1px) center / 27px 27px,
+    linear-gradient(color-mix(in srgb, var(--terrain-ink) 14%, transparent) 1px, transparent 1px) center / 27px 27px,
+    radial-gradient(ellipse at 73% 58%, var(--color-brand-primary-soft), transparent 72%);
+  mask-image: linear-gradient(90deg, transparent, #000 47%);
+}
+
+.contours {
+  position: absolute;
+  inset: -30% -16% -14% 9%;
+  transform: rotate(-19deg);
+}
+
+.contours span {
+  position: absolute;
+  inset: calc(var(--contour-index) * 4.8%);
+  border: 1px solid color-mix(in srgb, var(--terrain-ink) 38%, transparent);
+  border-radius: 59% 41% 60% 40% / 44% 60% 40% 56%;
+  transform: translate(calc(var(--contour-index) * 3px), calc(var(--contour-index) * -1px))
+    rotate(calc(var(--contour-index) * 4deg));
+}
+
+.route {
+  position: absolute;
+  inset: 53% 5% auto 28%;
+  height: 1px;
+  transform: rotate(-24deg);
+  background: color-mix(in srgb, var(--terrain-accent) 38%, transparent);
+}
+
+.route span {
+  position: absolute;
+  top: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-brand-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--terrain-accent) 12%, transparent);
+}
+
+.route span:nth-child(1) { left: 15%; }
+.route span:nth-child(2) { left: 49%; }
+.route span:nth-child(3) { left: 83%; }
+
+@container (max-width: 36rem) {
+  .terrain {
+    inset-inline-start: 64%;
+    opacity: 0.55;
+    mask-image: linear-gradient(90deg, transparent, #000 65%);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .lighting { display: block; }
+  .hero[data-spotlight="active"] .spotlight { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .eyebrow { animation: reveal 380ms ease-out both; }
+  .title { animation: reveal 520ms ease-out 40ms both; }
+  .description { animation: reveal 470ms ease-out 100ms both; }
+  .meta { animation: reveal 430ms ease-out 170ms both; }
+}
+
+@keyframes reveal {
+  from { opacity: 0.38; transform: translateY(7px); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}

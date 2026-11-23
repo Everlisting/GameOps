@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -26,6 +27,7 @@ import {
   MATERIAL_CATEGORY_LABEL,
 } from "@/lib/validation/inspiration";
 
+import { INSPIRATION_TOPICS } from "@/lib/inspiration-catalog";
 const ALL = "__all";
 
 export default function InspirationListFilters() {
@@ -35,6 +37,7 @@ export default function InspirationListFilters() {
 
   const urlType = search.get("type") ?? "";
   const urlCategory = search.get("category") ?? "";
+  const urlTopic = search.get("topic") ?? "";
   const urlQ = search.get("q") ?? "";
   const urlTag = search.get("tag") ?? "";
   const urlPublished = search.get("published") ?? "all";
@@ -53,16 +56,18 @@ export default function InspirationListFilters() {
     // 切 type → 清掉 category(避免组合非法)
     if (patch.type !== undefined) params.delete("category");
     if (params.has("page")) params.delete("page");
+    params.set("keepFilters", "1");
     const qs = params.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
   const showCategory = urlType === "MATERIAL";
   const hasAny =
-    !!(urlQ || urlTag || urlType || urlCategory || urlPublished !== "all");
+    !!(urlQ || urlTag || urlType || urlCategory || urlTopic || urlPublished !== "all");
 
   return (
     <div className="flex flex-wrap items-end gap-3">
+      <Field className="w-40"><FieldLabel htmlFor="ins-topic">内容主题</FieldLabel><Select value={urlTopic || ALL} onValueChange={(value) => commit({ topic: value })}><SelectTrigger id="ins-topic"><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value={ALL}>全部主题</SelectItem>{INSPIRATION_TOPICS.map((topic) => <SelectItem key={topic.label} value={topic.label}>{topic.label}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
       <Field className="min-w-[220px] flex-1">
         <FieldLabel htmlFor="ins-q">搜索</FieldLabel>
         <div className="relative">
@@ -168,7 +173,7 @@ export default function InspirationListFilters() {
         type="button"
         variant="outline"
         onClick={() =>
-          commit({ q: "", tag: "", type: "", category: "", published: "" })
+          commit({ q: "", tag: "", type: "", category: "", topic: "", published: "" })
         }
         disabled={!hasAny}
       >

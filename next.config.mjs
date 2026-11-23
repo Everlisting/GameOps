@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 素材原文件由 Route Handler 流式上传，大小限制统一见 lib/inspiration-upload.ts。
   reactStrictMode: true,
   experimental: {
     // 动态页面在正常导航时读取最新数据，免去进入页面后的全局 refresh。
@@ -17,7 +18,18 @@ const nextConfig = {
   // instrumentation.ts 走的是单独的 webpack 上下文,
   // serverComponentsExternalPackages 不覆盖它 —— 这里手动 externals 第三方包,
   // 并把 Node 内建(fs/path/crypto…)也声明成 external,运行时直接 require。
-  webpack: (config, { isServer }) => {
+  webpack: (config, { dev, isServer }) => {
+    if (dev) {
+      // 上传文件是运行时数据。排除它们，避免落盘使 CSS 重新编译并触发表单刷新。
+      const ignored = config.watchOptions?.ignored;
+      const uploads = /(?:^|[\\/])public[\\/]uploads(?:[\\/]|$)/;
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: ignored instanceof RegExp
+          ? new RegExp(`(?:${ignored.source})|(?:${uploads.source})`, ignored.flags)
+          : uploads,
+      };
+    }
     if (isServer) {
       const externals = Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean);
       externals.push(({ request }, callback) => {

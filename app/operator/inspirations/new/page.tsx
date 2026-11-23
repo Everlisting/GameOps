@@ -10,7 +10,7 @@ import InspirationForm from "../_components/InspirationForm";
 export default async function NewInspirationPage() {
   await requireRole("OPERATOR");
   return (
-    <div className="p-8">
+    <div className="p-5 sm:p-8">
       <div className="mb-4">
         <Link
           href="/operator/inspirations"
@@ -24,7 +24,7 @@ export default async function NewInspirationPage() {
       <header className="mb-6">
         <h1 className="text-lg font-semibold">新建创作灵感</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          视频教程 / 文档教程 / 创作素材;先选类型,字段会随之联动。
+          先选择内容主题与资源类型，再添加内容。选择「已发布」后，访客无需登录即可查看。
         </p>
       </header>
 

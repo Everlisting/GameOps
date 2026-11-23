@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { fmtDateTime } from "@/lib/format";
 import InspirationForm from "../_components/InspirationForm";
+import { inspirationFiles } from "@/lib/inspiration-files";
 
 export default async function EditInspirationPage({
   params,
@@ -27,6 +28,7 @@ export default async function EditInspirationPage({
       summary: true,
       content: true,
       url: true,
+      files: true,
       coverImage: true,
       tags: true,
       published: true,
@@ -38,7 +40,7 @@ export default async function EditInspirationPage({
   if (!i) nextNotFound();
 
   return (
-    <div className="p-8">
+    <div className="p-5 sm:p-8">
       <div className="mb-4">
         <Link
           href="/operator/inspirations"
@@ -68,6 +70,7 @@ export default async function EditInspirationPage({
           summary: i.summary ?? "",
           content: i.content ?? "",
           url: i.url ?? "",
+          files: inspirationFiles(i),
           coverImage: i.coverImage ?? "",
           tags: i.tags,
           published: i.published,

@@ -1,18 +1,12 @@
 allowBuilds:
-  '@prisma/client': set this to true or false
-  '@prisma/engines': set this to true or false
-  argon2: set this to true or false
-  esbuild: set this to true or false
-  msw: set this to true or false
-  prisma: set this to true or false
-  protobufjs: set this to true or false
-  tesseract.js: set this to true or false
+  '@prisma/client': true
+  '@prisma/engines': true
+  argon2: true
+  esbuild: true
+  msw: false
+  prisma: true
+  protobufjs: false
+  tesseract.js: false
 # pnpm 10+ 把 onlyBuiltDependencies 等设置从 package.json 挪到了这里。
 # 允许运行 postinstall 构建脚本的依赖白名单。
 # argon2 是原生模块(密码哈希),不构建会导致登录在运行时崩溃 —— 必须保留。
-onlyBuiltDependencies:
-  - argon2
-  - esbuild
-  - "@prisma/client"
-  - "@prisma/engines"
-  - prisma

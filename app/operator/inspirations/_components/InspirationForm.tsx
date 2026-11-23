@@ -12,31 +12,22 @@
  */
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, X } from "lucide-react";
+import { X } from "lucide-react";
 
+import HoldButton from "@/components/HoldButton";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import {
   INSPIRATION_TYPES,
   INSPIRATION_TYPE_LABEL,
@@ -45,8 +36,14 @@ import {
   SUGGESTED_TAGS,
   type InspirationType,
   type MaterialCategory,
+  inspirationCreateSchema,
 } from "@/lib/validation/inspiration";
 import UploadField from "./UploadField";
+import MultiFileUpload from "./MultiFileUpload";
+import { inspirationFiles, type InspirationFileData } from "@/lib/inspiration-files";
+import { INSPIRATION_TOPICS } from "@/lib/inspiration-catalog";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Separator } from "@/components/ui/separator";
 
 export type InspirationFormInitial = {
   id?: string;
@@ -56,6 +53,7 @@ export type InspirationFormInitial = {
   summary: string;
   content: string;
   url: string;
+  files?: InspirationFileData[];
   coverImage: string;
   tags: string[];
   published: boolean;
@@ -76,19 +74,22 @@ export default function InspirationForm({
   const [title, setTitle] = useState(initial.title);
   const [summary, setSummary] = useState(initial.summary);
   const [content, setContent] = useState(initial.content);
-  const [url, setUrl] = useState(initial.url);
+  const [files, setFiles] = useState<InspirationFileData[]>(() => inspirationFiles({ ...initial, url: initial.url || null }));
+  const [url, setUrl] = useState(() => inspirationFiles({ ...initial, url: initial.url || null }).length ? "" : initial.url);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
   const [coverImage, setCoverImage] = useState(initial.coverImage);
   const [tags, setTags] = useState<string[]>(initial.tags);
   const [tagInput, setTagInput] = useState("");
   const [published, setPublished] = useState(initial.published);
 
-  const [submitting, setSubmitting] = useState(false);
+  const [operation, setOperation] = useState<"save" | "delete" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmDel, setConfirmDel] = useState(false);
+  const [deleteAttempt, setDeleteAttempt] = useState(0);
+  const busy = operation !== null || uploadingFiles;
 
   // 各 type 的字段提示 + 上传 kind/MIME 联动
   const hints = useMemo(() => computeHints(type, category), [type, category]);
-  const upload = useMemo(() => computeUpload(type, category), [type, category]);
+
 
   function changeType(next: InspirationType) {
     setType(next);
@@ -111,8 +112,9 @@ export default function InspirationForm({
   }
 
   async function submit() {
+    if (busy) return;
     setError(null);
-    setSubmitting(true);
+    setOperation("save");
     try {
       const body = {
         type,
@@ -120,11 +122,18 @@ export default function InspirationForm({
         title,
         summary: summary || null,
         content: content || null,
-        url: url || null,
+        url: files[0]?.url ?? (url || null),
+        files,
         coverImage: coverImage || null,
         tags,
         published,
       };
+
+      const validation = inspirationCreateSchema.safeParse(body);
+      if (!validation.success) {
+        setError(validation.error.issues.map((issue) => issue.message).join("；"));
+        return;
+      }
 
       const isEdit = mode === "edit" && initial.id;
       const res = await fetch(
@@ -137,8 +146,8 @@ export default function InspirationForm({
           body: JSON.stringify(body),
         },
       );
-      const data = await res.json();
       if (!res.ok) {
+        const data = await res.json();
         const detail = data?.error?.details
           ? Object.values(data.error.details).flat().join(";")
           : "";
@@ -148,32 +157,34 @@ export default function InspirationForm({
       if (isEdit) {
         router.refresh();
       } else {
-        router.push(`/operator/inspirations/${data.id}`);
+        router.replace("/operator/inspirations");
       }
     } catch {
       setError("网络错误,请重试");
     } finally {
-      setSubmitting(false);
+      setOperation(null);
     }
   }
 
   async function destroy() {
-    if (!initial.id) return;
-    setSubmitting(true);
+    if (!initial.id || busy) return;
+    setError(null);
+    setOperation("delete");
     try {
       const res = await fetch(`/api/operator/inspirations/${initial.id}`, {
         method: "DELETE",
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data?.error?.message ?? "删除失败");
+      if (res.ok) {
+        router.replace("/operator/inspirations");
         return;
       }
-      router.push("/operator/inspirations");
-    } finally {
-      setSubmitting(false);
-      setConfirmDel(false);
+      const data = await res.json().catch(() => ({}));
+      setError(data?.error?.message ?? "删除失败");
+    } catch {
+      setError("删除失败，请检查网络后重试。");
     }
+    setOperation(null);
+    setDeleteAttempt((attempt) => attempt + 1);
   }
 
   return (
@@ -181,11 +192,20 @@ export default function InspirationForm({
       <Card className="flex flex-col gap-5 p-5">
         <h2 className="text-sm font-medium">基础信息</h2>
 
+        <Field>
+          <FieldLabel htmlFor="inspiration-topic">内容主题</FieldLabel>
+          <Select value={tags.find((tag) => INSPIRATION_TOPICS.some((topic) => topic.label === tag)) ?? "__all"} onValueChange={(value) => setTags((previous) => [...previous.filter((tag) => !INSPIRATION_TOPICS.some((topic) => topic.label === tag)), ...(value === "__all" ? [] : [value])])}>
+            <SelectTrigger id="inspiration-topic"><SelectValue placeholder="选择内容主题" /></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="__all">未分类 / 通用资源</SelectItem>{INSPIRATION_TOPICS.map((topic) => <SelectItem key={topic.label} value={topic.label}>{topic.label}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground">选择资源所属主题，方便创作者在主题索引中找到它。</p>
+        </Field>
+
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <Label className="mb-1.5 block text-xs">类型 *</Label>
+            <Label htmlFor="ins-form-type" className="mb-1.5 block text-sm">资源类型 *</Label>
             <Select value={type} onValueChange={(v) => changeType(v as InspirationType)}>
-              <SelectTrigger>
+              <SelectTrigger id="ins-form-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -200,12 +220,12 @@ export default function InspirationForm({
 
           {type === "MATERIAL" && (
             <div>
-              <Label className="mb-1.5 block text-xs">素材子类 *</Label>
+              <Label htmlFor="ins-form-category" className="mb-1.5 block text-sm">素材子类 *</Label>
               <Select
                 value={category ?? undefined}
                 onValueChange={(v) => setCategory(v as MaterialCategory)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="ins-form-category">
                   <SelectValue placeholder="选择素材类型" />
                 </SelectTrigger>
                 <SelectContent>
@@ -251,61 +271,60 @@ export default function InspirationForm({
       <Card className="flex flex-col gap-5 p-5">
         <div>
           <h2 className="text-sm font-medium">资源</h2>
-          <p className="mt-1 text-xs text-muted-foreground">{hints.section}</p>
+          <p className="mt-1 text-sm text-muted-foreground">上传附件，或填写外部资源链接。</p>
+          {type === "DOC_TUTORIAL" && (
+            <p className="mt-1 text-sm text-muted-foreground">腾讯文档和飞书公开分享链接可在站内预览，也可以上传 PDF 附件。</p>
+          )}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <Label className="mb-1.5 block text-xs">
-              资源 {hints.urlRequired && "*"}
-            </Label>
-            {upload.allowResource ? (
-              <UploadField
-                kind={upload.kind}
-                accept={upload.accept}
-                previewType={upload.previewType}
-                value={url}
-                onChange={setUrl}
-                placeholder={hints.urlPlaceholder}
-              />
-            ) : (
-              <p className="rounded-md border border-dashed border-input px-3 py-2 text-xs text-muted-foreground">
-                此类型不需要上传资源,内容填到下方「正文」即可。
-              </p>
-            )}
-            {hints.urlHint && (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {hints.urlHint}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label className="mb-1.5 block text-xs">封面图</Label>
+        <FieldGroup className="gap-5">
+          <MultiFileUpload
+            files={files}
+            onChange={setFiles}
+            onBusyChange={setUploadingFiles}
+            disabled={operation !== null}
+          />
+          <Field>
+            <FieldLabel htmlFor="ins-external-url">外部资源链接（选填）</FieldLabel>
+            <Input
+              id="ins-external-url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://…（没有上传附件时使用）"
+              disabled={operation !== null || files.length > 0}
+            />
+          </Field>
+
+          <Separator />
+
+          <Field>
+            <FieldLabel htmlFor="ins-cover-url">封面图（选填）</FieldLabel>
             <UploadField
               kind="cover"
               accept="image/png,image/jpeg,image/webp,image/gif"
               previewType="image"
+              urlInputId="ins-cover-url"
               value={coverImage}
               onChange={setCoverImage}
-              placeholder="可选 · https://… 或上传"
+              placeholder="https://…（也可上传封面图）"
             />
-          </div>
-        </div>
+          </Field>
 
-        <div>
-          <Label htmlFor="ins-content" className="mb-1.5 block text-xs">
-            正文 {hints.contentRequired && "*"}
-          </Label>
-          <Textarea
-            id="ins-content"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            maxLength={20000}
-            rows={hints.contentRows}
-            placeholder={hints.contentPlaceholder}
-            className="font-mono text-xs"
-          />
-        </div>
+          <Field>
+            <FieldLabel htmlFor="ins-content">
+              正文 {hints.contentRequired && !files.length && "*"}
+            </FieldLabel>
+            <Textarea
+              id="ins-content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              maxLength={20000}
+              rows={hints.contentRows}
+              placeholder={hints.contentPlaceholder}
+              className="font-mono text-xs"
+            />
+          </Field>
+        </FieldGroup>
       </Card>
 
       <Card className="flex flex-col gap-4 p-5">
@@ -386,66 +405,42 @@ export default function InspirationForm({
       </Card>
 
       {error && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          {mode === "edit" && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setConfirmDel(true)}
-              disabled={submitting}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="size-3.5" />
-              删除
-            </Button>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.back()}
-            disabled={submitting}
+      <div className="flex flex-wrap items-center justify-between gap-3 [--save-width:4.5rem]">
+        {mode === "edit" && (
+          <HoldButton
+            key={deleteAttempt}
+            disabled={busy}
+            className="h-8! w-[calc(var(--save-width)*2.5)]"
+            onHold={() => void destroy()}
+            holdTime={2000}
+            holdDescription="长按 2 秒删除素材"
+            doneLabel="删除中…"
+            resetAfter={0}
+            radius={10}
           >
+            按住删除
+          </HoldButton>
+        )}
+        <div className="ml-auto flex items-center gap-3">
+          <Button type="button" variant="outline" onClick={() => router.back()} disabled={busy}>
             取消
           </Button>
-          <Button type="button" onClick={submit} disabled={submitting}>
-            {submitting
-              ? "保存中…"
-              : mode === "create"
-                ? "创建"
-                : "保存"}
+          <Button
+            type="button"
+            onClick={submit}
+            disabled={busy}
+            className={mode === "edit" ? "w-(--save-width)" : undefined}
+          >
+            {operation === "save" ? "保存中…" : mode === "create" ? "创建" : "保存"}
           </Button>
         </div>
       </div>
 
-      <AlertDialog open={confirmDel} onOpenChange={setConfirmDel}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除这条灵感?</AlertDialogTitle>
-            <AlertDialogDescription>
-              删除后创作者立刻看不到。此操作不可恢复。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={destroy}
-              className={cn(
-                "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-              )}
-            >
-              确认删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
@@ -454,6 +449,9 @@ function computeHints(
   type: InspirationType,
   category: MaterialCategory | null,
 ) {
+  if (type === "MATERIAL" && (category === "AUDIO" || category === "TEMPLATE")) {
+    return { section: category === "AUDIO" ? "音效配乐：上传音频或填写资源链接，注明来源及使用范围。" : "模板文件：上传 ZIP 素材包或填写工程文件链接，注明适用软件及版本。", urlRequired: true, urlPlaceholder: "https://...", urlHint: undefined, contentRequired: false, contentRows: 5, contentPlaceholder: "使用说明、来源、授权范围及注意事项" };
+  }
   if (type === "VIDEO_TUTORIAL") {
     return {
       section: "视频教程:把抖音/B站等视频链接放在「资源链接」,正文用作补充说明。",
@@ -529,62 +527,5 @@ function computeHints(
     contentRequired: false,
     contentRows: 6,
     contentPlaceholder: "",
-  };
-}
-
-/**
- * 按 type+category 决定资源上传的 kind / MIME 白名单 / 预览模式。
- * 文本素材不允许上传(内容写在正文里);其他都给上传按钮 + 外链输入并存。
- */
-type UploadCfg = {
-  allowResource: boolean;
-  kind: "image" | "video" | "doc";
-  accept: string;
-  previewType: "image" | "video" | "doc" | "none";
-};
-
-function computeUpload(
-  type: InspirationType,
-  category: MaterialCategory | null,
-): UploadCfg {
-  if (type === "VIDEO_TUTORIAL") {
-    return {
-      allowResource: true,
-      kind: "video",
-      accept: "video/mp4,video/webm,video/quicktime",
-      previewType: "video",
-    };
-  }
-  if (type === "DOC_TUTORIAL") {
-    return {
-      allowResource: true,
-      kind: "doc",
-      accept: "application/pdf,text/plain,text/markdown,application/zip",
-      previewType: "doc",
-    };
-  }
-  // MATERIAL
-  if (category === "VIDEO") {
-    return {
-      allowResource: true,
-      kind: "video",
-      accept: "video/mp4,video/webm,video/quicktime",
-      previewType: "video",
-    };
-  }
-  if (category === "IMAGE") {
-    return {
-      allowResource: true,
-      kind: "image",
-      accept: "image/png,image/jpeg,image/webp,image/gif,image/svg+xml",
-      previewType: "image",
-    };
-  }
-  // 文本素材 / 还没选 category
-  return {
-    allowResource: false,
-    kind: "doc",
-    accept: "",
-    previewType: "none",
   };
 }

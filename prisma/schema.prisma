@@ -47,6 +47,8 @@ enum InspirationType {
 enum MaterialCategory {
   VIDEO // 视频素材
   IMAGE // 图片素材
+  AUDIO // 音效与配乐
+  TEMPLATE // 模板与工程文件
   TEXT_PROMPT // 文本素材 - 提示词
   TEXT_STORY // 文本素材 - 故事
   TEXT_OTHER // 文本素材 - 其他
@@ -310,6 +312,7 @@ model Inspiration {
   summary     String? // 列表短描述
   content     String? // 详细正文(文档教程 / 文本素材)
   url         String? // 视频教程 / 视频素材 / 图片素材 的资源链接
+    files       Json              @default("[]") // 有序附件清单；首项为主文件，旧单文件仍兼容 url
   coverImage  String? // 封面图(可选)
   tags        String[] // 标签(AI创作 / 实拍指引 / 图文创作 …)
   published   Boolean           @default(true) // 是否对创作者可见(草稿 = false)

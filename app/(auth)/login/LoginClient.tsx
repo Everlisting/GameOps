@@ -108,6 +108,7 @@ function Header({
             className={styles.pillIntro}
             style={{ display: "flex", alignItems: "center", gap: 8 }}
           >
+            <a href="/inspirations" className={styles.navSignin} style={{ fontSize: 13, padding: "8px 12px", whiteSpace: "nowrap" }}>创作灵感</a>
             <button
               type="button"
               onClick={() => onOpenAuth("login")}

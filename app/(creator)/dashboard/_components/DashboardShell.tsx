@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 
 /** 详情页路径正则:/dashboard/activities/<id>(无再深路径) */
-const HIDE_ASIDE_PATTERNS = [/^\/dashboard\/activities\/[^/?#]+$/];
+const HIDE_ASIDE_PATTERNS = [/^\/dashboard\/activities\/[^/?#]+$/, /^\/dashboard\/inspirations$/];
 
 /**
  * Dashboard 壳:左主区 + 右固定侧栏(xl 以上显示)。

@@ -5,18 +5,19 @@
  *   - type 三态:VIDEO_TUTORIAL / DOC_TUTORIAL / MATERIAL
  *   - category 仅 type=MATERIAL 时使用,非 MATERIAL 一律落 null
  *   - content / url / coverImage 按 type+category 取舍:
- *       VIDEO_TUTORIAL  → 必填 url(视频外链)
- *       DOC_TUTORIAL    → content 与 url 至少二选一
- *       MATERIAL/VIDEO  → 必填 url
- *       MATERIAL/IMAGE  → 必填 url
- *       MATERIAL/TEXT_* → 必填 content
+ *       VIDEO_TUTORIAL  → url 或 files
+ *       DOC_TUTORIAL    → content / url / files 至少一项
+ *       MATERIAL 媒体类 → url 或 files
+ *       MATERIAL/TEXT_* → content 或 files
+ *   - files 支持最多30个混合格式附件，独立于资源分类
  *   - tags 自由文本,做长度/字符白名单
  *   - published=false 表示草稿,创作者不可见
  *
  * 校验在 inspirationCreateSchema 的 superRefine 里集中做。
- * Update 用 partial 版本,跨字段约束不重做(单字段微调常见,如切换 published)。
+ * Update 先校验 partial 入参，接口合并现有记录后用 Create 规则校验完整状态。
  */
 import { z } from "zod";
+import { inspirationFilesSchema } from "@/lib/inspiration-files";
 
 export const INSPIRATION_TYPES = [
   "VIDEO_TUTORIAL",
@@ -27,6 +28,8 @@ export const INSPIRATION_TYPES = [
 export const MATERIAL_CATEGORIES = [
   "VIDEO",
   "IMAGE",
+  "AUDIO",
+  "TEMPLATE",
   "TEXT_PROMPT",
   "TEXT_STORY",
   "TEXT_OTHER",
@@ -44,6 +47,8 @@ export const INSPIRATION_TYPE_LABEL: Record<InspirationType, string> = {
 export const MATERIAL_CATEGORY_LABEL: Record<MaterialCategory, string> = {
   VIDEO: "视频素材",
   IMAGE: "图片素材",
+  AUDIO: "音效配乐",
+  TEMPLATE: "模板文件",
   TEXT_PROMPT: "提示词素材",
   TEXT_STORY: "故事素材",
   TEXT_OTHER: "其他文本素材",
@@ -59,6 +64,15 @@ export const SUGGESTED_TAGS = [
   "运镜",
   "选题",
   "封面设计",
+  "武将立绘",
+  "游戏素材",
+  "三视图库",
+  "百大作者",
+  "率土CG",
+  "率土cos",
+  "故事素材",
+  "武将设定",
+  "联动素材",
 ] as const;
 
 // ── 字段级 ─────────────────────────────────────────────
@@ -100,6 +114,7 @@ export const inspirationCreateSchema = z
     summary: trimToNull(200),
     content: trimToNull(20000),
     url: optionalUrl,
+    files: inspirationFilesSchema.default([]),
     coverImage: optionalUrl,
     tags: tagsArray.default([]),
     published: z.boolean().default(true),
@@ -122,41 +137,41 @@ export const inspirationCreateSchema = z
       });
     }
 
-    if (data.type === "VIDEO_TUTORIAL" && !data.url) {
+    if (data.type === "VIDEO_TUTORIAL" && !data.url && !data.files.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["url"],
-        message: "视频教程必须提供视频链接",
+        message: "视频教程需上传文件或提供视频链接",
       });
     }
-    if (data.type === "DOC_TUTORIAL" && !data.content && !data.url) {
+    if (data.type === "DOC_TUTORIAL" && !data.content && !data.url && !data.files.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["content"],
-        message: "文档教程需填写正文或外部链接(二选一)",
+        message: "文档教程需填写正文、上传文件或提供外部链接",
       });
     }
     if (data.type === "MATERIAL") {
       if (
-        (data.category === "VIDEO" || data.category === "IMAGE") &&
-        !data.url
+        (data.category === "VIDEO" || data.category === "IMAGE" || data.category === "AUDIO" || data.category === "TEMPLATE") &&
+        !data.url && !data.files.length
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["url"],
-          message: "视频/图片素材必须提供资源链接",
+          message: "请上传资源文件或提供资源链接",
         });
       }
       if (
         (data.category === "TEXT_PROMPT" ||
           data.category === "TEXT_STORY" ||
           data.category === "TEXT_OTHER") &&
-        !data.content
+        !data.content && !data.files.length
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["content"],
-          message: "文本素材必须填写正文",
+          message: "文本素材需填写正文或上传文件",
         });
       }
     }
@@ -170,6 +185,7 @@ export const inspirationUpdateSchema = z.object({
   summary: trimToNull(200).optional(),
   content: trimToNull(20000).optional(),
   url: optionalUrl.optional(),
+  files: inspirationFilesSchema.optional(),
   coverImage: optionalUrl.optional(),
   tags: tagsArray.optional(),
   published: z.boolean().optional(),

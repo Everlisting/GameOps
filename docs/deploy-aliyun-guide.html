@@ -319,6 +319,21 @@ server {
 
     client_max_body_size 50m;   # EXCEL/封面上传，放开体积
 
+    # 素材原文件：应用逐类限制，最大单文件 1 GB，另留 multipart 边界空间。
+    location = /api/operator/uploads/inspiration {
+        client_max_body_size 1025m;
+        client_body_timeout 3600s;
+        proxy_request_buffering off;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_send_timeout 3600s;
+        proxy_read_timeout 3600s;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -418,7 +433,7 @@ pm2 reload gameops</code></pre>
 <tr><td>启动即崩 / DB 连接超时</td><td>RDS 白名单是否含 ECS 内网 IP；<code>DATABASE_URL</code> 用的是<strong>内网</strong>地址；密码特殊字符是否 URL 编码。</td></tr>
 <tr><td>502 Bad Gateway</td><td>PM2 是否 online（<code>pm2 status</code>）；<code>curl 127.0.0.1:3000</code> 是否通；Nginx <code>proxy_pass</code> 端口。</td></tr>
 <tr><td>时间显示差 8 小时</td><td>RDS 参数 <code>timezone</code> 是否为 UTC；前端渲染由 <code>lib/format.ts</code> 锁 Asia/Shanghai。</td></tr>
-<tr><td>上传 413 Request Entity Too Large</td><td>Nginx <code>client_max_body_size</code> 调大（示例 50m）。</td></tr>
+<tr><td>上传 413 Request Entity Too Large</td><td>核对 Nginx <code>client_max_body_size</code>：通用示例 50m；创作灵感上传的精确 location 使用 1025m，并关闭请求缓冲。</td></tr>
 <tr><td>argon2 报错 / 装不上</td><td>确认 <code>build-essential</code> 已装；删 <code>node_modules</code> 后重 <code>pnpm install</code>。</td></tr>
 <tr><td>cron/舆情任务重复触发</td><td>PM2 是否被误配成多实例/cluster；本项目必须<strong>单实例 fork</strong>。</td></tr>
 <tr><td>舆情报告一直不出现</td><td>分析容器是否 up；两侧 <code>ANALYSIS_SHARED_SECRET</code> 是否一致；<code>ANALYSIS_BASE_URL</code> 是否 127.0.0.1:8000；<code>storage/opinion-reports/</code> 是否可写。</td></tr>

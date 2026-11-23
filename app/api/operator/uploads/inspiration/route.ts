@@ -1,123 +1,66 @@
 /**
- * POST /api/operator/uploads/inspiration — 创作灵感资源上传。
- *
- * 入参(multipart/form-data):
- *   - file:File
- *   - kind:cover | image | video | doc(决定 MIME 白名单 + 大小上限 + 落盘子目录)
- *
- * 落盘:public/uploads/inspirations/<kind>/<uuid>.<ext>,返回站内路径。
- *
- * 上线 OSS 后:把写盘那段换成 OSS putObject,返回 OSS 的 https URL,前端无感知
- * (前端字段统一存"URL or 站内路径",zod 已经在 lib/validation/inspiration.ts 同时接两种)。
+ * 原文件流式上传：POST ?kind=cover|image|video|audio|doc，Content-Type 为文件 MIME。
+ * 兼容旧 multipart/form-data（file + kind）。只在校验完成后发布文件路径。
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-
+import { z } from "zod";
 import { route } from "@/lib/api";
 import { requireRole } from "@/lib/rbac";
 import { badRequest } from "@/lib/errors";
+import { INSPIRATION_UPLOAD_CONFIG, INSPIRATION_UPLOAD_KINDS, inspirationUploadSizeError, type InspirationUploadKind } from "@/lib/inspiration-upload";
+import { writeInspirationUpload } from "@/lib/inspiration-upload.server";
 
 export const runtime = "nodejs";
-
-type Kind = "cover" | "image" | "video" | "doc";
-
-const KIND_CONFIG: Record<
-  Kind,
-  { maxBytes: number; mimeToExt: Record<string, string>; label: string }
-> = {
-  cover: {
-    maxBytes: 5 * 1024 * 1024,
-    mimeToExt: {
-      "image/png": "png",
-      "image/jpeg": "jpg",
-      "image/webp": "webp",
-      "image/gif": "gif",
-    },
-    label: "封面图",
-  },
-  image: {
-    maxBytes: 10 * 1024 * 1024,
-    mimeToExt: {
-      "image/png": "png",
-      "image/jpeg": "jpg",
-      "image/webp": "webp",
-      "image/gif": "gif",
-      "image/svg+xml": "svg",
-    },
-    label: "图片素材",
-  },
-  video: {
-    maxBytes: 200 * 1024 * 1024,
-    mimeToExt: {
-      "video/mp4": "mp4",
-      "video/webm": "webm",
-      "video/quicktime": "mov",
-    },
-    label: "视频资源",
-  },
-  doc: {
-    maxBytes: 20 * 1024 * 1024,
-    mimeToExt: {
-      "application/pdf": "pdf",
-      "text/plain": "txt",
-      "text/markdown": "md",
-      "application/zip": "zip",
-    },
-    label: "文档资源",
-  },
-};
-
-function isKind(v: string | null): v is Kind {
-  return v === "cover" || v === "image" || v === "video" || v === "doc";
-}
+const kindSchema = z.enum(INSPIRATION_UPLOAD_KINDS);
 
 export const POST = route(async (req) => {
   await requireRole("OPERATOR");
+  let kind: InspirationUploadKind;
+  let mime: string;
+  let stream: ReadableStream<Uint8Array>;
+  const contentType = req.headers.get("content-type") ?? "";
 
-  let form: FormData;
+  if (contentType.toLowerCase().startsWith("multipart/form-data")) {
+    // 旧客户端兼容路径；新页面直接上传原文件，不调用 formData() 缓冲大文件。
+    const length = Number(req.headers.get("content-length"));
+    if (length > INSPIRATION_UPLOAD_CONFIG.doc.maxBytes + 64 * 1024) throw badRequest("上传请求过大，单文件最大 1 GB");
+    let form: FormData;
+    try { form = await req.formData(); } catch { throw badRequest("请求体必须是有效的 multipart/form-data"); }
+    kind = kindSchema.parse(form.get("kind"));
+    const file = form.get("file");
+    if (!(file instanceof File)) throw badRequest("缺少 file 字段");
+    const error = inspirationUploadSizeError(kind, file.size);
+    if (error) throw badRequest(error);
+    mime = file.type;
+    stream = file.stream();
+  } else {
+    kind = kindSchema.parse(new URL(req.url).searchParams.get("kind"));
+    if (!req.body) throw badRequest("缺少文件内容");
+    mime = contentType.split(";")[0].trim().toLowerCase();
+    const length = req.headers.get("content-length");
+    if (length !== null) {
+      const error = inspirationUploadSizeError(kind, Number(length));
+      if (error) throw badRequest(error);
+    }
+    stream = req.body;
+  }
+
+  const config = INSPIRATION_UPLOAD_CONFIG[kind];
+  const formats: Readonly<Record<string, string>> = config.mimeToExt;
+  if (!Object.hasOwn(formats, mime)) throw badRequest(`${config.label}仅支持 ${Object.keys(formats).join(" / ")}`);
+  const directory = path.join(process.cwd(), "public", "uploads", "inspirations", kind);
+  await fs.mkdir(directory, { recursive: true });
+  const id = crypto.randomUUID();
+  const filename = `${id}.${formats[mime]}`;
+  const temporaryPath = path.join(directory, `.${id}.part`);
+  const size = await writeInspirationUpload(stream, temporaryPath, config.maxBytes, `${config.label}不能超过 ${config.limitLabel}`);
   try {
-    form = await req.formData();
-  } catch {
-    throw badRequest("请求体必须是 multipart/form-data");
+    await fs.rename(temporaryPath, path.join(directory, filename));
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true });
+    throw error;
   }
-
-  const kindRaw = form.get("kind");
-  const kind = typeof kindRaw === "string" ? kindRaw : null;
-  if (!isKind(kind)) throw badRequest("kind 必须是 cover/image/video/doc");
-
-  const file = form.get("file");
-  if (!(file instanceof File)) throw badRequest("缺少 file 字段");
-
-  const cfg = KIND_CONFIG[kind];
-  const ext = cfg.mimeToExt[file.type];
-  if (!ext) {
-    const allow = Object.keys(cfg.mimeToExt).join(" / ");
-    throw badRequest(`${cfg.label}仅支持 ${allow}`);
-  }
-  if (file.size === 0) throw badRequest("文件为空");
-  if (file.size > cfg.maxBytes) {
-    throw badRequest(
-      `${cfg.label}不能超过 ${Math.round(cfg.maxBytes / 1024 / 1024)} MB`,
-    );
-  }
-
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const dir = path.join(
-    process.cwd(),
-    "public",
-    "uploads",
-    "inspirations",
-    kind,
-  );
-  await fs.mkdir(dir, { recursive: true });
-
-  const filename = `${crypto.randomUUID()}.${ext}`;
-  await fs.writeFile(path.join(dir, filename), bytes);
-
-  return Response.json({
-    url: `/uploads/inspirations/${kind}/${filename}`,
-    size: file.size,
-    mime: file.type,
-  });
+  return Response.json({ url: `/uploads/inspirations/${kind}/${filename}`, size, mime });
 });

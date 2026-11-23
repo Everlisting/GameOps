@@ -1,203 +1,40 @@
-/**
- * 运营端 · 创作灵感管理 · 列表
- * 过滤:?type / ?category / ?published / ?q / ?tag
- */
 import type { Prisma } from "@prisma/client";
 import Link from "next/link";
-import { ImageIcon, Plus, Sparkles } from "lucide-react";
-
+import { ExternalLink, FileText, Plus } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { fmtDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  INSPIRATION_TYPES,
-  INSPIRATION_TYPE_LABEL,
-  MATERIAL_CATEGORY_LABEL,
-  type InspirationType,
-  type MaterialCategory,
-} from "@/lib/validation/inspiration";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
+import { INSPIRATION_TYPES, MATERIAL_CATEGORIES, INSPIRATION_TYPE_LABEL, MATERIAL_CATEGORY_LABEL, type InspirationType, type MaterialCategory } from "@/lib/validation/inspiration";
+import { INSPIRATION_TOPICS, safeResourceUrl } from "@/lib/inspiration-catalog";
 import InspirationListFilters from "./_components/InspirationListFilters";
 
-export default async function OperatorInspirationsPage({
-  searchParams,
-}: {
-  searchParams?: {
-    type?: string;
-    category?: string;
-    published?: string;
-    q?: string;
-    tag?: string;
-  };
-}) {
+export default async function OperatorInspirationsPage({ searchParams = {} }: { searchParams?: { type?: string; category?: string; published?: string; q?: string; tag?: string; topic?: string; page?: string } }) {
   await requireRole("OPERATOR");
-
-  const type = INSPIRATION_TYPES.includes(searchParams?.type as InspirationType)
-    ? (searchParams!.type as InspirationType)
-    : undefined;
-  const category =
-    type === "MATERIAL" &&
-    isMaterialCategory(searchParams?.category as string | undefined)
-      ? (searchParams!.category as MaterialCategory)
-      : undefined;
-  const published =
-    searchParams?.published === "true"
-      ? true
-      : searchParams?.published === "false"
-        ? false
-        : undefined;
-  const q = searchParams?.q?.trim() ?? "";
-  const tag = searchParams?.tag?.trim() ?? "";
-
-  const where: Prisma.InspirationWhereInput = {};
-  if (type) where.type = type;
-  if (category) where.category = category;
-  if (published !== undefined) where.published = published;
-  if (q) {
-    where.OR = [
-      { title: { contains: q, mode: "insensitive" } },
-      { summary: { contains: q, mode: "insensitive" } },
-    ];
-  }
-  if (tag) where.tags = { has: tag };
-
-  const items = await prisma.inspiration.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: 200,
-    select: {
-      id: true,
-      type: true,
-      category: true,
-      title: true,
-      summary: true,
-      coverImage: true,
-      tags: true,
-      published: true,
-      createdAt: true,
-      createdBy: { select: { username: true, displayName: true } },
-    },
-  });
-
-  return (
-    <div className="p-8">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold">创作灵感管理</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            维护视频教程、文档教程、创作素材;发布后会出现在创作者端。
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/operator/inspirations/new">
-            <Plus className="size-4" />
-            新建灵感
-          </Link>
-        </Button>
-      </header>
-
-      <Card className="mb-5 p-4">
-        <InspirationListFilters />
-        <p className="mt-3 text-xs text-muted-foreground">
-          共 {items.length} 条{items.length >= 200 ? "(仅展示最近 200 条)" : ""}
-        </p>
-      </Card>
-
-      {items.length === 0 ? (
-        <Card className="border-dashed p-10 text-center text-sm text-muted-foreground">
-          没有符合条件的灵感。
-        </Card>
-      ) : (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {items.map((i) => (
-            <li key={i.id}>
-              <Link
-                href={`/operator/inspirations/${i.id}`}
-                className="group block h-full"
-              >
-                <Card className="flex h-full flex-col overflow-hidden transition-colors hover:border-ring">
-                  <div className="relative aspect-video w-full overflow-hidden bg-muted/40">
-                    {i.coverImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={i.coverImage}
-                        alt=""
-                        className="size-full object-cover transition-transform group-hover:scale-[1.02]"
-                      />
-                    ) : (
-                      <div className="flex size-full items-center justify-center text-muted-foreground">
-                        {i.type === "MATERIAL" ? (
-                          <ImageIcon className="size-8 opacity-40" />
-                        ) : (
-                          <Sparkles className="size-8 opacity-40" />
-                        )}
-                      </div>
-                    )}
-                    <div className="absolute left-2 top-2 flex items-center gap-1">
-                      <Badge variant="secondary">
-                        {INSPIRATION_TYPE_LABEL[i.type]}
-                      </Badge>
-                      {i.category && (
-                        <Badge variant="outline">
-                          {MATERIAL_CATEGORY_LABEL[i.category]}
-                        </Badge>
-                      )}
-                    </div>
-                    {!i.published && (
-                      <div className="absolute right-2 top-2">
-                        <Badge variant="warning">草稿</Badge>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col gap-2 p-4">
-                    <h3 className="line-clamp-2 text-sm font-medium group-hover:text-primary">
-                      {i.title}
-                    </h3>
-                    <p className="line-clamp-2 text-xs text-muted-foreground">
-                      {i.summary ?? "未填写简介"}
-                    </p>
-                    {i.tags.length > 0 && (
-                      <div className="mt-auto flex flex-wrap gap-1">
-                        {i.tags.slice(0, 4).map((t) => (
-                          <span
-                            key={t}
-                            className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                        {i.tags.length > 4 && (
-                          <span className="text-[10px] text-muted-foreground">
-                            +{i.tags.length - 4}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div className="mt-1 flex items-baseline justify-between text-[11px] text-muted-foreground">
-                      <span>
-                        {i.createdBy?.displayName ?? i.createdBy?.username ?? "—"}
-                      </span>
-                      <span>{fmtDate(i.createdAt)}</span>
-                    </div>
-                  </div>
-                </Card>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function isMaterialCategory(v: string | undefined): boolean {
-  return (
-    v === "VIDEO" ||
-    v === "IMAGE" ||
-    v === "TEXT_PROMPT" ||
-    v === "TEXT_STORY" ||
-    v === "TEXT_OTHER"
-  );
+  const type = INSPIRATION_TYPES.find((value) => value === searchParams.type);
+  const category = type === "MATERIAL" ? MATERIAL_CATEGORIES.find((value) => value === searchParams.category) : undefined;
+  const topic = INSPIRATION_TOPICS.find((entry) => entry.label === searchParams.topic)?.label;
+  const published = searchParams.published === "true" ? true : searchParams.published === "false" ? false : undefined;
+  const q = searchParams.q?.trim().slice(0, 120);
+  const tag = searchParams.tag?.trim().slice(0, 30);
+  const where: Prisma.InspirationWhereInput = { ...(type ? { type } : {}), ...(category ? { category } : {}), ...(published !== undefined ? { published } : {}) };
+  if (q) where.OR = [{ title: { contains: q, mode: "insensitive" } }, { summary: { contains: q, mode: "insensitive" } }];
+  if (tag || topic) where.tags = { hasEvery: [...new Set([tag, topic].filter((value): value is string => !!value))] };
+  const [total, all, live, materials] = await Promise.all([prisma.inspiration.count({ where }), prisma.inspiration.count(), prisma.inspiration.count({ where: { published: true } }), prisma.inspiration.count({ where: { type: "MATERIAL" } })]);
+  const pages = Math.max(1, Math.ceil(total / 24));
+  const requested = Number(searchParams.page);
+  const page = Number.isSafeInteger(requested) && requested > 0 ? Math.min(requested, pages) : 1;
+  const items = await prisma.inspiration.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * 24, take: 24, select: { id: true, type: true, category: true, title: true, summary: true, coverImage: true, tags: true, published: true, createdAt: true, createdBy: { select: { username: true, displayName: true } } } });
+  function pageUrl(next: number) { const params = new URLSearchParams(); for (const [key,value] of Object.entries(searchParams)) if (value) params.set(key,value); params.set("page", String(next)); params.set("keepFilters", "1"); return `/operator/inspirations?${params}`; }
+  return <div className="flex flex-col gap-6 p-5 sm:p-8">
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="mb-2 text-xs font-medium tracking-widest text-muted-foreground">CONTENT LIBRARY</p><h1 className="text-2xl font-semibold">创作灵感管理</h1><p className="mt-2 text-sm text-muted-foreground">按主题组织素材与教程。已发布内容可供任何访客浏览。</p></div><div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link href="/inspirations" target="_blank"><ExternalLink data-icon="inline-start" />查看公开创作库</Link></Button><Button asChild><Link href="/operator/inspirations/new"><Plus data-icon="inline-start" />新建资源</Link></Button></div></header>
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[{ label: "全部资源", value: all }, { label: "已发布 · 公开可见", value: live }, { label: "草稿 · 仅后台可见", value: all-live }, { label: "创作素材", value: materials }].map((stat) => <Card key={stat.label} className="shadow-none"><CardHeader className="pb-3"><CardTitle className="text-sm text-muted-foreground">{stat.label}</CardTitle></CardHeader><CardContent className="text-3xl font-semibold tabular-nums">{stat.value}</CardContent></Card>)}</div>
+    <Card className="p-4 shadow-none"><InspirationListFilters /></Card>
+    <div className="flex items-center justify-between"><h2 className="font-semibold">资源列表</h2><span className="text-sm text-muted-foreground">共 {total} 条</span></div>
+    {items.length === 0 ? <Empty className="rounded-xl border border-dashed"><EmptyHeader><EmptyTitle>没有匹配的资源</EmptyTitle><EmptyDescription>调整筛选条件，或新建一份创作资源。</EmptyDescription></EmptyHeader></Empty> : <div className="overflow-x-auto rounded-xl border bg-card"><table className="w-full min-w-[800px] text-left text-sm"><thead className="border-b bg-muted/40 text-muted-foreground"><tr>{["资源", "类型 / 主题", "可见性", "创建人", "发布时间", "操作"].map((label) => <th key={label} scope="col" className="px-5 py-4 font-medium">{label}</th>)}</tr></thead><tbody className="divide-y">{items.map((item) => <tr key={item.id} className="hover:bg-muted/25"><td className="max-w-sm px-5 py-4"><Link className="flex items-center gap-3 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href={`/operator/inspirations/${item.id}`}><div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">{safeResourceUrl(item.coverImage) ? <img src={safeResourceUrl(item.coverImage)!} alt="" loading="lazy" className="size-full object-cover" /> : <FileText className="size-5 text-muted-foreground" />}</div><div className="min-w-0"><p className="truncate font-medium">{item.title}</p><p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{item.summary || "未填写简介"}</p></div></Link></td><td className="px-5 py-4"><p>{item.category ? MATERIAL_CATEGORY_LABEL[item.category as MaterialCategory] : INSPIRATION_TYPE_LABEL[item.type as InspirationType]}</p><p className="mt-1 text-xs text-muted-foreground">{item.tags.filter((value) => INSPIRATION_TOPICS.some((entry) => entry.label === value)).join(" / ") || "未分类 / 通用"}</p></td><td className="px-5 py-4"><Badge variant={item.published ? "secondary" : "outline"}>{item.published ? "已发布" : "草稿"}</Badge></td><td className="px-5 py-4">{item.createdBy?.displayName ?? item.createdBy?.username ?? "—"}</td><td className="whitespace-nowrap px-5 py-4 text-muted-foreground">{fmtDate(item.createdAt)}</td><td className="px-5 py-4"><Button asChild variant="outline" size="sm"><Link href={`/operator/inspirations/${item.id}`}>编辑</Link></Button></td></tr>)}</tbody></table></div>}
+    {pages > 1 && <nav aria-label="资源分页" className="flex items-center justify-center gap-4">{page > 1 ? <Button variant="outline" asChild><Link href={pageUrl(page-1)}>上一页</Link></Button> : <Button variant="outline" disabled>上一页</Button>}<span className="text-sm">{page} / {pages}</span>{page < pages ? <Button variant="outline" asChild><Link href={pageUrl(page+1)}>下一页</Link></Button> : <Button variant="outline" disabled>下一页</Button>}</nav>}
+  </div>;
 }

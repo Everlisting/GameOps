@@ -171,6 +171,177 @@ html, body {
   }
 }
 
+.inspiration-theme {
+  --color-brand-primary: #255c69;
+  --color-brand-primary-hover: #1d4954;
+  --color-brand-primary-soft: #ebf3f5;
+  --color-brand-accent: #b87328;
+  --color-brand-accent-soft: #fbf3e8;
+  --color-ink-button: #17191e;
+  --color-bg-canvas: #f6f5f2;
+  --color-bg-surface: #fff;
+  --color-bg-subtle: #efece6;
+  --color-border-hairline: rgb(23 25 30 / 0.08);
+  --color-border-strong: rgb(23 25 30 / 0.16);
+  --color-border-focus: rgb(37 92 105 / 0.36);
+  --color-text-primary: #17191e;
+  --color-text-secondary: #575d6b;
+  --color-text-tertiary: #878e9e;
+  --color-text-inverse: #fff;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+  --shadow-none: none;
+  --shadow-card: 0 2px 10px rgb(23 25 30 / 0.04), 0 0 0 1px rgb(23 25 30 / 0.06);
+  --shadow-card-hover: 0 10px 24px rgb(23 25 30 / 0.08), 0 0 0 1px rgb(37 92 105 / 0.22);
+  --shadow-float: 0 12px 32px rgb(23 25 30 / 0.12);
+  --shadow-focus: 0 0 0 3px rgb(37 92 105 / 0.16);
+  --color-file-badge: rgb(23 25 30 / 0.68);
+  --inspiration-transition: 240ms ease-out;
+
+  --background: var(--color-bg-canvas);
+  --foreground: var(--color-text-primary);
+  --card: var(--color-bg-surface);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-bg-surface);
+  --popover-foreground: var(--color-text-primary);
+  --primary: var(--color-ink-button);
+  --primary-foreground: var(--color-text-inverse);
+  --secondary: var(--color-brand-primary-soft);
+  --secondary-foreground: var(--color-brand-primary);
+  --accent-bg: var(--color-brand-primary-soft);
+  --accent-foreground: var(--color-brand-primary-hover);
+  --muted-bg: var(--color-bg-subtle);
+  --muted-foreground: var(--color-text-secondary);
+  --border-color: var(--color-border-hairline);
+  --color-border: var(--color-border-hairline);
+  --input: var(--color-border-strong);
+  --ring: var(--color-border-focus);
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.inspiration-theme :is([data-slot="button"], [data-slot="select-trigger"], [data-slot="select-item"]) {
+  border-radius: var(--radius-sm);
+  transition: color var(--inspiration-transition), background-color var(--inspiration-transition), border-color var(--inspiration-transition);
+}
+
+.inspiration-theme [data-slot="input"] {
+  transition: color var(--inspiration-transition), border-color var(--inspiration-transition), box-shadow var(--inspiration-transition);
+}
+
+.inspiration-theme [data-slot="badge"] { border-radius: var(--radius-xs); }
+
+.inspiration-theme [data-slot="button"][data-variant="default"]:hover {
+  background-color: var(--color-brand-primary-hover);
+}
+
+.inspiration-theme :is([data-slot="input"], [data-slot="select-trigger"]):hover {
+  border-color: var(--color-brand-primary);
+}
+
+.inspiration-theme :is([data-slot="input"], [data-slot="select-trigger"], [data-slot="button"]):focus-visible {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.inspiration-panel {
+  border-radius: var(--radius-lg);
+  background-color: var(--color-bg-surface);
+  box-shadow: var(--shadow-float);
+}
+
+.inspiration-card {
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--inspiration-transition), transform var(--inspiration-transition);
+}
+
+.inspiration-card:has(button:focus-visible) {
+  box-shadow: var(--shadow-focus), var(--shadow-card);
+}
+
+.inspiration-cover {
+  background-color: color-mix(in oklab, var(--color-bg-subtle) 78%, var(--color-brand-primary-soft));
+}
+
+.inspiration-document-art,
+.inspiration-media-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background:
+    repeating-linear-gradient(135deg, transparent 0 9px, var(--color-border-hairline) 9px 10px),
+    linear-gradient(135deg, var(--color-bg-canvas), var(--color-brand-primary-soft));
+  color: var(--color-brand-primary);
+}
+
+.inspiration-script-art {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 9px, var(--color-border-hairline) 9px 10px),
+    linear-gradient(135deg, var(--color-bg-subtle), var(--color-brand-accent-soft));
+}
+
+.inspiration-document-sheet {
+  display: flex;
+  width: 75%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: start;
+  gap: 0.45rem;
+  border: 1px solid var(--color-border-hairline);
+  border-radius: var(--radius-xs);
+  padding: clamp(6px, 1vw, 12px);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.inspiration-script-art svg { color: var(--color-brand-accent); }
+.inspiration-script-art .inspiration-document-sheet { color: var(--color-text-secondary); }
+.inspiration-document-lines {
+  width: 100%;
+  height: 1.25rem;
+  background: repeating-linear-gradient(to bottom, var(--color-border-strong) 0 1px, transparent 1px 6px);
+}
+
+.inspiration-template-layout {
+  display: grid;
+  width: 100%;
+  min-height: 1.75rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+
+.inspiration-template-layout span {
+  border-radius: var(--radius-xs);
+  background: var(--color-brand-primary-soft);
+}
+
+.inspiration-template-layout span:first-child { grid-row: span 2; }
+.inspiration-template-layout span:last-child { background: var(--color-bg-subtle); }
+
+@media (hover: hover) and (pointer: fine) {
+  .inspiration-card:hover { box-shadow: var(--shadow-card-hover); }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .inspiration-card:hover { transform: translateY(-2px); }
+  .inspiration-cover-image { transition: transform var(--inspiration-transition); }
+  .inspiration-card:hover .inspiration-cover-image { transform: scale(1.03); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspiration-card,
+  .inspiration-theme :is([data-slot="button"], [data-slot="input"], [data-slot="select-trigger"], [data-slot="select-item"]) { transition: none; }
+}
+
+@media (prefers-contrast: more) {
+  .inspiration-theme { --color-text-tertiary: var(--color-text-secondary); }
+}
+
 /* 隐藏轨道,保留滚轮、触控和键盘滚动。 */
 @utility no-scrollbar {
   scrollbar-width: none;

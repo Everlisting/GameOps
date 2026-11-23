@@ -3,7 +3,7 @@
 /**
  * 灵感资源上传组件:支持本地上传 OR 直接粘贴外链。
  *
- * 上传走 POST /api/operator/uploads/inspiration?kind=...,返回站内 URL 后写回 value。
+ * 上传走 POST /api/operator/uploads/inspiration?kind=...，以原文件作为请求体流式上传。
  * 也保留下方文本输入,用户可以粘贴任意 http(s) 链接(视频教程常用抖音/B 站外链)。
  *
  * 预览:
@@ -18,8 +18,7 @@ import { ExternalLink, File as FileIcon, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-type Kind = "cover" | "image" | "video" | "doc";
+import { INSPIRATION_UPLOAD_CONFIG, inspirationUploadSizeError, type InspirationUploadKind } from "@/lib/inspiration-upload";
 
 export default function UploadField({
   kind,
@@ -27,16 +26,18 @@ export default function UploadField({
   value,
   onChange,
   previewType = "none",
+  urlInputId,
   placeholder = "https://… 或点上方上传",
   showUrlInput = true,
   disabled,
 }: {
-  kind: Kind;
+  kind: InspirationUploadKind;
   /** input[accept] 字符串,例如 "image/*" 或 "video/mp4,video/webm" */
   accept: string;
   value: string;
   onChange: (v: string) => void;
   previewType?: "image" | "video" | "doc" | "none";
+  urlInputId?: string;
   placeholder?: string;
   showUrlInput?: boolean;
   disabled?: boolean;
@@ -51,14 +52,14 @@ export default function UploadField({
     e.target.value = "";
     if (!file) return;
     setError(null);
+    const sizeError = inspirationUploadSizeError(kind, file.size);
+    if (sizeError) { setError(sizeError); return; }
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("kind", kind);
-      const res = await fetch("/api/operator/uploads/inspiration", {
+      const res = await fetch(`/api/operator/uploads/inspiration?kind=${kind}`, {
         method: "POST",
-        body: form,
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
       });
       const data = await res.json();
       if (!res.ok) {
@@ -124,6 +125,8 @@ export default function UploadField({
         )}
       </div>
 
+      <p className="text-xs text-muted-foreground">单文件最大 {INSPIRATION_UPLOAD_CONFIG[kind].limitLabel}，保留原文件。</p>
+
       {/* 预览区 */}
       {value && previewType !== "none" && (
         <div className="overflow-hidden rounded-md border border-border bg-muted/30">
@@ -155,6 +158,7 @@ export default function UploadField({
       {/* 外链输入:用户也可以贴别处的 URL */}
       {showUrlInput && (
         <Input
+          id={urlInputId}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
