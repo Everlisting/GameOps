@@ -13,7 +13,7 @@
 - 部署:中台→阿里云;爬虫机→本地 Windows 内网(单向出站)
 
 ## 架构要点(详见 docs/architecture.md)
-- 三类角色层级:ADMIN ⊃ OPERATOR,CREATOR 独立对外。共用登录入口,按 role 跳转。
+- 后台权限为 ADMIN ⊃ OPERATOR ⊃ REVIEWER，CREATOR 独立。审核员从 `/operator/submissions` 进入本人分配的周期与作品。固定账号用于登录和审计，显示用户名可修改。具体数据范围见 [AGENTS.md](AGENTS.md) 与 `lib/roles.ts`。
 - 爬虫 Agent 拉模型:爬虫机轮询中台领任务、回传 CSV,中台不主动连爬虫机。
 - **Jenkins 风格 Job/Task**:Job 是模板(绑 Agent + repo + 命令模板 + 参数 schema + 产物清单 + 可选 cron),Task 是一次执行。Agent 并发=1;失败不自动重试,手动重跑克隆新 task。详见 `docs/agent-protocol.md`。
 - **关键动作走审计**:`task.trigger / cancel / requeue / rerun / priority` 都写 `AuditLog`(actorId + actorUsername 快照 + targetType/targetId + details JSON)。
@@ -66,7 +66,9 @@
 - **舆情监控 env**:`ANALYSIS_BASE_URL`(分析服务地址,dev 默认 `http://127.0.0.1:8000`)/ `ANALYSIS_SHARED_SECRET`(Bearer token,与分析服务同源)/ `OPINION_AES_KEY`(32 字节 base64,加密 apiKey 用)。缺失只 warn 不阻塞其他功能,首次触发接口时懒失败。
 - **分析服务本地起法**:`cd F:\Kaifa\data-hub\services\slg && docker compose up -d`(先在 shell 或该目录 `.env` 设 `ANALYSIS_SHARED_SECRET`)。中台 dev 侧同一台机器起 `pnpm dev` 即可。分析服务已迁入爬虫总集仓 `data-hub`(见 `docs/crawler-monorepo-plan.md`);旧 `slg_analyzer` 目录仅作回溯保留。
 
-## 开发阶段(当前:阶段 9 完成,舆情监控上线)
+## 阶段 1–9 交付记录
+
+后续新增的视频库审核、专题结算、BI 与公开素材库见 [README 业务模块](README.md#业务模块与文档)。
 1.✅地基+认证+RBAC+登录分流  2.✅创作者端MVP(活动/报名/投稿)  3.✅运营端核心(含创作灵感)
 4.✅爬虫链路+Agent
    4.1 ✅协议骨架 / 4.2 ✅parser+明细 / 4.3 ✅每日汇总 / 4.4 ✅运营 UI

@@ -9,11 +9,12 @@
 
 ## 项目定位
 
-三类角色,层级关系 `ADMIN ⊃ OPERATOR`,`CREATOR` 独立对外。
+后台权限按 `ADMIN ⊃ OPERATOR ⊃ REVIEWER` 分级，创作者独立登录 `/dashboard`。游客可在 `/inspirations` 浏览、分享和下载已发布素材。
 
 | 角色 | 入口 | 核心能力 |
 | --- | --- | --- |
 | **创作者** Creator | `/dashboard` | 浏览/报名活动、投稿、看个人数据与预估激励 |
+| **审核员** Reviewer | `/operator/submissions` | 查看本人获分配的周期和视频，逐条审核，维护个人资料 |
 | **运营** Operator | `/operator/*` | 活动/稿件/创作者/采集任务全栈管理 + BI 大屏 |
 | **管理员** Admin | `/operator/*` + `/operator/admin/*` | 运营全部 + Job 模板 CRUD + 爬虫机管理 + 用户管理 |
 
@@ -30,11 +31,11 @@
 | 鉴权 | 自建 argon2 哈希 + jose 签 JWT,httpOnly cookie | middleware 在 Edge,只能用 jose |
 | 校验 | Zod | 接口入参 + Job paramSchema + CSV 行 |
 | UI | Tailwind v4 + shadcn/ui(radix-ui 命名空间) | 约定见 `docs/ui-conventions.md` |
-| 图表 | ECharts | BI 大屏(阶段 7) |
+| 图表 | Recharts | BI 按作品发布时间筛选，手动刷新 |
 | 调度 | node-cron + cron-parser | Job 定时;`instrumentation.ts` 进程级启动 |
 | Excel | xlsx (SheetJS) | EXCEL 类型参数客户端解析 |
 | 爬虫端 | Python 3.10+(独立仓 + agent-reference 骨架) | 仅 HTTP 通信,Bearer token |
-| 外发 | 飞书群自定义机器人 webhook | 阶段 6 接 |
+| 外发 | 飞书群自定义机器人 webhook | 运营日报与消息外发 |
 | 部署 | 阿里云(中台)/ 本地 Windows + 任务计划程序(爬虫机) | 单向出站 |
 
 ---
@@ -46,6 +47,7 @@ gameops/
 ├─ app/
 │  ├─ (auth)/login/                        登录页(/login)
 │  ├─ (creator)/dashboard/                 创作者工作台(/dashboard)
+│  ├─ inspirations/                       公开素材库(/inspirations)
 │  ├─ operator/                            运营 / 管理员后台(/operator/*)
 │  │  ├─ tasks/                            采集任务(Job 视图 + 触发 + 执行历史)
 │  │  ├─ datasets/                         入库数据集 / 留底文件
@@ -53,7 +55,7 @@ gameops/
 │  │  └─ admin/                            ADMIN 专属:Job 模板 / 爬虫机 / 运营账户
 │  └─ api/
 │     ├─ agent/                            爬虫机调用(Bearer 鉴权)
-│     ├─ operator/                         OPERATOR 接口
+│     ├─ operator/                         后台接口，按操作校验角色与数据范围
 │     └─ admin/                            管理员接口
 ├─ components/ui/                          shadcn 原语(radix-ui 命名空间)
 ├─ lib/                                    跨层共享:auth / rbac / db / api / validation / parsers
@@ -70,7 +72,7 @@ gameops/
 ### 1. 鉴权 & RBAC
 
 - `lib/auth.ts` / `lib/session.ts`:argon2 + jose 签 JWT,默认 7 天
-- `lib/rbac.ts`:`requireRole("OPERATOR" | "ADMIN")` 服务端兜底
+- `lib/rbac.ts`:页面与接口按所需角色鉴权，审核服务另校验视频归属
 - `middleware.ts`:Edge,路由级第一道关
 
 ### 2. 爬虫调度(Jenkins 风格)
@@ -131,9 +133,10 @@ pnpm install
 
 # 2. .env 配置(参考 .env.example)
 #    DATABASE_URL=postgres://...
-#    JWT_SECRET=...
+#    AUTH_SECRET=...
 
-# 3. 跑 migration
+# 3. 生成 Prisma Client，再对开发库应用迁移
+pnpm db:generate
 pnpm db:migrate
 
 # 4. (可选)种子数据
@@ -162,21 +165,7 @@ pnpm test             # vitest 单元 / 集成
 
 ## 爬虫机接入
 
-完整步骤见 `docs/agent-setup-guide.md` 和 `agent-reference/README.md`。最短路径:
-
-```powershell
-# 在管理员账号:/operator/admin/agents/new 拿到 token
-# 把 agent-reference/ 整目录拷到爬虫机
-cd D:\crawler\agent-reference
-pip install -r requirements.txt
-copy .env.example .env        # 填 CRAWLER_BASE_URL + CRAWLER_TOKEN
-
-# 用任务计划程序注册 heartbeat(每分钟)和 executor(开机启动)
-schtasks /create /xml ".\tasks\heartbeat.xml" /tn "GameOps Crawler Heartbeat"
-schtasks /create /xml ".\tasks\executor.xml"  /tn "GameOps Crawler Executor"
-schtasks /run /tn "GameOps Crawler Heartbeat"
-schtasks /run /tn "GameOps Crawler Executor"
-```
+管理员创建爬虫机并取得 Token 后，将 `agent-reference/` 复制到 Windows 机器，通过 `install.cmd -BaseUrl "<中台地址>" -Token "<agentId>.<secret>"` 注册常驻计划任务。安装条件和更新步骤见 [Agent 安装手册](agent-reference/README.md)。
 
 ---
 
@@ -185,45 +174,26 @@ schtasks /run /tn "GameOps Crawler Executor"
 - **禁止 `any`**:不确定用 `unknown` 再收窄
 - API 必走 `lib/api.ts` 的 `route()` 包,Zod 校验入参,错误抛 `AppError`
 - DB 必走 `lib/db.ts` 的 `prisma` 单例
-- 受保护页/接口 `requireRole("OPERATOR" | "ADMIN")` 兜底(中间件是第一道,这是第二道)
+- 受保护页/接口 按角色调用 `requireRole` 兜底(中间件是第一道,这是第二道)
 - middleware 运行在 Edge,**只能** 用 jose,不能 import argon2 / prisma
 - 改数据模型:`schema.prisma` → migrate → 写代码;不手写 DDL
 - 提交前:`pnpm typecheck && pnpm test`
 
 ---
 
-## 开发阶段(2026-06 状态)
+## 业务模块与文档
 
-| 阶段 | 状态 | 内容 |
-| --- | :-: | --- |
-| 1 | ✅ | 地基 + 认证 + RBAC + 登录分流 |
-| 2 | ✅ | 创作者端 MVP(活动 / 报名 / 投稿) |
-| 3 | ✅ | 运营端核心(含创作灵感) |
-| 4 | ✅ | 爬虫链路 + Agent(已完成 Jenkins 风格重构) |
-|   |    | · 4.5 重构:Job 模板 + 命令模板 + 并发=1 + cron + 实时日志 |
-|   |    | · 时区统一 UTC 存 / 北京时间显示 |
-|   |    | · 审计日志 `AuditLog`(trigger/cancel/rerun/requeue) |
-|   |    | · Excel 参数 / 可选产物 / glob 通配 / 留底入库 |
-| 5 | 🔜 | 激励引擎(规则块组合 + 半自动结算) |
-| 6 | 🔜 | 每日汇总 + 飞书 webhook + cron 兜底 |
-| 7 | 🔜 | BI 大屏(ECharts + 预聚合) |
-| 8 | 🔜 | 管理员面板(审计日志查看 / 权限细化) |
-
----
-
-## 文档导航
-
-| 文档 | 谁该看 | 内容 |
+| 业务入口 | 使用方式 | 详细说明 |
 | --- | --- | --- |
-| `README.md` | 新接手 | 你正在读的,索引 + 总览 |
-| `CLAUDE.md` | Claude Code | 强约束,跟代码同步更新 |
-| `docs/architecture.md` | 架构 / 后端 | 模块划分 / 数据三层 / 协议 / Schema 草案 |
-| `docs/agent-protocol.md` | 爬虫开发 / 后端 | Agent ↔ 中台 HTTP 协议契约 |
-| `docs/agent-setup-guide.md` | 运维 / 部署 | 从拿 token 到 Windows 任务计划程序的完整操作 |
-| `docs/ui-conventions.md` | 前端 | shadcn 封装规则 / 筛选条 / 表单控件 |
-| `agent-reference/README.md` | 爬虫机运维 | 同目录下 Python 参考实现的部署手册 |
+| 稿件管理 | 运营建立统计周期并分配视频，审核员逐条判定并选择标签。运营可按作品查看审核历史。 | [审核与分配](docs/submissions-design.md) |
+| 活动管理 | 征稿活动接受报名投稿，按活动规则预估激励。专题活动从视频库匹配作品，对通过审核的作品试算奖池，并在确认时冻结结果。 | [专题活动与结算](docs/special-activities.md) |
+| 运营概览与 BI | 概览跟进项目、审核、活动和舆情。BI 按发布时间分析作品传播、达人排行和审核质量。 | [BI 指标口径](docs/bi-dashboard-design.md) |
+| 创作灵感 | 运营发布教程和多文件素材，游客与创作者按主题、类型检索，可预览、分享或下载。 | [公开素材库](docs/inspirations.md) |
+| 运营助手与舆情 | 检索知识库、查询项目数据，查看公域、私域和对比报告。 | [知识库编辑](docs/knowledge-editor.md) · [舆情分析](docs/opinion-monitor.md) |
 
----
+按角色阅读 [创作者手册](docs/user-guides/creator-guide.html)、[运营与审核手册](docs/user-guides/operator-guide.html) 或 [管理员手册](docs/user-guides/admin-guide.html)。
+
+开发与部署参考 [系统架构](docs/architecture.md)、[UI 约定](docs/ui-conventions.md)、[Agent 协议](docs/agent-protocol.md)、[爬虫机接入](docs/agent-setup-guide.md) 和 [阿里云部署指南](docs/deploy-aliyun-guide.html)。协作规则见 [AGENTS.md](AGENTS.md)。
 
 ## 反馈 / 提交
 

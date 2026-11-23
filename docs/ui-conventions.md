@@ -195,7 +195,7 @@ export default function MyFilters() {
 
 - 简单单选:`app/operator/admin/operators/_components/OperatorUserCreateForm.tsx`(角色)
 - 受控 + 禁用:`app/operator/admin/operators/_components/OperatorUserEditForm.tsx`(角色/状态 + `disabled={isSelf}`)
-- 表格紧凑工具条(`size="sm"`):`app/operator/submissions/_components/SubmissionsTable.tsx`(批量审核)
+- 审核周期下拉筛选见 `app/operator/submissions/_components/ReviewPeriodSelect.tsx`。视频列表与单条审核弹窗分别见 `VideoReviewTable.tsx` 和 `VideoReviewDialog.tsx`（同目录）。
 - 复杂表单内多 Select:`app/operator/activities/_components/RewardRulesEditor.tsx`(规则类型 + 指标)
 - 日期筛选:`app/(creator)/_components/ActivityFilters.tsx`
 - DateTime 表单字段:`app/operator/activities/_components/ActivityForm.tsx`

@@ -1,9 +1,6 @@
 # 游戏运营中台 — 架构设计文档
 
-> 版本:v0.2(设计草案) · 技术栈:Next.js + Node + TypeScript,爬虫端 Python
-> 本文档用于团队评审与开发对齐,确定后进入编码阶段。
-> v0.2 变更:确定部署(阿里云+本地爬虫机)、Python Agent、数据三层策略、
-> 飞书 webhook 同步、CSV→表映射改为代码内定义、激励规则组合引擎。
+> 依据 2026-11-23 工作区实现整理。数据模型以 [Prisma Schema](../prisma/schema.prisma) 为准。
 
 ---
 
@@ -14,7 +11,7 @@
 - **多角色分流**:登录后按角色跳转到不同工作台。
 - **内容运营闭环**:创作者投稿 → 运营审核管理 → 活动激励结算。
 - **分布式数据采集**:多台本地 Windows 爬虫机执行 Python 爬虫,CSV 回传中台入库。
-- **数据可视化与外发**:BI 大屏(分钟级刷新),每日汇总数据推送飞书群。
+- **数据可视化与外发**:BI 大屏按页面请求或手动刷新,每日汇总数据推送飞书群。
 
 ---
 
@@ -25,7 +22,7 @@
 | 角色 | 入口 | 核心功能 |
 |------|------|----------|
 | 创作者 Creator | 创作者工作台 | 参与活动、投稿、查看预估激励、个人数据 |
-| 审核 Reviewer | 稿件审核工作台 | 稿件查看、单条/批量审核、个人账户设置 |
+| 审核 Reviewer | 稿件审核工作台 | 查看本人分配的周期与视频、逐条审核、个人账户设置 |
 | 运营 Operator | 运营后台 | BI 大屏、稿件管理、创作者管理、活动管理、启动爬虫任务 |
 | 管理员 Admin | 运营后台 + 管理面板 | 运营全部功能 + 爬虫任务管理 + 机器管理 + 用户权限管理 |
 
@@ -35,9 +32,9 @@
 
 **实现**:RBAC。用户表带 `role`;中间件按"所需最低角色"判断(接口要求 Operator,则 Operator 与 Admin 均通过)。后续权限若需细化,再平滑升级为"角色-权限点"模型,初期不过度设计。
 
-**登录**:账密自建。密码 argon2/bcrypt 哈希;会话用 JWT(httpOnly cookie)。创作者与运营**共用登录入口**,按 `role` 跳转不同首页。
+**登录**:账密自建。密码 argon2 哈希;会话用 JWT(httpOnly cookie)。创作者与运营**共用登录入口**,按 `role` 跳转不同首页。
 
-运营/管理员账户分为「用户名」与「账号名称」:数据库 `User.displayName` 为可修改的显示昵称(1–32 字符,支持中文、不要求唯一),`User.username` 为账号名称(3–32 位字母、数字、下划线、点或短横线,全局唯一、创建后不可修改)。管理员创建时填写两者,本人可在 `/operator/account` 修改用户名。旧账户未设置昵称时显示账号名称。运营会话从数据库读取最新昵称;登录、审计快照仍使用固定账号名称,外键仍用 `User.id`。创作者的用户名与 `Creator.nickname` 行为保持原样。
+后台账户分为「用户名」与「账号名称」:数据库 `User.displayName` 为可修改的显示昵称(1–32 字符,支持中文、不要求唯一),`User.username` 为账号名称(3–32 位字母、数字、下划线、点或短横线,全局唯一、创建后不可修改)。管理员创建时填写两者,本人可在 `/operator/account` 修改用户名。旧账户未设置昵称时显示账号名称。运营会话从数据库读取最新昵称;登录、审计快照仍使用固定账号名称,外键仍用 `User.id`。创作者的用户名与 `Creator.nickname` 行为保持原样。
 
 ---
 
@@ -47,10 +44,10 @@
 |----|------|------|
 | 前端 | Next.js 14 (App Router) + React + TS | 创作者端与运营端按路由分组隔离 |
 | UI/样式 | Tailwind CSS + shadcn/ui | 运营后台表格/表单密集,组件库提效 |
-| 图表/大屏 | ECharts | 大屏复杂可视化首选 |
+| 图表/大屏 | Recharts | 作品发布趋势、播放变化与审核分布 |
 | 后端 | Next.js Route Handlers + Node | 一体化;调度逻辑可后续拆独立服务 |
 | 数据库 | PostgreSQL + Prisma | 数据量小(总量约 10w),关系型足够 |
-| 缓存/队列 | Redis | BI 指标缓存、会话(任务队列亦可先用 DB) |
+| 采集队列 | PostgreSQL | Agent 从 CrawlerTask 领取任务 |
 | 校验 | Zod | API 入参 + CSV 行校验 |
 | 鉴权 | 自建(argon2 + JWT) | 账密登录 |
 | 测试 | Vitest + Playwright | 单元/集成 + E2E |
@@ -75,7 +72,7 @@
 │  │ 认证/RBAC │ 业务 API  │ BI 聚合   │ 爬虫调度 API       │  │
 │  └──────────┴──────────┴──────────┴───────────────────┘  │
 │  ┌─────────────┐   ┌─────────────┐   ┌────────────────┐  │
-│  │ PostgreSQL  │   │   Redis      │   │ 飞书 webhook    │──┼──> 飞书群
+│  │ PostgreSQL  │   │  采集任务队列 │   │ 飞书 webhook    │──┼──> 飞书群
 │  └─────────────┘   └─────────────┘   └────────────────┘  │
 └───────────────────────▲─────────────────────────────────┘
                         │ 出站轮询 / 回传 (HTTPS)  ※单向
@@ -95,10 +92,10 @@
 ## 5. 模块划分
 
 ### 5.1 创作者端
-活动浏览与报名、投稿与状态查看、预估激励查看、个人数据。
+创作者在工作台报名、投稿并查看预估激励。公开素材库 `/inspirations` 与工作台共用查询和浏览组件，仅展示已发布资源。见[创作灵感](inspirations.md)。
 
 ### 5.2 运营端
-BI 大屏、稿件管理(审核/筛选/批量)、创作者管理、活动管理(含激励规则配置)、启动爬虫任务。
+运营概览汇总项目、稿件、活动、舆情。运营按周期分配视频，审核结果写入 `VideoStat`，独立于征稿记录 `Submission`。专题活动从视频库匹配作品，计奖读取审核结果。见[稿件管理](submissions-design.md)与[专题结算](special-activities.md)。
 
 ### 5.3 管理员端(运营端之上)
 爬虫任务管理(定义/绑定机器/调度/历史日志)、机器管理(心跳/在线状态)、用户与权限管理。
@@ -130,6 +127,7 @@ PENDING ──claim──▶ RUNNING ──result(success)──▶ SUCCEEDED
 |------|------|------|
 | `/api/agent/heartbeat` | POST | 心跳,1 分钟一次,中台判 10 分钟无心跳为离线 |
 | `/api/agent/tasks/claim` | POST | 原子领任务(SKIP LOCKED + NOT EXISTS 保证并发=1) |
+| `/api/agent/tasks/<id>/prepare` | POST | 执行前记录实际源码版本和执行环境，与建任务时保存的模板快照配合，供重跑复现 |
 | `/api/agent/tasks/<id>/log` | POST | 流式推子进程输出;同时作为**取消信号通道**(4xx 视为取消) |
 | `/api/agent/tasks/<id>/result` | POST | multipart 上传:status + files + csvTypes(可含 null) |
 
@@ -171,22 +169,17 @@ model AuditLog {
 
 CSV 多、表与 CSV 非一一对应(有汇总取舍)。映射关系**写在代码内**(放弃可视化建表),数据分三层:
 
-1. **原始层 staging**:Agent 回传 CSV 原样落地(通用原始记录表,每行存 JSON + 元数据:来源任务、csvType、采集时间)。忠实留底,不做业务判断。
-2. **明细层 detail(只留最新)**:按 csvType 对应的解析器(代码内定义 + Zod 校验)处理,**upsert 覆盖**,每个作品只保留最新数据。
-3. **每日汇总层 daily summary**:每天定时跑一次,对全部作品当天数据做汇总快照(每天一行/一批),**此层承担历史趋势**——日积月累形成时间序列。
+1. 原始文件按产物类型留底，`RawDataset` 记录来源、文件位置及解析结果。
+2. `lib/parsers/` 按 csvType 解析，更新视频、主播或直播明细。视频采集保留人工审核结果。
+3. `DailyVideoStat` 保存视频按日快照，供 BI 比较同一作品前后两天的播放量。
 
-每种 CSV 新增时:代码内加一个解析器(列映射 + Zod schema + 目标表 upsert 逻辑)。因 CSV 较多,建议抽象统一的"解析器注册"机制,新增 CSV 只实现一个解析器接口。
+### 6.3 飞书同步
 
-### 6.3 每日汇总 + 飞书同步
+管理员配置接收日报的群机器人和日报内容。飞书应用的群聊与双向消息使用长连接，见[飞书连接配置](feishu-ws-hot-reload.md)。
 
-- 定时任务跑出每日汇总表后,通过**飞书群自定义机器人 webhook** 推送一张消息/表格卡片到群。
-- webhook 方式无需申请应用、无需审批,中台 POST 卡片 JSON 即可。
-- 配置项:webhook URL(及可选签名密钥)放环境变量;推送内容/格式做成模板。
+### 6.4 BI 统计
 
-### 6.4 BI 大屏:分钟级刷新
-
-数据来源:明细层 + 每日汇总层 + 业务数据(稿件/活动/创作者)。
-分钟级需求 → **预聚合 + 缓存**,不上实时推送:定时(1–5 分钟)聚合写 Redis/聚合表,前端按间隔轮询。图表用 ECharts。
+大屏按北京时间的作品发布日期选取有效视频。累计播放量取所选作品的最新值，每日播放变化只比较相邻两日都有快照的作品。按页面请求读取，支持手动刷新。日期边界、审核指标与排行见 [BI 统计口径](bi-dashboard-design.md)。
 
 ### 6.5 预估激励:组合规则引擎(半自动) — 阶段 5 已落地
 
@@ -222,186 +215,20 @@ CSV 多、表与 CSV 非一一对应(有汇总取舍)。映射关系**写在代�
 
 ---
 
-## 7. 数据库 Schema 草案
+## 7. 数据模型
 
-```prisma
-enum Role { CREATOR OPERATOR ADMIN }
+| 业务 | 主要模型与关系 |
+| --- | --- |
+| 征稿活动 | `Activity` 关联报名、`Submission` 投稿与每位创作者的 `Incentive` |
+| 视频审核 | `SubmissionPeriod` 按日期定义统计范围；`VideoReviewAssignment` 按视频唯一分配。实际审核人、结果和审核时间保存在 `VideoStat`，标签引用 `ReviewTag`，修改记录写入 `AuditLog` |
+| 专题活动 | `SpecialActivity` 按规则匹配有效视频；确认结算时保存配置、审核结果与计奖快照 |
+| 创作灵感 | `Inspiration.files` 保存有序附件，首项同步主链接，旧单链接资源继续可读 |
 
-// ── 用户与权限 ──
-model User {
-  id           String   @id @default(cuid())
-  username     String   @unique
-  passwordHash String
-  role         Role
-  status       String   @default("active")
-  createdAt    DateTime @default(now())
-  creator      Creator?
-}
-
-model Creator {
-  id          String  @id @default(cuid())
-  userId      String  @unique
-  user        User    @relation(fields: [userId], references: [id])
-  nickname    String
-  tier        String?
-  platforms   Json?
-  submissions Submission[]
-  incentives  Incentive[]
-}
-
-// ── 活动 / 稿件 / 激励 ──
-model Activity {
-  id          String   @id @default(cuid())
-  name        String
-  status      String                          // draft/ongoing/ended
-  startAt     DateTime
-  endAt       DateTime
-  rewardRules Json                            // 组合规则配置(供引擎读取)
-  submissions Submission[]
-}
-
-model Submission {
-  id         String    @id @default(cuid())
-  creatorId  String
-  activityId String?
-  title      String
-  url        String
-  platform   String
-  status     String    @default("pending")    // pending/approved/rejected
-  reviewNote String?
-  createdAt  DateTime  @default(now())
-  creator    Creator   @relation(fields: [creatorId], references: [id])
-  activity   Activity? @relation(fields: [activityId], references: [id])
-}
-
-// 阶段5 已落地 · (creatorId, activityId) 唯一一行;重算覆盖 estimated/breakdown/computedAt,人工 adjusted 保留
-model Incentive {
-  id           String    @id @default(cuid())
-  creatorId    String
-  activityId   String                                // 阶段5 起,激励必绑活动(原可空)
-  estimated    Decimal   @db.Decimal(12, 2)          // 引擎最新一次计算结果
-  adjusted     Decimal?  @db.Decimal(12, 2)          // 人工调整;null = 沿用 estimated
-  adjustedById String?
-  adjustedAt   DateTime?
-  adjustReason String?
-  breakdown    Json      @default("[]")              // IncentiveContribution[] 快照
-  computedAt   DateTime  @default(now())
-  status       String    @default("estimated")       // estimated/settled
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  creator    Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  adjustedBy User?    @relation("adjustedIncentives", fields: [adjustedById], references: [id], onDelete: SetNull)
-
-  @@unique([creatorId, activityId])
-  @@index([activityId])
-  @@index([creatorId, status])
-}
-
-// ── 爬虫:机器 / 任务 / 执行 ──
-model CrawlerMachine {
-  id         String    @id          // machine_id
-  name       String
-  secretHash String
-  lastSeenAt DateTime?
-  status     String    @default("offline")
-}
-
-model CrawlerTask {
-  id              String   @id @default(cuid())
-  name            String
-  csvType         String                // 产出 CSV 类型(对应代码内解析器)
-  targetMachineId String?               // 指定机器,空=任意可用
-  schedule        String?               // cron,空=仅手动
-  config          Json
-  enabled         Boolean  @default(true)
-  runs            CrawlerRun[]
-}
-
-model CrawlerRun {
-  id         String    @id @default(cuid())
-  taskId     String
-  machineId  String?
-  status     String    @default("pending")  // pending/claimed/running/succeeded/failed
-  claimedAt  DateTime?
-  finishedAt DateTime?
-  rowsOk     Int       @default(0)
-  rowsFailed Int       @default(0)
-  errorMsg   String?
-  rawFileRef String?                         // 归档原始 CSV 引用
-  task       CrawlerTask @relation(fields: [taskId], references: [id])
-}
-
-// ── 数据三层 ──
-
-// 原始层:所有回传 CSV 原样落地
-model RawRecord {
-  id          String   @id @default(cuid())
-  runId       String
-  csvType     String
-  payload     Json                            // 单行原始数据
-  collectedAt DateTime @default(now())
-  @@index([csvType, collectedAt])
-}
-
-// 明细层:只留最新(示例,实际每种业务对象一张)
-model WorkDetail {
-  id          String   @id @default(cuid())
-  workKey     String   @unique                // 业务主键,用于 upsert
-  title       String?
-  platform    String?
-  views       Int      @default(0)
-  likes       Int      @default(0)
-  updatedAt   DateTime @updatedAt
-  // ... 按需扩展字段
-}
-
-// 每日汇总层:承担历史趋势,每天一批
-model DailySummary {
-  id          String   @id @default(cuid())
-  date        DateTime                         // 汇总日期
-  metric      String                           // 指标名
-  value       Decimal
-  dims        Json?                            // 维度(平台/活动等)
-  createdAt   DateTime @default(now())
-  @@index([date, metric])
-}
-```
-
-> `WorkDetail` / `DailySummary` 为示意。明细表只 upsert 留最新;趋势看 `DailySummary`(每日快照累积)。
-
----
+字段、索引与唯一约束见 [Prisma Schema](../prisma/schema.prisma)，变更历史见 [migrations](../prisma/migrations)。
 
 ## 8. 部署与网络
 
-- **中台**:阿里云服务器,常驻 Node + PostgreSQL + Redis。配 HTTPS 域名(供爬虫机出站访问)。
-- **爬虫机**:本地 Windows,Python Agent 做成 Windows 服务开机自启;只需能出网访问中台域名。
-- **网络**:单向出站,中台无需访问爬虫机内网。开发期 Agent → `localhost:3000`,上线改为阿里云域名。
-- **环境变量**:Zod 校验(见 `lib/validation/env.ts`),含 DB、Redis、JWT 密钥、飞书 webhook URL。
-
----
-
-## 9. 开发路线(分阶段)
-
-1. **地基**:骨架 + CLAUDE.md + 错误/环境/DB 单例(已具备)+ 用户表 + 认证 + RBAC 中间件。
-2. **创作者端 MVP**:登录分流、活动浏览、投稿、稿件状态。
-3. **运营端核心**:稿件管理、创作者管理、活动管理(含激励规则表单)。
-4. **爬虫链路**:机器/任务/执行模型 + Agent 协议接口 + Python Agent 雏形 + 一种 csvType 解析入库(三层)打通。
-5. ✅ **激励引擎**:七类规则块 + `cap`/`cpmCap` 双上限 + 聚合层 + `Incentive` 表 + 创作者预估 / 运营结算明细 UI + 人工调整审计(`incentive.compute` / `incentive.adjust`)。
-6. **每日汇总 + 飞书**:汇总定时任务 + webhook 推送。
-7. ✅ **BI 大屏**:`/operator/bi` 路由 + `aggregateDashboard` 单次 server 聚合 + shadcn `Card` 容器 + `ChartLineInteractive` 风格 30 天投稿/通过趋势 + 4 张 `ChartPieDonutText` 维度切片 + KPI sparkline + 浏览器 Fullscreen API 全屏壳。
-8. ✅ **管理员面板**:`/operator/admin/*` 下 — 运营账户(operators)/ 爬虫 Job / 爬虫机 agents / csvType 管理 + **审计日志查看**(`audit-logs`):近 60 天硬底窗口、操作人/动作/目标类型/起止时间多维筛选(URL 同步、变更回到 page=1)、详情 Dialog 渲染 details JSON、可选每页 25/50/100/200 条。
-9. **完善**:其余 csvType 解析器、调度自动化、测试与监控。
-
----
-
-## 10. 待确认事项(剩余)
-
-- 各 csvType 的具体列定义 → 用于编写对应解析器与明细/汇总表(可在阶段 4 起逐个补充)。
-- ~~激励规则的具体规则块类型与参数~~ — 阶段 5 已确定七类(见 §6.5)。
-- 每日汇总推送飞书的具体内容与卡片样式。
-- 创作者绑定的外部平台有哪些(影响 platforms 字段与采集)。
+中台在阿里云 ECS 以 PM2 单实例运行，Nginx 提供 HTTPS，业务数据保存在 PostgreSQL。进程内调度器和后台任务随中台启动。Windows 采集机通过计划任务运行 Agent，主动出站领取任务。首次部署、上传限制与持久化目录见[阿里云部署指南](deploy-aliyun-guide.html)。
 
 ## 附:已放弃/简化的方案(记录决策)
 

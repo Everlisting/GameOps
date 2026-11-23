@@ -118,18 +118,18 @@
     <!-- 2 -->
     <section id="operators">
       <h2><span class="n">2</span>运营账户</h2>
-      <p class="lead"><span class="path">/operator/admin/operators</span> · 创建与维护后台账户(仅 OPERATOR / ADMIN;创作者账号在「创作者管理」处理)。</p>
+      <p class="lead"><span class="path">/operator/admin/operators</span> · 创建与维护后台账户（支持审核员、运营和管理员；创作者在「创作者管理」维护）。</p>
       <h4>列表</h4>
       <ul>
-        <li>筛选:角色(运营 / 管理员)、状态(启用 / 停用)、用户名搜索。</li>
+        <li>筛选:角色（审核员 / 运营 / 管理员）、状态(启用 / 停用)、用户名搜索。</li>
         <li>列:用户名 · 邮箱 · 角色徽标 · 状态 · 创建时间。右上「新建账户」。</li>
       </ul>
       <ol class="steps">
-        <li><b>新建账户</b>填用户名、初始密码、角色。密码以 argon2 哈希存储。</li>
+        <li><b>新建账户</b>填写固定账号名称、显示用户名、初始密码和角色。固定账号用于登录，创建后不可更名；显示用户名支持中文、可重复，本人可在账户设置修改。密码以 argon2 哈希存储。</li>
         <li><b>编辑</b>调整资料/角色或重置密码。</li>
         <li><b>启停</b>停用后该账户无法登录。</li>
       </ol>
-      <div class="tip">最小授权原则:日常审核/运营给 OPERATOR;只有需要管机器、账户、外发的人才给 ADMIN。</div>
+      <div class="tip">仅负责审核的人员选 REVIEWER。启用账户后，由运营在稿件周期详情分配视频；审核员登录即进入本人任务。负责分配、标签与活动结算的人员选 OPERATOR，账户与系统配置由 ADMIN 管理。</div>
     </section>
 
     <!-- 3 -->

@@ -119,66 +119,49 @@
       <h2><span class="n">1</span>登录与角色</h2>
       <p class="lead">与创作者共用登录入口。用运营/管理员账号登录后,自动进入 <span class="path">/operator/dashboard</span>。</p>
       <ul>
-        <li><b>角色层级</b>:管理员(ADMIN)⊃ 运营(OPERATOR)。管理员比运营多一整组「管理面板」。</li>
-        <li><b>账号来源</b>:运营/管理员账号由管理员在「运营账户管理」中创建,<b>不能自行注册</b>(注册入口只产出创作者账号)。</li>
+        <li><b>角色层级</b>:管理员（ADMIN）⊃ 运营（OPERATOR）⊃ 审核员（REVIEWER）。审核员登录后进入 <code>/operator/submissions</code>，仅处理分配给自己的稿件。管理员比运营多一整组「管理面板」。</li>
+        <li><b>账号来源</b>:审核、运营和管理员账号由管理员在「运营账户管理」中创建,<b>不能自行注册</b>(注册入口只产出创作者账号)。</li>
       </ul>
     </section>
 
     <!-- 2 -->
     <section id="layout">
       <h2><span class="n">2</span>界面导览</h2>
-      <p class="lead">左侧导航 + 右侧内容。顶部品牌显示「GameOps · 运营后台」。</p>
+      <p class="lead">左侧为 GameOps 运营中台导航，右侧显示当前工作区。</p>
 
       <h3>2.1 左侧导航分组</h3>
-      <p><b>运营工作区</b>(所有人可见):概览、BI 大屏、项目数据、活动管理、舆情监控、稿件管理、创作者管理、创作灵感、AI 助手、采集任务、采集数据。<br>
+      <p><b>运营工作区</b>（运营和管理员可见）:概览、BI 大屏、项目数据、活动管理、舆情监控、稿件管理、创作者管理、创作灵感、AI 助手、采集任务、采集数据。<br>
       <b>管理面板</b> <span class="adminonly">仅管理员</span>:运营账户、爬虫 Job、爬虫机、csvType 管理、飞书外发、审计日志、运行错误。</p>
-      <p>多数菜单有二级项(如活动管理下的「全部/进行中/草稿/已结束」),点一级进默认页,点二级带筛选进入。</p>
+      <p>「活动管理」下可选专题活动或征稿活动。审核员的「审核工作区」只展示稿件入口。</p>
 
       <h3>2.2 左下角账户菜单</h3>
-      <p>显示你的用户名 + 角色徽标(<span class="pill p-info">管理员</span> 或 <span class="pill p-mut">运营</span>)。下拉含:<b>账户设置</b>、<b>深色/浅色模式</b>切换、<b>退出登录</b>。</p>
+      <p>显示你的用户名和角色。下拉含：<b>账户设置</b>、<b>深色/浅色模式</b>切换、<b>退出登录</b>。</p>
       <div class="tip">带日期时间的筛选统一用日期时间选择器;下拉统一用 Select 组件;URL 会同步筛选条件,便于分享带筛选的链接。</div>
     </section>
 
     <!-- 3 -->
     <section id="overview">
       <h2><span class="n">3</span>概览</h2>
-      <p class="lead"><span class="path">/operator/dashboard</span> · 聚焦「当前要跟进」的指标与待办。</p>
-      <h4>5 张统计卡(点击跳转到对应列表)</h4>
-      <div class="tblwrap"><table>
-        <thead><tr><th>卡片</th><th>含义 / 跳转</th></tr></thead>
-        <tbody>
-          <tr><td><span class="pill p-warn">待审稿件</span></td><td>待审核投稿总数 → 稿件待审。</td></tr>
-          <tr><td><span class="pill p-warn">待审创作者</span></td><td>注册待审核人数 → 创作者待审。</td></tr>
-          <tr><td><span class="pill p-ok">进行中活动</span></td><td>进行中活动数 → 活动列表。</td></tr>
-          <tr><td><span class="pill p-info">本月报名</span></td><td>本自然月报名总数。</td></tr>
-          <tr><td><span class="pill p-info">本月投稿</span></td><td>本自然月投稿总数。</td></tr>
-        </tbody>
-      </table></div>
-      <h4>待办区</h4>
-      <ul>
-        <li><b>待审稿件</b>——每条显示创作者头像、标题、平台、活动、时间,以及三维审核进度标 <span class="pill p-info">标</span><span class="pill p-info">内</span><span class="pill p-info">易</span>。点击进入审核页。</li>
-        <li><b>最近审核动作</b>——最近通过/驳回记录。</li>
-        <li><b>待审创作者</b> 与 <b>进行中活动</b>——右列快捷入口。</li>
-      </ul>
+      <p><span class="path">/operator/dashboard</span> 分四块展示。项目数据默认统计北京时间本月，可切换最近 12 个月；视频播放量为当月所发作品的当前累计值，直播按月汇总，主播人数取全库名单。</p>
+      <p>稿件区显示全库有效视频的审核进度、未分配数和最近两个审核中周期。活动区列出最多四个进行中的专题或征稿活动，按截止日从近到远排列。舆情区展示任务数和最近三项任务。</p>
+      <p>月份只影响项目数据。点击刷新可重新读取四块数据，舆情服务超时时其他三块仍可查看。</p>
     </section>
 
     <!-- 4 -->
     <section id="bi">
       <h2><span class="n">4</span>BI 大屏</h2>
-      <p class="lead"><span class="path">/operator/bi</span> · 数据可视化看板,适合投屏。</p>
-      <ul>
-        <li>交互式折线图(趋势)、环形图(占比)等,基于平台明细数据聚合。</li>
-        <li>支持浏览器全屏模式,用于会议/投屏。</li>
-      </ul>
+      <p><span class="path">/operator/bi</span> 按北京时间的作品发布日期筛选，排除隐藏及无发布日期的视频。默认范围为最近一个有作品的日期向前 30 天，止日最晚为昨天，可选区间最长 366 天。页面支持手动刷新和全屏。</p>
+      <p>播放量表示入选作品当前累计播放量。要看增长，请看「每日可比播放变化」，它仅比较相邻两天均有快照的同一作品；缺数据的日期留空。审核合格率的分母为已审核作品，审核进度的分母为全部入选作品。</p>
+      <p>可查看达人与作品排行、作品分层和平台分布。底部活动、审核周期及舆情展示当前状态。</p>
     </section>
 
     <!-- 5 -->
     <section id="data">
       <h2><span class="n">5</span>项目数据</h2>
-      <p class="lead">三张明细表:主播 / 视频 / 直播。均支持<b>手动导入</b>(补录、回填)与<b>导出</b>,爬虫上报复用同一套解析器。三页默认只看本月,可用日期筛选查往月;顶部有统计卡,支持排序与分页(每页条数可选)。</p>
+      <p class="lead">三张明细表:主播 / 视频 / 直播。均支持<b>手动导入</b>(补录、回填)与<b>导出</b>,爬虫上报复用同一套解析器。视频和直播默认显示本月，可按业务日期查往月；主播名单单独按入会日期筛选;顶部有统计卡,支持排序与分页(每页条数可选)。</p>
 
       <h3>5.1 主播数据 <span class="path">/operator/data/streamers</span></h3>
-      <p>以<b>名单</b>为基表(即使本月没发作品,主播也在列),数值列由视频与直播明细按 UID 聚合而来。</p>
+      <p>以主播名单为基表，按平台和 UID 汇总视频与直播指标。本月没有作品的主播仍在名单内。</p>
       <h4>列</h4>
       <div class="tblwrap"><table>
         <thead><tr><th>来源</th><th>字段</th></tr></thead>
@@ -193,7 +176,7 @@
       <ul>
         <li><b>导入</b>(右上)——上传名单表,识别列:主播平台 / UID(必需)/ 昵称 / 抖音号 / 入会时间 / 团号 / 运营经纪人 / 招募经纪人 / 粉丝量;按(平台, UID)去重更新,<b>只写身份字段、缺列不覆盖</b>。</li>
         <li><b>导出</b>——导出当前筛选结果。</li>
-        <li><b>搜索 / 团号</b>——作用于名单;<b>日期窗口</b>——同时收窄视频与直播聚合区间(不影响主播是否在列)。</li>
+        <li>搜索、团号和入会时间筛选主播名单。视频与直播按平台和 UID 汇总，默认统计北京时间本月 1 日至今天，期间没有作品的主播仍保留。</li>
         <li>表头可点击排序。</li>
       </ul>
       <div class="note">源表无「直播场次」列,故本页无此指标;被隐藏/删除的作品不计入统计。</div>
@@ -224,12 +207,14 @@
     <!-- 6 -->
     <section id="activities">
       <h2><span class="n">6</span>活动管理</h2>
-      <p class="lead">创建活动、配置激励规则、推动状态流转。</p>
+      <p class="lead">征稿活动接收报名和投稿；专题活动从视频库匹配作品。两者各自计算奖励。</p>
 
-      <h3>6.1 活动列表 <span class="path">/operator/activities</span></h3>
+      <h3>专题活动 <span class="path">/operator/special-activities</span></h3>
+      <p>设置日期、标题关键词、达人 UID 或作品名单，配置奖池并试算。在「稿件明细」查看命中与排除原因。仅审核合格的稿件参与计奖；若有待审稿件，先完成审核再刷新预估。满足截止及数据条件后，确认结算会冻结本次结果。</p>
+      <h3>6.1 征稿活动列表 <span class="path">/operator/activities</span></h3>
       <ul>
-        <li><b>右上「新建活动」</b>——进入创建表单。</li>
-        <li><b>筛选</b>——搜索(活动名)+ 日期范围;左侧二级菜单按状态:全部 / 进行中 / 草稿 / 已结束。</li>
+        <li>点击右上角「新建征稿活动」进入创建表单。</li>
+        <li><b>筛选</b>——搜索(活动名)+ 日期范围;在列表中按状态筛选:全部 / 进行中 / 草稿 / 已结束。</li>
         <li><b>卡片</b>——封面 + 状态徽标 + 活动名 + 描述 + 起止 + 报名/投稿数;草稿若设了定时发布,右上角有「定时发布」小标。点卡进详情。</li>
       </ul>
 
@@ -260,7 +245,7 @@
 
     <!-- 7 -->
     <section id="incentive">
-      <h2><span class="n">7</span>激励结算</h2>
+      <h2><span class="n">7</span>征稿活动激励</h2>
       <p class="lead">激励引擎按你配置的规则,为「报名 ∪ 投稿」的候选人计算金额。</p>
 
       <h3>7.1 七类规则块</h3>
@@ -289,29 +274,13 @@
     <!-- 8 -->
     <section id="submissions">
       <h2><span class="n">8</span>稿件审核</h2>
-      <p class="lead"><span class="path">/operator/submissions</span> · 三维独立评审:标题 / 内容 / 易闪。</p>
-
-      <h3>8.1 汇总卡片视图(默认)</h3>
-      <p>稿件按活动汇总成卡片(按活动开始月份分段),每卡显示该活动三态稿件计数。筛选:搜索(活动名 / 抖音昵称 / 抖音号 / 易闪 ID)+ 日期范围 + 左侧状态菜单。<b>点卡片进入该活动的审核表格。</b>右上「导入易闪结果」见 8.3。</p>
-
-      <h3>8.2 审核表格(点卡片进入)</h3>
-      <p>进入某活动后,顶部有「当前活动」提示 + 筛选(可加平台筛选)+ 分页;表格列出该活动稿件,支持批量审核。左上「返回活动汇总」。</p>
-      <h4>三维审核</h4>
-      <div class="tblwrap"><table>
-        <thead><tr><th>维度</th><th>标</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr><td>标题</td><td><span class="pill p-info">标</span></td><td>标题是否合规、契合活动主题。</td></tr>
-          <tr><td>内容</td><td><span class="pill p-info">内</span></td><td>作品内容质量与合规性。</td></tr>
-          <tr><td>易闪</td><td><span class="pill p-info">易</span></td><td>易闪维度校验(可配合易闪结果导入)。</td></tr>
-        </tbody>
-      </table></div>
+      <p>从「全部稿件」进入 <span class="path">/operator/submissions</span>。周期按北京时间的作品发布时间统计视频库，可覆盖未参加征稿活动的作品。</p>
       <ol class="steps">
-        <li><b>逐维评审</b>三张子卡片各自给出通过/驳回并可填备注,<b>独立保存</b>。</li>
-        <li><b>得出最终态</b>系统汇总三维得出投稿最终状态(<span class="pill p-warn">待审核</span> / <span class="pill p-ok">已通过</span> / <span class="pill p-bad">未通过</span>),备注对创作者可见。</li>
+        <li><b>创建与分配（运营、管理员）</b>　创建周期后点「查看详情」，从有效、待审且未分配的视频中，按组均分或按人指定数量。先预览再确认；可用数量变化时重新预览。重叠周期内同一作品只分配一次，已有分配的周期仅能改名称和状态。</li>
+        <li><b>进入审核</b>　审核员点周期卡「前往审核」，仅看到本人分配的作品。运营和管理员可在周期详情点「进入稿件审核」。在 <span class="path">/operator/submissions/review</span> 选择审核活动会同步日期范围。</li>
+        <li><b>逐条保存</b>　点标题旁的审核按钮打开指定作品，或点「开始审核」从当前范围内最早的待审作品开始。预览视频，选择合格或不合格，并选到该分支最后一个可用标签（最多三级）。可填写备注，再选择保存并关闭或「保存并审核下一条」。</li>
+        <li><b>核对记录</b>　运营和管理员可在列表右侧查看审核人、时间、结果、标签和备注。周期标记为冻结后仍按最新视频数据统计。易闪结果导入属于征稿记录，由运营或管理员操作。</li>
       </ol>
-
-      <h3>8.3 导入易闪结果</h3>
-      <p><span class="path">/operator/submissions/import-yishan</span> · 批量回填易闪维度的数据/结论,减少逐条操作。</p>
     </section>
 
     <!-- 9 -->
@@ -333,11 +302,8 @@
     <!-- 10 -->
     <section id="inspiration">
       <h2><span class="n">10</span>创作灵感</h2>
-      <p class="lead"><span class="path">/operator/inspirations</span> · 维护给创作者的资源库。</p>
-      <ul>
-        <li>三类内容:视频教程 / 文档教程 / 创作素材;左侧二级菜单可按类型或「草稿」筛选。</li>
-        <li>新建条目可填标题、摘要、正文/链接、封面、标签;先存<b>草稿</b>,发布后才对创作者可见。</li>
-      </ul>
+      <p>在 <span class="path">/operator/inspirations</span> 创建或编辑资源，选择主题、类型和标签。保存为草稿后可继续编辑；发布后，游客即可通过 <span class="path">/inspirations</span> 浏览和分享。</p>
+      <p>每项最多 30 个附件，可混合图片、视频、音频、文档和 ZIP。首项为主文件，可调整顺序或设为主文件。上传失败时重试或移除失败项，再保存。单文件上限为封面 5 MB、图片 50 MB、视频 500 MB、音频 100 MB、文档和 ZIP 1 GB。</p>
     </section>
 
     <!-- 11 -->
@@ -413,7 +379,7 @@
       <h2><span class="n">15</span>账户设置</h2>
       <p class="lead"><span class="path">/operator/account</span> · 由左下角账户菜单进入。</p>
       <ul>
-        <li>顶部卡片显示用户名、邮箱、角色徽标、账号状态、创建/更新时间。</li>
+        <li>可修改显示用户名。固定账号名称用于登录与审计。顶部卡片显示邮箱、角色徽标、账号状态、创建/更新时间。</li>
         <li><b>账户安全</b>:修改邮箱;修改登录密码(<b>需当前密码</b>)。</li>
         <li>账号的角色与状态由管理员维护,本页不可自改。</li>
       </ul>
@@ -421,7 +387,8 @@
 
     <!-- Appendix -->
     <section id="perm">
-      <h2><span class="n">A</span>权限速查:运营 vs 管理员</h2>
+      <h2><span class="n">A</span>权限速查</h2>
+      <p>审核员可查看本人获分配的周期和稿件、逐条审核、维护本人账户。分配、标签管理、审核日志和易闪导入要求运营或管理员权限。下表列出运营与管理员的权限。</p>
       <div class="tblwrap"><table>
         <thead><tr><th>功能</th><th>运营 OPERATOR</th><th>管理员 ADMIN</th></tr></thead>
         <tbody>

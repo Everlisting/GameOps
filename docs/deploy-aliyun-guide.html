@@ -396,7 +396,7 @@ curl -H "Authorization: Bearer $ANALYSIS_SHARED_SECRET" http://127.0.0.1:8000/he
 <div class="card">
 <ul class="chk">
   <li><code>https://yourdomain.com/login</code> 能打开，证书有效（绿锁）。</li>
-  <li>用管理员账号登录成功，按 role 正确跳转（ADMIN/OPERATOR → <code>/operator</code>，CREATOR → <code>/dashboard</code>）。</li>
+  <li>按角色验证登录首页：管理员和运营进入 <code>/operator/dashboard</code>，审核员进入 <code>/operator/submissions</code> 并只看到本人分配的稿件，创作者进入 <code>/dashboard</code>。退出登录后可访问 <code>/inspirations</code> 并查看已发布素材。</li>
   <li><code>pm2 status</code> 显示 <code>gameops</code> online，重启计数为 0。</li>
   <li><code>pm2 logs gameops</code> 中可见 cron-scheduler / downloader 启动日志，无 <code>DATABASE_URL</code> / 连接报错。</li>
   <li>后台能建 Job / 触发 Task（若爬虫机 Agent 已就绪）。</li>
@@ -408,6 +408,8 @@ curl -H "Authorization: Bearer $ANALYSIS_SHARED_SECRET" http://127.0.0.1:8000/he
 
 <!-- ============ 12 UPDATE ============ -->
 <h2 class="sec" id="update"><span class="n">12</span>更新与回滚</h2>
+<h3>升级已有环境：视频审核与素材库</h3>
+<p>升级到视频库审核时，先应用版本迁移并生成对应 Prisma Client，在开放新版审核工作台前运行 <code>pnpm exec tsx prisma/backfill-video-reviews.ts</code>。脚本按平台和作品 ID 从历史征稿记录继承审核结果、备注和标签，输出 copied / skipped 计数，可重复执行。旧素材链接自动作为单文件读取。</p>
 <h3>日常更新（无破坏性迁移）</h3>
 <pre><button class="copy">复制</button><code>cd /opt/gameops
 git pull
